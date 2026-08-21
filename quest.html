@@ -1,0 +1,3216 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Test — Meta Quest Viewer v12</title>
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      window.QUEST_MODE = params.get('mode') === 'mr' ? 'mr' : 'vr';
+      var stored = 100;
+      try {
+        var parsed = Number(window.localStorage.getItem('moja-test-mr-scale'));
+        if (Number.isFinite(parsed)) stored = parsed;
+      } catch (error) {
+        stored = 100;
+      }
+      window.MOJA_START_SCALE = Math.max(10, Math.min(500, stored));
+    })();
+  </script>
+  <script src="https://aframe.io/releases/1.8.0/aframe.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      background: radial-gradient(circle at 50% 34%, #1f2a3a 0%, #0b1220 72%);
+    }
+    .topbar {
+      position: fixed;
+      z-index: 1000;
+      inset: 14px 14px auto 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .pill {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 0 15px;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 999px;
+      background: rgba(15,23,42,.86);
+      color: #fff;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 800;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 28px rgba(0,0,0,.20);
+    }
+    .title { pointer-events: none; color: #dbeafe; }
+    .enter { background: #2563eb; border-color: #60a5fa; cursor: pointer; }
+    .enter.mr { background: #16a34a; border-color: #4ade80; }
+    .legend {
+      position: fixed;
+      z-index: 1000;
+      left: 50%;
+      bottom: 16px;
+      transform: translateX(-50%);
+      width: min(94vw, 1060px);
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      pointer-events: none;
+    }
+    .legend span {
+      padding: 6px 9px;
+      border: 1px solid rgba(255,255,255,.09);
+      border-radius: 999px;
+      background: rgba(15,23,42,.78);
+      color: #dbeafe;
+      font-size: 11px;
+      backdrop-filter: blur(10px);
+    }
+    .landing {
+      position: fixed;
+      z-index: 1100;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      pointer-events: none;
+    }
+    .card {
+      width: min(94vw, 720px);
+      padding: 22px;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 24px;
+      background: rgba(15,23,42,.90);
+      color: #fff;
+      text-align: center;
+      backdrop-filter: blur(15px);
+      box-shadow: 0 24px 70px rgba(0,0,0,.36);
+      pointer-events: auto;
+    }
+    .version { color: #93c5fd; font-size: 11px; font-weight: 900; letter-spacing: .10em; }
+    .version.mr { color: #86efac; }
+    h1 { margin: 7px 0 6px; font-size: clamp(24px, 4vw, 36px); }
+    p { margin: 6px auto; max-width: 630px; color: #cbd5e1; line-height: 1.45; font-size: 14px; }
+    .scale-box {
+      display: grid;
+      grid-template-columns: 130px 1fr;
+      align-items: center;
+      gap: 12px;
+      width: min(100%, 590px);
+      margin: 18px auto 8px;
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(30,41,59,.78);
+      text-align: left;
+    }
+    .scale-box label { color: #e2e8f0; font-size: 13px; font-weight: 800; }
+    .scale-input { display: grid; grid-template-columns: 110px 1fr; gap: 10px; align-items: center; }
+    input[type="number"] {
+      width: 100%;
+      min-height: 42px;
+      padding: 0 12px;
+      border: 1px solid #475569;
+      border-radius: 12px;
+      background: #0f172a;
+      color: #fff;
+      font-size: 17px;
+      font-weight: 800;
+    }
+    input[type="range"] { width: 100%; accent-color: #22c55e; }
+    .presets, .actions, .controls { display: flex; justify-content: center; flex-wrap: wrap; gap: 7px; }
+    .presets { margin-top: 9px; }
+    .controls { margin: 15px 0 4px; }
+    .controls span { padding: 6px 9px; border-radius: 999px; background: #1e293b; color: #dbeafe; font-size: 11px; }
+    .actions { margin-top: 18px; }
+    .button, .preset {
+      min-height: 42px;
+      padding: 0 15px;
+      border: 1px solid rgba(255,255,255,.13);
+      border-radius: 999px;
+      background: #334155;
+      color: #fff;
+      font-weight: 850;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .preset { min-height: 34px; padding: 0 12px; font-size: 12px; }
+    .button { display: inline-flex; align-items: center; justify-content: center; }
+    .button.primary { background: #2563eb; border-color: #60a5fa; }
+    .button.primary.mr { background: #16a34a; border-color: #4ade80; }
+    .note { margin-top: 10px; color: #94a3b8; font-size: 11px; }
+    @media (max-width: 720px) {
+      .title { display: none; }
+      .legend span { font-size: 10px; }
+      .scale-box { grid-template-columns: 1fr; text-align: center; }
+      .scale-input { grid-template-columns: 100px 1fr; }
+      .controls { display: none; }
+      .card { padding: 18px; }
+    }
+  </style>
+  <script>
+  (function () {
+    'use strict';
+
+    var MOJA = window.MOJA = {
+      UP: new THREE.Vector3(0, 1, 0),
+      clamp: function (value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      },
+      formatNumber: function (value, decimals) {
+        if (!Number.isFinite(value)) return '—';
+        return value.toFixed(decimals).replace('.', ',');
+      },
+      formatMetres: function (value) {
+        if (!Number.isFinite(value)) return '—';
+        return MOJA.formatNumber(value, value >= 10 ? 1 : 2);
+      },
+      formatDistance: function (metres) {
+        if (!Number.isFinite(metres)) return '—';
+        return MOJA.formatNumber(metres, 3) + ' m  •  ' + Math.round(metres * 1000) + ' mm';
+      },
+      formatScaleRatio: function (scale) {
+        if (!Number.isFinite(scale) || scale <= 0) return '—';
+        if (Math.abs(scale - 1) < 0.005) return '1:1';
+        if (scale < 1) return '1:' + MOJA.formatNumber(1 / scale, 2);
+        return MOJA.formatNumber(scale, 2) + ':1';
+      },
+      getInteractiveEl: function (intersection) {
+        if (!intersection || !intersection.object) return null;
+        var current = intersection.object;
+        var fallback = null;
+        while (current) {
+          if (current.el) {
+            if (!fallback) fallback = current.el;
+            var classes = current.el.classList;
+            if (classes && (
+              classes.contains('ui-click') ||
+              classes.contains('measure-target') ||
+              classes.contains('teleportable') ||
+              classes.contains('ray-target')
+            )) return current.el;
+          }
+          current = current.parent;
+        }
+        return fallback;
+      },
+      isObjectInside: function (object, root) {
+        var current = object;
+        while (current) {
+          if (current === root) return true;
+          current = current.parent;
+        }
+        return false;
+      },
+      intersectionNormalY: function (intersection) {
+        if (!intersection || !intersection.face || !intersection.object) return 1;
+        var normal = intersection.face.normal.clone();
+        normal.transformDirection(intersection.object.matrixWorld);
+        return normal.y;
+      },
+      disableShadows: function (sceneEl, root) {
+        if (sceneEl && sceneEl.renderer && sceneEl.renderer.shadowMap) {
+          sceneEl.renderer.shadowMap.enabled = false;
+          sceneEl.renderer.shadowMap.autoUpdate = false;
+          sceneEl.renderer.shadowMap.needsUpdate = false;
+        }
+        if (!root) return;
+        root.traverse(function (node) {
+          if (!node.isMesh) return;
+          node.castShadow = false;
+          node.receiveShadow = false;
+        });
+      },
+      addEdges: function (root) {
+        if (!root) return;
+        var meshes = [];
+        root.traverse(function (node) {
+          if (node.isMesh && node.geometry && !node.userData.mojaEdgeOverlay) meshes.push(node);
+        });
+        meshes.forEach(function (mesh) {
+          if (mesh.userData.mojaEdgesAdded || !mesh.geometry.attributes || !mesh.geometry.attributes.position) return;
+          mesh.userData.mojaEdgesAdded = true;
+          var geometry;
+          try {
+            geometry = new THREE.EdgesGeometry(mesh.geometry, 32);
+          } catch (error) {
+            return;
+          }
+          var position = geometry.getAttribute('position');
+          if (!position || position.count === 0) {
+            geometry.dispose();
+            return;
+          }
+          var material = new THREE.LineBasicMaterial({
+            color: 0x26384c,
+            transparent: true,
+            opacity: window.QUEST_MODE === 'mr' ? 0.34 : 0.28,
+            depthTest: true,
+            depthWrite: false,
+            toneMapped: false
+          });
+          var lines = new THREE.LineSegments(geometry, material);
+          lines.name = '__MOJA_EDGES__';
+          lines.userData.mojaEdgeOverlay = true;
+          lines.renderOrder = 4;
+          lines.raycast = function () {};
+          mesh.add(lines);
+        });
+      },
+      setEdgesVisible: function (root, visible) {
+        if (!root) return;
+        root.traverse(function (node) {
+          if (node.userData && node.userData.mojaEdgeOverlay) node.visible = Boolean(visible);
+        });
+      }
+    };
+
+    AFRAME.registerComponent('model-normalizer', {
+      schema: { pivot: {type: 'selector'} },
+      init: function () {
+        this.done = false;
+        this.onLoaded = this.onLoaded.bind(this);
+        this.el.addEventListener('model-loaded', this.onLoaded);
+        if (this.el.getObject3D('mesh')) window.setTimeout(this.onLoaded, 0);
+      },
+      onLoaded: function () {
+        if (this.done || !this.data.pivot) return;
+        var mesh = this.el.getObject3D('mesh');
+        if (!mesh) return;
+        this.done = true;
+
+        MOJA.disableShadows(this.el.sceneEl, mesh);
+        MOJA.addEdges(mesh);
+
+        var pivotObject = this.data.pivot.object3D;
+        var assetObject = this.el.object3D;
+        var savedPosition = pivotObject.position.clone();
+        var savedQuaternion = pivotObject.quaternion.clone();
+        var savedScale = pivotObject.scale.clone();
+        var savedVisible = pivotObject.visible;
+
+        pivotObject.position.set(0, 0, 0);
+        pivotObject.quaternion.identity();
+        pivotObject.scale.set(1, 1, 1);
+        pivotObject.visible = true;
+        assetObject.position.set(0, 0, 0);
+        assetObject.updateMatrixWorld(true);
+
+        var box = new THREE.Box3().setFromObject(assetObject);
+        var center = box.getCenter(new THREE.Vector3());
+        assetObject.position.x -= center.x;
+        assetObject.position.y -= box.min.y;
+        assetObject.position.z -= center.z;
+        assetObject.updateMatrixWorld(true);
+        box.setFromObject(assetObject);
+        var size = box.getSize(new THREE.Vector3());
+
+        pivotObject.position.copy(savedPosition);
+        pivotObject.quaternion.copy(savedQuaternion);
+        pivotObject.scale.copy(savedScale);
+        pivotObject.visible = savedVisible;
+        pivotObject.updateMatrixWorld(true);
+
+        var detail = {asset: this.el, pivot: this.data.pivot, size: size.clone()};
+        this.el.emit('model-normalized', detail, false);
+        this.el.sceneEl.emit('model-normalized', detail, false);
+      },
+      remove: function () {
+        this.el.removeEventListener('model-loaded', this.onLoaded);
+      }
+    });
+
+    AFRAME.registerComponent('look-at-camera', {
+      schema: {camera: {type: 'selector'}, yawOnly: {default: true}},
+      init: function () {
+        this.cameraPosition = new THREE.Vector3();
+        this.ownPosition = new THREE.Vector3();
+        this.lookPosition = new THREE.Vector3();
+      },
+      tick: function () {
+        if (!this.data.camera) return;
+        this.data.camera.object3D.getWorldPosition(this.cameraPosition);
+        this.el.object3D.getWorldPosition(this.ownPosition);
+        this.lookPosition.copy(this.cameraPosition);
+        if (this.data.yawOnly) this.lookPosition.y = this.ownPosition.y;
+        this.el.object3D.lookAt(this.lookPosition);
+      }
+    });
+
+    AFRAME.registerComponent('metric-grid', {
+      schema: {size: {type: 'number', default: 20}, divisions: {type: 'int', default: 20}, opacity: {type: 'number', default: 0.16}},
+      init: function () { this.build(); },
+      update: function () { this.build(); },
+      build: function () {
+        if (this.grid) {
+          this.el.removeObject3D('mesh');
+          this.grid.geometry.dispose();
+          var oldMaterials = Array.isArray(this.grid.material) ? this.grid.material : [this.grid.material];
+          oldMaterials.forEach(function (material) { material.dispose(); });
+        }
+        this.grid = new THREE.GridHelper(
+          Math.max(2, this.data.size),
+          Math.max(2, this.data.divisions),
+          0x53677d,
+          0xa8b5c4
+        );
+        var materials = Array.isArray(this.grid.material) ? this.grid.material : [this.grid.material];
+        materials.forEach(function (material) {
+          material.transparent = true;
+          material.opacity = this.data.opacity;
+          material.depthWrite = false;
+        }, this);
+        this.grid.position.y = 0.004;
+        this.el.setObject3D('mesh', this.grid);
+      },
+      remove: function () {
+        if (!this.grid) return;
+        this.el.removeObject3D('mesh');
+        this.grid.geometry.dispose();
+        var materials = Array.isArray(this.grid.material) ? this.grid.material : [this.grid.material];
+        materials.forEach(function (material) { material.dispose(); });
+      }
+    });
+
+    AFRAME.registerComponent('trigger-ray', {
+      schema: {
+        objects: {default: '.ray-target'},
+        marker: {type: 'selector'},
+        color: {type: 'color', default: '#38BDF8'},
+        far: {type: 'number', default: 50}
+      },
+      init: function () {
+        this.active = false;
+        this.currentIntersection = null;
+        this.onTriggerDown = this.setActive.bind(this, true);
+        this.onTriggerUp = this.handleTriggerUp.bind(this);
+        this.configure = this.configure.bind(this);
+        this.el.addEventListener('triggerdown', this.onTriggerDown);
+        this.el.addEventListener('triggerup', this.onTriggerUp);
+        this.el.addEventListener('controllerconnected', this.configure);
+        window.setTimeout(this.configure, 0);
+      },
+      configure: function () {
+        this.el.setAttribute('raycaster', {
+          objects: this.data.objects,
+          far: this.data.far,
+          showLine: false,
+          lineColor: this.data.color,
+          lineOpacity: 0.95,
+          interval: 0
+        });
+        this.refresh();
+        if (this.data.marker) this.data.marker.object3D.visible = false;
+      },
+      refresh: function () {
+        var raycaster = this.el.components.raycaster;
+        if (raycaster && raycaster.refreshObjects) raycaster.refreshObjects();
+      },
+      setActive: function (active) {
+        this.active = active;
+        this.el.setAttribute('raycaster', 'showLine', active);
+        if (!active && this.data.marker) this.data.marker.object3D.visible = false;
+      },
+      setColor: function (color) {
+        this.el.setAttribute('raycaster', 'lineColor', color);
+        if (this.data.marker) this.data.marker.setAttribute('color', color);
+      },
+      handleTriggerUp: function () {
+        this.el.emit('moja-ray-select', {
+          intersection: this.currentIntersection,
+          targetEl: MOJA.getInteractiveEl(this.currentIntersection)
+        }, false);
+        this.setActive(false);
+      },
+      tick: function () {
+        var raycaster = this.el.components.raycaster;
+        var intersections = raycaster && raycaster.intersections;
+        this.currentIntersection = intersections && intersections.length ? intersections[0] : null;
+        if (!this.active || !this.data.marker) return;
+        if (!this.currentIntersection) {
+          this.data.marker.object3D.visible = false;
+          return;
+        }
+        this.data.marker.object3D.position.copy(this.currentIntersection.point);
+        this.data.marker.object3D.visible = true;
+      },
+      remove: function () {
+        this.el.removeEventListener('triggerdown', this.onTriggerDown);
+        this.el.removeEventListener('triggerup', this.onTriggerUp);
+        this.el.removeEventListener('controllerconnected', this.configure);
+      }
+    });
+
+    AFRAME.registerComponent('measurement-tool', {
+      schema: {
+        target: {type: 'selector'},
+        pointA: {type: 'selector'},
+        pointB: {type: 'selector'},
+        line: {type: 'selector'},
+        label: {type: 'selector'},
+        labelText: {type: 'selector'},
+        color: {type: 'color', default: '#F59E0B'}
+      },
+
+      init: function () {
+        this.enabled = false;
+        this.points = [null, null];
+        this.worldA = new THREE.Vector3();
+        this.worldB = new THREE.Vector3();
+        this.pathX = new THREE.Vector3();
+        this.pathXY = new THREE.Vector3();
+        this.midpoint = new THREE.Vector3();
+        this.localA = new THREE.Vector3();
+        this.localB = new THREE.Vector3();
+        this.localPathX = new THREE.Vector3();
+        this.localPathXY = new THREE.Vector3();
+        this.targetScale = new THREE.Vector3(1, 1, 1);
+        this.axisVisuals = {};
+        this.createAxisVisuals();
+        this.styleMainLabel();
+        this.clear();
+      },
+
+      createElement: function (tag, attributes, parent) {
+        var element = document.createElement(tag);
+        Object.keys(attributes || {}).forEach(function (name) {
+element.setAttribute(name, attributes[name]);
+        });
+        (parent || this.el).appendChild(element);
+        return element;
+      },
+
+      createAxisVisual: function (axis, color) {
+        var line = this.createElement('a-entity', {
+line: 'start: 0 0 0; end: 0 0 0; color: ' + color + '; opacity: 0.96',
+visible: 'false'
+        });
+        var label = this.createElement('a-entity', {
+'look-at-camera': 'camera: #camera; yawOnly: false',
+scale: '0.34 0.34 0.34',
+visible: 'false'
+        });
+        this.createElement('a-plane', {
+width: '1.06',
+height: '0.145',
+color: '#0B1220',
+opacity: '0.48',
+material: 'shader: flat; transparent: true; depthWrite: false'
+        }, label);
+        var text = this.createElement('a-text', {
+value: axis,
+align: 'center',
+anchor: 'center',
+baseline: 'center',
+width: '0.98',
+color: color,
+position: '0 0 0.006'
+        }, label);
+        return {line: line, label: label, text: text, color: color};
+      },
+
+      createAxisVisuals: function () {
+        this.axisVisuals.x = this.createAxisVisual('ΔX', '#EF4444');
+        this.axisVisuals.y = this.createAxisVisual('ΔY', '#22C55E');
+        this.axisVisuals.z = this.createAxisVisual('ΔZ', '#3B82F6');
+      },
+
+      styleMainLabel: function () {
+        if (!this.data.label) return;
+        var plane = this.data.label.querySelector('a-plane');
+        if (plane) {
+plane.setAttribute('width', 1.78);
+plane.setAttribute('height', 0.245);
+plane.setAttribute('opacity', 0.58);
+plane.setAttribute('material', 'shader: flat; transparent: true; depthWrite: false');
+        }
+        if (this.data.labelText) {
+this.data.labelText.setAttribute('width', 1.64);
+this.data.labelText.setAttribute('color', '#FDE68A');
+        }
+      },
+
+      setEnabled: function (enabled) {
+        this.enabled = Boolean(enabled);
+      },
+
+      toggle: function () {
+        this.setEnabled(!this.enabled);
+        return this.enabled;
+      },
+
+      isEnabled: function () {
+        return this.enabled;
+      },
+
+      pointFromIntersection: function (intersection) {
+        if (!intersection || !intersection.point) return null;
+        var worldPoint = intersection.point.clone();
+        var targetObject = this.data.target && this.data.target.object3D;
+        if (targetObject && MOJA.isObjectInside(intersection.object, targetObject)) {
+targetObject.updateMatrixWorld(true);
+return {
+  space: 'target',
+  value: targetObject.worldToLocal(worldPoint)
+};
+        }
+        return {space: 'world', value: worldPoint};
+      },
+
+      resolvePoint: function (stored, output) {
+        if (!stored) return null;
+        output.copy(stored.value);
+        if (stored.space === 'target' && this.data.target) {
+this.data.target.object3D.updateMatrixWorld(true);
+this.data.target.object3D.localToWorld(output);
+        }
+        return output;
+      },
+
+      addIntersection: function (intersection) {
+        if (!this.enabled) return false;
+        var point = this.pointFromIntersection(intersection);
+        if (!point) return false;
+        if (this.points[0] && this.points[1]) this.clear();
+        if (!this.points[0]) this.points[0] = point;
+        else this.points[1] = point;
+        this.updateVisual();
+        return true;
+      },
+
+      hideAxisVisual: function (visual) {
+        if (!visual) return;
+        visual.line.object3D.visible = false;
+        visual.label.object3D.visible = false;
+      },
+
+      clear: function () {
+        this.points[0] = null;
+        this.points[1] = null;
+        if (this.data.pointA) this.data.pointA.object3D.visible = false;
+        if (this.data.pointB) this.data.pointB.object3D.visible = false;
+        if (this.data.line) this.data.line.object3D.visible = false;
+        if (this.data.label) this.data.label.object3D.visible = false;
+        this.hideAxisVisual(this.axisVisuals.x);
+        this.hideAxisVisual(this.axisVisuals.y);
+        this.hideAxisVisual(this.axisVisuals.z);
+      },
+
+      setLine: function (element, start, end, color) {
+        element.setAttribute('line', {
+start: start,
+end: end,
+color: color,
+opacity: 0.96
+        });
+        element.object3D.visible = true;
+      },
+
+      setAxisVisual: function (visual, start, end, value, axis) {
+        var length = start.distanceTo(end);
+        if (length < 0.00005) {
+this.hideAxisVisual(visual);
+return;
+        }
+        this.setLine(visual.line, start, end, visual.color);
+        this.midpoint.copy(start).add(end).multiplyScalar(0.5);
+        var offset = Math.max(0.018, Math.min(0.085, length * 0.035));
+        if (axis === 'y') this.midpoint.x += offset;
+        else this.midpoint.y += offset;
+        visual.label.object3D.position.copy(this.midpoint);
+        var labelScale = MOJA.clamp(length * 0.075, 0.24, 0.46);
+        visual.label.object3D.scale.setScalar(labelScale);
+        visual.text.setAttribute('value', 'Δ' + axis.toUpperCase() + '  ' + Math.round(value * 1000) + ' mm');
+        visual.label.object3D.visible = true;
+      },
+
+      calculateOrthogonalPath: function () {
+        var first = this.points[0];
+        var second = this.points[1];
+        var targetObject = this.data.target && this.data.target.object3D;
+        var localMode = first.space === 'target' && second.space === 'target' && targetObject;
+        var dx;
+        var dy;
+        var dz;
+
+        if (localMode) {
+this.localA.copy(first.value);
+this.localB.copy(second.value);
+this.localPathX.set(this.localB.x, this.localA.y, this.localA.z);
+this.localPathXY.set(this.localB.x, this.localB.y, this.localA.z);
+
+this.worldA.copy(this.localA);
+this.pathX.copy(this.localPathX);
+this.pathXY.copy(this.localPathXY);
+this.worldB.copy(this.localB);
+targetObject.updateMatrixWorld(true);
+targetObject.localToWorld(this.worldA);
+targetObject.localToWorld(this.pathX);
+targetObject.localToWorld(this.pathXY);
+targetObject.localToWorld(this.worldB);
+targetObject.getWorldScale(this.targetScale);
+
+dx = Math.abs(this.localB.x - this.localA.x) * Math.abs(this.targetScale.x);
+dy = Math.abs(this.localB.y - this.localA.y) * Math.abs(this.targetScale.y);
+dz = Math.abs(this.localB.z - this.localA.z) * Math.abs(this.targetScale.z);
+        } else {
+this.resolvePoint(first, this.worldA);
+this.resolvePoint(second, this.worldB);
+this.pathX.set(this.worldB.x, this.worldA.y, this.worldA.z);
+this.pathXY.set(this.worldB.x, this.worldB.y, this.worldA.z);
+dx = Math.abs(this.worldB.x - this.worldA.x);
+dy = Math.abs(this.worldB.y - this.worldA.y);
+dz = Math.abs(this.worldB.z - this.worldA.z);
+        }
+
+        return {dx: dx, dy: dy, dz: dz, local: Boolean(localMode)};
+      },
+
+      updateVisual: function () {
+        if (!this.points[0]) {
+this.clear();
+return;
+        }
+
+        this.resolvePoint(this.points[0], this.worldA);
+        if (this.data.pointA) {
+this.data.pointA.object3D.position.copy(this.worldA);
+this.data.pointA.object3D.visible = true;
+        }
+
+        if (!this.points[1]) {
+if (this.data.pointB) this.data.pointB.object3D.visible = false;
+if (this.data.line) this.data.line.object3D.visible = false;
+if (this.data.label) this.data.label.object3D.visible = false;
+this.hideAxisVisual(this.axisVisuals.x);
+this.hideAxisVisual(this.axisVisuals.y);
+this.hideAxisVisual(this.axisVisuals.z);
+return;
+        }
+
+        var components = this.calculateOrthogonalPath();
+        if (this.data.pointA) this.data.pointA.object3D.position.copy(this.worldA);
+        if (this.data.pointB) {
+this.data.pointB.object3D.position.copy(this.worldB);
+this.data.pointB.object3D.visible = true;
+        }
+
+        if (this.data.line) {
+this.setLine(this.data.line, this.worldA, this.worldB, this.data.color);
+        }
+
+        this.setAxisVisual(this.axisVisuals.x, this.worldA, this.pathX, components.dx, 'x');
+        this.setAxisVisual(this.axisVisuals.y, this.pathX, this.pathXY, components.dy, 'y');
+        this.setAxisVisual(this.axisVisuals.z, this.pathXY, this.worldB, components.dz, 'z');
+
+        var distance = this.worldA.distanceTo(this.worldB);
+        this.midpoint.copy(this.worldA).add(this.worldB).multiplyScalar(0.5);
+        this.midpoint.y += Math.max(0.045, Math.min(0.22, distance * 0.045));
+
+        if (this.data.label) {
+this.data.label.object3D.position.copy(this.midpoint);
+var mainScale = MOJA.clamp(distance * 0.07, 0.28, 0.52);
+this.data.label.object3D.scale.setScalar(mainScale);
+this.data.label.object3D.visible = true;
+        }
+        if (this.data.labelText) {
+var coordinateText = components.local ? 'OSIE MODELU' : 'OSIE ŚWIATA';
+this.data.labelText.setAttribute(
+  'value',
+  'L  ' + MOJA.formatDistance(distance) + '\n' +
+  'ΔX ' + Math.round(components.dx * 1000) + '  •  ' +
+  'ΔY ' + Math.round(components.dy * 1000) + '  •  ' +
+  'ΔZ ' + Math.round(components.dz * 1000) + ' mm  •  ' + coordinateText
+);
+        }
+      },
+
+      tick: function () {
+        if (this.points[0]) this.updateVisual();
+      },
+
+      remove: function () {
+        var self = this;
+        ['x', 'y', 'z'].forEach(function (axis) {
+var visual = self.axisVisuals[axis];
+if (!visual) return;
+if (visual.line.parentNode) visual.line.parentNode.removeChild(visual.line);
+if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
+        });
+      }
+    });
+
+    AFRAME.registerComponent('viewer-button', {
+      schema: {action: {default: ''}, value: {type: 'number', default: 0}},
+      init: function () {
+        this.onClick = this.onClick.bind(this);
+        this.el.addEventListener('click', this.onClick);
+      },
+      onClick: function () {
+        this.el.sceneEl.emit('viewer-ui-action', {
+          action: this.data.action,
+          value: this.data.value,
+          source: this.el
+        }, false);
+      },
+      remove: function () {
+        this.el.removeEventListener('click', this.onClick);
+      }
+    });
+
+    AFRAME.registerComponent('scale-slider', {
+      schema: {min: {type: 'number', default: 10}, max: {type: 'number', default: 300}, width: {type: 'number', default: 0.42}},
+      init: function () {
+        this.localPoint = new THREE.Vector3();
+        this.onClick = this.onClick.bind(this);
+        this.el.addEventListener('click', this.onClick);
+      },
+      onClick: function (event) {
+        var intersection = event.detail && event.detail.intersection;
+        if (!intersection || !intersection.point) return;
+        this.localPoint.copy(intersection.point);
+        this.el.object3D.worldToLocal(this.localPoint);
+        var normalized = MOJA.clamp((this.localPoint.x / this.data.width) + 0.5, 0, 1);
+        var value = this.data.min + normalized * (this.data.max - this.data.min);
+        value = Math.round(value / 5) * 5;
+        this.el.sceneEl.emit('viewer-ui-action', {action: 'scale', value: value, source: this.el}, false);
+      },
+      remove: function () {
+        this.el.removeEventListener('click', this.onClick);
+      }
+    });
+
+    function createElement(tag, attrs, parent) {
+      var el = document.createElement(tag);
+      Object.keys(attrs || {}).forEach(function (name) { el.setAttribute(name, attrs[name]); });
+      if (parent) parent.appendChild(el);
+      return el;
+    }
+
+    function createPanelButton(parent, x, y, width, color, label, action, value) {
+      var button = createElement('a-plane', {
+        class: 'component-ui ui-click',
+        width: width,
+        height: 0.064,
+        color: color,
+        position: x + ' ' + y + ' 0.012',
+        material: 'shader: flat',
+        'viewer-button': 'action: ' + action + '; value: ' + (value || 0)
+      }, parent);
+      createElement('a-text', {
+        value: label,
+        align: 'center',
+        width: Math.max(0.28, width * 1.45),
+        color: '#FFFFFF',
+        position: '0 0 0.006'
+      }, button);
+      return button;
+    }
+
+    AFRAME.registerComponent('lighting-control', {
+      schema: {
+        ambient: {type: 'selector'},
+        front: {type: 'selector'},
+        back: {type: 'selector'},
+        left: {type: 'selector'},
+        right: {type: 'selector'},
+        top: {type: 'selector'},
+        bottom: {type: 'selector'},
+        panel: {type: 'selector'},
+        valueText: {type: 'selector'},
+        detailText: {type: 'selector'},
+        storageKey: {default: 'moja-test-mr-scale-lighting360'}
+      },
+
+      init: function () {
+        this.panelVisible = false;
+        this.percent = 100;
+
+        this.onUIAction = this.onUIAction.bind(this);
+        this.el.addEventListener('viewer-ui-action', this.onUIAction);
+
+        this.load();
+        this.apply();
+        this.setPanelVisible(false);
+      },
+
+      clampPercent: function (value) {
+        var number = Number(value);
+        if (!Number.isFinite(number)) number = 100;
+        return Math.round(MOJA.clamp(number, 25, 1000));
+      },
+
+      load: function () {
+        try {
+          var raw = window.localStorage.getItem(this.data.storageKey);
+          if (!raw) return;
+
+          var saved = JSON.parse(raw);
+          if (Number.isFinite(saved.percent)) {
+            this.percent = this.clampPercent(saved.percent);
+          }
+        } catch (error) {}
+      },
+
+      save: function () {
+        try {
+          window.localStorage.setItem(
+            this.data.storageKey,
+            JSON.stringify({percent: this.percent})
+          );
+        } catch (error) {}
+      },
+
+      setIntensity: function (element, intensity) {
+        if (!element) return;
+        element.setAttribute('light', 'intensity', Math.max(0, intensity));
+      },
+
+      apply: function () {
+        var factor = this.percent / 100;
+
+        /*
+          Oświetlenie 360° pod CAD.
+          Nie używamy map cieni.
+          Wszystkie kierunki są sterowane jednym procentem.
+        */
+        this.setIntensity(this.data.ambient, 0.12 * factor);
+
+        this.setIntensity(this.data.front,  0.18 * factor);
+        this.setIntensity(this.data.back,   0.18 * factor);
+        this.setIntensity(this.data.left,   0.18 * factor);
+        this.setIntensity(this.data.right,  0.18 * factor);
+        this.setIntensity(this.data.top,    0.24 * factor);
+        this.setIntensity(this.data.bottom, 0.10 * factor);
+
+        this.updatePanel();
+        this.save();
+      },
+
+      setPanelVisible: function (visible) {
+        this.panelVisible = Boolean(visible);
+        if (this.data.panel) this.data.panel.object3D.visible = this.panelVisible;
+        this.updateInteractivity();
+        this.updatePanel();
+
+        var viewer = this.el.components['quest-viewer'];
+        if (viewer && viewer.refreshRaycaster) viewer.refreshRaycaster();
+      },
+
+      updateInteractivity: function () {
+        if (!this.data.panel) return;
+        var active = this.panelVisible;
+
+        this.data.panel.querySelectorAll('.lighting-ui').forEach(function (control) {
+          if (active) control.classList.add('ray-target');
+          else control.classList.remove('ray-target');
+        });
+      },
+
+      updatePanel: function () {
+        if (this.data.valueText) {
+          this.data.valueText.setAttribute('value', 'NATĘŻENIE  ' + this.percent + '%');
+        }
+
+        if (this.data.detailText) {
+          this.data.detailText.setAttribute(
+            'value',
+            'ŚWIATŁO 360°  •  PRZÓD / TYŁ / LEWO / PRAWO / GÓRA / DÓŁ'
+          );
+        }
+      },
+
+      changePercent: function (delta) {
+        this.percent = this.clampPercent(this.percent + (Number(delta) || 0));
+        this.apply();
+      },
+
+      setStandard: function () {
+        this.percent = 100;
+        this.apply();
+      },
+
+      backToComponents: function () {
+        this.setPanelVisible(false);
+        var selection = this.el.components['component-selection'];
+        if (selection && selection.enabled) selection.setPanelVisible(true);
+      },
+
+      onUIAction: function (event) {
+        var detail = event.detail || {};
+
+        switch (detail.action) {
+          case 'lighting-open':
+            var selection = this.el.components['component-selection'];
+            if (selection) selection.setPanelVisible(false);
+            this.setPanelVisible(true);
+            break;
+
+          case 'lighting-close':
+            this.backToComponents();
+            break;
+
+          case 'lighting-global':
+            this.changePercent(detail.value);
+            break;
+
+          case 'lighting-reset':
+            this.setStandard();
+            break;
+        }
+      },
+
+      remove: function () {
+        this.el.removeEventListener('viewer-ui-action', this.onUIAction);
+      }
+    });
+
+
+    AFRAME.registerComponent('annotation-control', {
+      schema: {
+        pivot: {type: 'selector'},
+        root: {type: 'selector'},
+        camera: {type: 'selector'},
+        right: {type: 'selector'},
+        panel: {type: 'selector'},
+        keyboard: {type: 'selector'},
+        preview: {type: 'selector'},
+        status: {type: 'selector'}
+      },
+
+      init: function () {
+        this.enabled = false;
+        this.panelVisible = false;
+        this.keyboardVisible = false;
+        this.tool = 'draw';
+        this.colorIndex = 1;
+        this.color = '#FF3B30';
+        this.thicknessMm = 10;
+        this.textSizeMm = 140;
+        this.textBuffer = 'UWAGA';
+        this.lastKeyInputAt = 0;
+        this.keyDebounceMs = 220;
+        this.pendingTextPlacement = false;
+        this.drawing = false;
+        this.currentStroke = null;
+        this.items = [];
+        this.lastPoint = new THREE.Vector3();
+        this.currentPoint = new THREE.Vector3();
+        this.worldPoint = new THREE.Vector3();
+        this.controllerQuat = new THREE.Quaternion();
+        this.forward = new THREE.Vector3();
+        this.yAxis = new THREE.Vector3(0, 1, 0);
+
+        this.onTriggerDown = this.onTriggerDown.bind(this);
+        this.onTriggerUp = this.onTriggerUp.bind(this);
+        this.onUIAction = this.onUIAction.bind(this);
+
+        this.el.addEventListener('viewer-ui-action', this.onUIAction);
+        if (this.data.right) {
+          this.data.right.addEventListener('triggerdown', this.onTriggerDown);
+          this.data.right.addEventListener('triggerup', this.onTriggerUp);
+        }
+
+        this.buildKeyboard();
+        this.setPanelVisible(false);
+        this.setKeyboardVisible(false);
+        this.updatePanel();
+      },
+
+      setEnabled: function (enabled) {
+        this.enabled = Boolean(enabled);
+        if (!this.enabled) {
+          this.drawing = false;
+          this.setKeyboardVisible(false);
+          this.setPanelVisible(false);
+        } else {
+          this.setPanelVisible(true);
+        }
+        this.updatePanel();
+      },
+
+      setPanelVisible: function (visible) {
+        this.panelVisible = Boolean(visible) && this.enabled && !this.keyboardVisible;
+        if (this.data.panel) this.data.panel.object3D.visible = this.panelVisible;
+        this.updateInteractivity();
+        this.refreshRaycaster();
+      },
+
+      setKeyboardVisible: function (visible) {
+        this.keyboardVisible = Boolean(visible) && this.enabled;
+        if (this.data.keyboard) this.data.keyboard.object3D.visible = this.keyboardVisible;
+        if (this.data.panel) this.data.panel.object3D.visible = this.enabled && !this.keyboardVisible && this.panelVisible;
+        this.updateInteractivity();
+        this.updateKeyboardPreview();
+        this.refreshRaycaster();
+      },
+
+      togglePanel: function () {
+        if (this.keyboardVisible) {
+          this.setKeyboardVisible(false);
+          this.panelVisible = true;
+          this.setPanelVisible(true);
+          return;
+        }
+        this.setPanelVisible(!this.panelVisible);
+      },
+
+      updateInteractivity: function () {
+        var panelActive = this.panelVisible && this.enabled && !this.keyboardVisible;
+        var keyboardActive = this.keyboardVisible && this.enabled;
+
+        if (this.data.panel) {
+          this.data.panel.querySelectorAll('.annotation-ui').forEach(function (control) {
+            if (panelActive) control.classList.add('ray-target');
+            else control.classList.remove('ray-target');
+          });
+        }
+
+        if (this.data.keyboard) {
+          this.data.keyboard.querySelectorAll('.annotation-key').forEach(function (control) {
+            if (keyboardActive) control.classList.add('ray-target');
+            else control.classList.remove('ray-target');
+          });
+        }
+      },
+
+      refreshRaycaster: function () {
+        if (!this.data.right) return;
+        var ray = this.data.right.components['trigger-ray'];
+        if (ray) window.setTimeout(function () { ray.refresh(); }, 0);
+      },
+
+      colorFromIndex: function (index) {
+        var colors = {
+          1: '#FF3B30',
+          2: '#FFD60A',
+          3: '#34C759',
+          4: '#00D9FF',
+          5: '#FFFFFF',
+          6: '#FF2DFF'
+        };
+        return colors[index] || '#FF3B30';
+      },
+
+      updatePanel: function () {
+        if (!this.data.status) return;
+        var toolText = this.tool === 'draw' ? 'RYSOWANIE 3D' : 'TEKST 3D';
+        this.data.status.setAttribute(
+          'value',
+          toolText + '  •  LINIA ' + this.thicknessMm + ' mm  •  TEKST ' + this.textSizeMm + ' mm'
+        );
+        this.data.status.setAttribute('color', this.color);
+      },
+
+      getControllerTipWorld: function (output) {
+        if (!this.data.right) return output.set(0, 0, 0);
+        this.data.right.object3D.getWorldPosition(output);
+        this.data.right.object3D.getWorldQuaternion(this.controllerQuat);
+        this.forward.set(0, 0, -0.055).applyQuaternion(this.controllerQuat);
+        output.add(this.forward);
+        return output;
+      },
+
+      worldToAnnotationLocal: function (world, output) {
+        output.copy(world);
+        if (this.data.root) {
+          this.data.root.object3D.updateMatrixWorld(true);
+          this.data.root.object3D.worldToLocal(output);
+        }
+        return output;
+      },
+
+      isPointingAtAnnotationUI: function () {
+        if (!this.data.right) return false;
+        var ray = this.data.right.components['trigger-ray'];
+        var intersection = ray && ray.currentIntersection;
+        var target = MOJA.getInteractiveEl(intersection);
+        return Boolean(target && target.classList && (
+          target.classList.contains('annotation-ui') ||
+          target.classList.contains('annotation-key')
+        ));
+      },
+
+      beginStroke: function () {
+        if (!this.data.root) return;
+        this.drawing = true;
+        this.currentStroke = new THREE.Group();
+        this.currentStroke.name = '__MOJA_ANNOTATION_STROKE__';
+        this.data.root.object3D.add(this.currentStroke);
+        this.items.push({type: 'stroke', object: this.currentStroke});
+        this.getControllerTipWorld(this.worldPoint);
+        this.worldToAnnotationLocal(this.worldPoint, this.lastPoint);
+      },
+
+      addStrokeSegment: function (a, b) {
+        if (!this.currentStroke) return;
+        var distance = a.distanceTo(b);
+        if (!Number.isFinite(distance) || distance < 0.004) return;
+
+        var radius = Math.max(0.001, this.thicknessMm / 2000);
+        var geometry = new THREE.CylinderGeometry(radius, radius, distance, 8, 1, false);
+        var material = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(this.color),
+          depthTest: true,
+          depthWrite: true,
+          toneMapped: false
+        });
+        var mesh = new THREE.Mesh(geometry, material);
+        mesh.position.copy(a).add(b).multiplyScalar(0.5);
+
+        var direction = b.clone().sub(a).normalize();
+        mesh.quaternion.setFromUnitVectors(this.yAxis, direction);
+        mesh.renderOrder = 12;
+        this.currentStroke.add(mesh);
+      },
+
+      finishStroke: function () {
+        this.drawing = false;
+        this.currentStroke = null;
+      },
+
+      updateDrawing: function () {
+        if (!this.enabled || this.tool !== 'draw' || !this.drawing) return;
+        this.getControllerTipWorld(this.worldPoint);
+        this.worldToAnnotationLocal(this.worldPoint, this.currentPoint);
+
+        if (this.currentPoint.distanceTo(this.lastPoint) < 0.008) return;
+
+        this.addStrokeSegment(this.lastPoint, this.currentPoint);
+        this.lastPoint.copy(this.currentPoint);
+      },
+
+      resolveTextPlacementWorld: function (output) {
+        var ray = this.data.right && this.data.right.components['trigger-ray'];
+        var intersection = ray && ray.currentIntersection;
+        var target = MOJA.getInteractiveEl(intersection);
+
+        if (intersection && intersection.point &&
+            !(target && target.classList && (
+              target.classList.contains('annotation-ui') ||
+              target.classList.contains('annotation-key')
+            ))) {
+          output.copy(intersection.point);
+          if (intersection.face && intersection.object) {
+            var normal = intersection.face.normal.clone();
+            normal.transformDirection(intersection.object.matrixWorld);
+            output.addScaledVector(normal, 0.018);
+          }
+          return output;
+        }
+
+        if (!this.data.right) return output.set(0, 1.4, -1);
+        this.data.right.object3D.getWorldPosition(output);
+        this.data.right.object3D.getWorldQuaternion(this.controllerQuat);
+        this.forward.set(0, 0, -0.7).applyQuaternion(this.controllerQuat);
+        output.add(this.forward);
+        return output;
+      },
+
+      createTextSprite: function (value) {
+        var fontPx = 132;
+        var padX = 58;
+        var padY = 34;
+        var radius = 28;
+
+        var measureCanvas = document.createElement('canvas');
+        var measureContext = measureCanvas.getContext('2d');
+        measureContext.font = '700 ' + fontPx + 'px Arial, sans-serif';
+
+        var metrics = measureContext.measureText(value);
+        var textWidth = Math.ceil(metrics.width);
+        var canvasWidth = Math.max(512, Math.min(2048, textWidth + padX * 2));
+        var canvasHeight = 256;
+
+        var canvas = document.createElement('canvas');
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+
+        var context = canvas.getContext('2d');
+        context.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Ciemne tło z jasną ramką - dużo czytelniejsze na modelu i passthrough.
+        context.fillStyle = 'rgba(7,17,31,0.92)';
+        context.strokeStyle = this.color;
+        context.lineWidth = 8;
+
+        var x = 6;
+        var y = 6;
+        var w = canvas.width - 12;
+        var h = canvas.height - 12;
+
+        context.beginPath();
+        context.moveTo(x + radius, y);
+        context.lineTo(x + w - radius, y);
+        context.quadraticCurveTo(x + w, y, x + w, y + radius);
+        context.lineTo(x + w, y + h - radius);
+        context.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+        context.lineTo(x + radius, y + h);
+        context.quadraticCurveTo(x, y + h, x, y + h - radius);
+        context.lineTo(x, y + radius);
+        context.quadraticCurveTo(x, y, x + radius, y);
+        context.closePath();
+        context.fill();
+        context.stroke();
+
+        context.font = '700 ' + fontPx + 'px Arial, sans-serif';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+
+        // Cienki czarny obrys liter poprawia czytelność na jasnym tle.
+        context.lineWidth = 10;
+        context.strokeStyle = 'rgba(0,0,0,0.92)';
+        context.strokeText(value, canvas.width / 2, canvas.height / 2 + 2);
+
+        context.fillStyle = this.color;
+        context.fillText(value, canvas.width / 2, canvas.height / 2 + 2);
+
+        var texture = new THREE.CanvasTexture(canvas);
+        texture.needsUpdate = true;
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.generateMipmaps = false;
+
+        var material = new THREE.SpriteMaterial({
+          map: texture,
+          transparent: true,
+          depthTest: true,
+          depthWrite: false,
+          toneMapped: false
+        });
+
+        var sprite = new THREE.Sprite(material);
+        sprite.name = '__MOJA_ANNOTATION_TEXT__';
+        sprite.renderOrder = 18;
+
+        // textSizeMm steruje wysokością etykiety w świecie.
+        var worldHeight = Math.max(0.055, this.textSizeMm / 1000);
+        var aspect = canvas.width / canvas.height;
+        sprite.scale.set(worldHeight * aspect, worldHeight, 1);
+
+        sprite.userData.mojaCanvasTexture = texture;
+        return sprite;
+      },
+
+      placeText: function () {
+        if (!this.data.root) return;
+
+        var value = String(this.textBuffer || '').trim();
+        if (!value) value = 'UWAGA';
+
+        // Punkt bierze się z AKTUALNEGO lasera w chwili puszczenia Triggera.
+        this.resolveTextPlacementWorld(this.worldPoint);
+        this.worldToAnnotationLocal(this.worldPoint, this.currentPoint);
+
+        var sprite = this.createTextSprite(value);
+        sprite.position.copy(this.currentPoint);
+
+        this.data.root.object3D.add(sprite);
+        this.items.push({type: 'text-sprite', object: sprite});
+      },
+
+      disposeObject: function (object) {
+        if (!object) return;
+        object.traverse(function (node) {
+          if (node.geometry && node.geometry.dispose) node.geometry.dispose();
+          if (node.material) {
+            if (Array.isArray(node.material)) {
+              node.material.forEach(function (material) {
+                if (material && material.dispose) material.dispose();
+              });
+            } else if (node.material.dispose) {
+              node.material.dispose();
+            }
+          }
+        });
+        if (object.parent) object.parent.remove(object);
+      },
+
+      undo: function () {
+        var item = this.items.pop();
+        if (!item) return;
+
+        if (item.type === 'stroke') {
+          this.disposeObject(item.object);
+        } else if (item.type === 'text-sprite' && item.object) {
+          if (item.object.material) {
+            if (item.object.material.map && item.object.material.map.dispose) {
+              item.object.material.map.dispose();
+            }
+            if (item.object.material.dispose) item.object.material.dispose();
+          }
+          if (item.object.parent) item.object.parent.remove(item.object);
+        } else if (item.type === 'text' && item.element && item.element.parentNode) {
+          item.element.parentNode.removeChild(item.element);
+        }
+      },
+
+      clearAll: function () {
+        while (this.items.length) this.undo();
+      },
+
+      onTriggerDown: function () {
+        if (!this.enabled || this.keyboardVisible || this.isPointingAtAnnotationUI()) return;
+
+        if (this.tool === 'draw') {
+          this.beginStroke();
+        } else if (this.tool === 'text') {
+          // Tekstu nie stawiamy na DOWN. Użytkownik może jeszcze skorygować laser.
+          this.pendingTextPlacement = true;
+        }
+      },
+
+      onTriggerUp: function () {
+        if (!this.enabled) return;
+
+        if (this.tool === 'draw') {
+          this.finishStroke();
+          return;
+        }
+
+        if (this.tool === 'text' && this.pendingTextPlacement) {
+          this.pendingTextPlacement = false;
+
+          // Jeżeli puszczamy Trigger nad panelem/klawiaturą, nie stawiamy tekstu.
+          if (!this.keyboardVisible && !this.isPointingAtAnnotationUI()) {
+            this.placeText();
+          }
+        }
+      },
+
+      acceptKeyInput: function (callback) {
+        var now = performance.now();
+
+        // Quest/A-Frame potrafi wygenerować dwa zdarzenia click dla jednego Triggera.
+        // Przyjmujemy tylko pierwsze w krótkim oknie czasowym.
+        if ((now - this.lastKeyInputAt) < this.keyDebounceMs) return false;
+
+        this.lastKeyInputAt = now;
+        callback();
+        this.updateKeyboardPreview();
+        return true;
+      },
+
+      buildKeyboard: function () {
+        if (!this.data.keyboard) return;
+
+        var self = this;
+
+        // Pełny alfabet PL + cyfry. Większe klawisze niż wcześniej.
+        var rows = [
+          '1234567890',
+          'QWERTYUIOP',
+          'ASDFGHJKL',
+          'ZXCVBNM',
+          'ĄĆĘŁŃÓŚŹŻ'
+        ];
+
+        rows.forEach(function (row, rowIndex) {
+          var chars = Array.from(row);
+          var count = chars.length;
+          var keyPitch = Math.min(0.112, 1.12 / count);
+          var keyWidth = keyPitch - 0.010;
+          var startX = -((count - 1) * keyPitch) / 2;
+          var y = 0.235 - rowIndex * 0.105;
+
+          chars.forEach(function (character, index) {
+            var key = document.createElement('a-plane');
+            key.setAttribute('class', 'annotation-key ui-click');
+            key.setAttribute('width', keyWidth);
+            key.setAttribute('height', '0.086');
+            key.setAttribute('color', '#1E3A5F');
+            key.setAttribute('position', (startX + index * keyPitch) + ' ' + y + ' 0.012');
+            key.setAttribute('material', 'shader: flat');
+
+            var label = document.createElement('a-text');
+            label.setAttribute('value', character);
+            label.setAttribute('align', 'center');
+            label.setAttribute('anchor', 'center');
+            label.setAttribute('baseline', 'center');
+            label.setAttribute('width', Math.max(0.18, keyWidth * 3.15));
+            label.setAttribute('color', '#FFFFFF');
+            label.setAttribute('position', '0 0 0.008');
+            key.appendChild(label);
+
+            key.addEventListener('click', function () {
+              self.acceptKeyInput(function () {
+                if (self.textBuffer.length < 42) self.textBuffer += character;
+              });
+            });
+
+            self.data.keyboard.appendChild(key);
+          });
+        });
+
+        function specialButton(x, y, width, color, label, handler) {
+          var key = document.createElement('a-plane');
+          key.setAttribute('class', 'annotation-key ui-click');
+          key.setAttribute('width', width);
+          key.setAttribute('height', '0.082');
+          key.setAttribute('color', color);
+          key.setAttribute('position', x + ' ' + y + ' 0.012');
+          key.setAttribute('material', 'shader: flat');
+
+          var text = document.createElement('a-text');
+          text.setAttribute('value', label);
+          text.setAttribute('align', 'center');
+          text.setAttribute('anchor', 'center');
+          text.setAttribute('baseline', 'center');
+          text.setAttribute('width', width * 1.9);
+          text.setAttribute('color', '#FFFFFF');
+          text.setAttribute('position', '0 0 0.008');
+          key.appendChild(text);
+
+          key.addEventListener('click', function () {
+            self.acceptKeyInput(handler);
+          });
+
+          self.data.keyboard.appendChild(key);
+        }
+
+        specialButton(-0.34, -0.315, 0.28, '#334155', 'SPACJA', function () {
+          if (self.textBuffer.length < 42) self.textBuffer += ' ';
+        });
+
+        specialButton(0, -0.315, 0.24, '#7C2D12', 'USUŃ', function () {
+          self.textBuffer = self.textBuffer.slice(0, -1);
+        });
+
+        specialButton(0.34, -0.315, 0.28, '#166534', 'GOTOWE', function () {
+          self.setKeyboardVisible(false);
+          self.panelVisible = true;
+          self.setPanelVisible(true);
+        });
+
+        specialButton(-0.24, -0.420, 0.22, '#475569', '-', function () {
+          if (self.textBuffer.length < 42) self.textBuffer += '-';
+        });
+
+        specialButton(0, -0.420, 0.22, '#475569', '/', function () {
+          if (self.textBuffer.length < 42) self.textBuffer += '/';
+        });
+
+        specialButton(0.24, -0.420, 0.22, '#475569', '.', function () {
+          if (self.textBuffer.length < 42) self.textBuffer += '.';
+        });
+      },
+
+      updateKeyboardPreview: function () {
+        if (this.data.preview) {
+          this.data.preview.setAttribute('value', this.textBuffer || ' ');
+          this.data.preview.setAttribute('color', this.color);
+        }
+      },
+
+      onUIAction: function (event) {
+        var detail = event.detail || {};
+
+        switch (detail.action) {
+          case 'annotation-tool-draw':
+            this.tool = 'draw';
+            this.updatePanel();
+            break;
+
+          case 'annotation-tool-text':
+            this.tool = 'text';
+            this.updatePanel();
+            break;
+
+          case 'annotation-color':
+            this.colorIndex = Math.round(detail.value);
+            this.color = this.colorFromIndex(this.colorIndex);
+            this.updatePanel();
+            this.updateKeyboardPreview();
+            break;
+
+          case 'annotation-thickness':
+            this.thicknessMm = Math.max(2, Math.min(50, Math.round(detail.value)));
+            this.updatePanel();
+            break;
+
+          case 'annotation-text-size':
+            this.textSizeMm = Math.max(50, Math.min(400, Math.round(detail.value)));
+            this.updatePanel();
+            break;
+
+          case 'annotation-keyboard':
+            this.tool = 'text';
+            this.panelVisible = true;
+            this.setPanelVisible(false);
+            this.setKeyboardVisible(true);
+            break;
+
+          case 'annotation-undo':
+            this.undo();
+            break;
+
+          case 'annotation-clear':
+            this.clearAll();
+            break;
+
+          case 'annotation-close':
+            this.setPanelVisible(false);
+            break;
+        }
+      },
+
+      tick: function () {
+        this.updateDrawing();
+      },
+
+      remove: function () {
+        this.el.removeEventListener('viewer-ui-action', this.onUIAction);
+        if (this.data.right) {
+          this.data.right.removeEventListener('triggerdown', this.onTriggerDown);
+          this.data.right.removeEventListener('triggerup', this.onTriggerUp);
+        }
+        this.clearAll();
+      }
+    });
+
+    AFRAME.registerComponent('component-selection', {
+      schema: {
+        asset: {type: 'selector'},
+        pivot: {type: 'selector'},
+        camera: {type: 'selector'},
+        right: {type: 'selector'},
+        panel: {type: 'selector'},
+        list: {type: 'selector'},
+        header: {type: 'selector'},
+        summary: {type: 'selector'},
+        rows: {type: 'int', default: 6}
+      },
+      init: function () {
+        this.asset = this.data.asset;
+        this.pivot = this.data.pivot;
+        this.camera = this.data.camera;
+        this.right = this.data.right;
+        this.panel = this.data.panel;
+        this.list = this.data.list;
+        this.header = this.data.header;
+        this.summary = this.data.summary;
+        this.enabled = false;
+        this.panelVisible = false;
+        this.built = false;
+        this.page = 0;
+        this.components = [];
+        this.meshes = [];
+        this.meshToIndex = new WeakMap();
+        this.selected = new Set();
+        this.helpers = new Map();
+        this.edgesVisible = true;
+        this.tempBox = new THREE.Box3();
+        this.onNormalized = this.onNormalized.bind(this);
+        this.onUIAction = this.onUIAction.bind(this);
+        this.el.addEventListener('model-normalized', this.onNormalized);
+        this.el.addEventListener('viewer-ui-action', this.onUIAction);
+        if (this.panel) this.panel.object3D.visible = false;
+        if (this.asset && this.asset.getObject3D('mesh')) window.setTimeout(this.buildComponents.bind(this), 0);
+      },
+      onNormalized: function (event) {
+        if (!event.detail || event.detail.asset !== this.asset) return;
+        this.buildComponents();
+      },
+      isMeaningfulName: function (name) {
+        if (!name) return false;
+        var value = String(name).trim();
+        if (!value) return false;
+        return !/^(mesh|node|object|primitive|geometry|group|scene|root|default|material)[\s_.-]*\d*$/i.test(value) &&
+          !/^(mesh|node|object|primitive|geometry|material)[_\-.]/i.test(value) &&
+          value !== '__MOJA_EDGES__';
+      },
+      displayName: function (object, fallbackIndex) {
+        var value = object && object.name ? String(object.name).trim() : '';
+        if (!this.isMeaningfulName(value)) value = 'Obiekt ' + String(fallbackIndex + 1).padStart(3, '0');
+        value = value.replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim();
+        return value || ('Obiekt ' + String(fallbackIndex + 1).padStart(3, '0'));
+      },
+      findComponentObject: function (mesh, root) {
+        var current = mesh;
+        while (current && current !== root) {
+          if (this.isMeaningfulName(current.name)) return current;
+          current = current.parent;
+        }
+        current = mesh;
+        while (current && current.parent && current.parent !== root) current = current.parent;
+        return current || mesh;
+      },
+      hierarchyDepth: function (object, root) {
+        var depth = 0;
+        var current = object && object.parent;
+        while (current && current !== root) {
+          if (this.isMeaningfulName(current.name)) depth += 1;
+          current = current.parent;
+        }
+        return Math.min(depth, 4);
+      },
+      buildComponents: function () {
+        var root = this.asset && this.asset.getObject3D('mesh');
+        if (!root) return;
+        this.clearSelection();
+        this.components = [];
+        this.meshes = [];
+        this.meshToIndex = new WeakMap();
+        var objectMap = new Map();
+        var sequence = 0;
+        var self = this;
+        root.traverse(function (node) {
+          if (!node.isMesh || (node.userData && node.userData.mojaEdgeOverlay)) return;
+          node.castShadow = false;
+          node.receiveShadow = false;
+          self.meshes.push(node);
+          var componentObject = self.findComponentObject(node, root);
+          var entry = objectMap.get(componentObject);
+          if (!entry) {
+            entry = {
+              object: componentObject,
+              rawName: self.displayName(componentObject, sequence),
+              name: '',
+              depth: self.hierarchyDepth(componentObject, root),
+              meshes: [],
+              order: sequence++
+            };
+            objectMap.set(componentObject, entry);
+          }
+          entry.meshes.push(node);
+        });
+        this.components = Array.from(objectMap.values()).sort(function (a, b) { return a.order - b.order; });
+        var totals = Object.create(null);
+        var used = Object.create(null);
+        this.components.forEach(function (component) {
+          totals[component.rawName] = (totals[component.rawName] || 0) + 1;
+        });
+        this.components.forEach(function (component, index) {
+          used[component.rawName] = (used[component.rawName] || 0) + 1;
+          component.name = totals[component.rawName] > 1
+            ? component.rawName + ' [' + used[component.rawName] + ']'
+            : component.rawName;
+          component.index = index;
+          component.meshes.forEach(function (mesh) { self.meshToIndex.set(mesh, index); });
+        });
+        this.built = true;
+        this.page = 0;
+        this.renderPanel();
+        this.refreshRaycaster();
+      },
+      setEnabled: function (enabled) {
+        this.enabled = Boolean(enabled);
+        this.setPanelVisible(this.enabled);
+        if (!this.enabled) {
+          var lighting = this.el.components['lighting-control'];
+          if (lighting) lighting.setPanelVisible(false);
+        }
+        this.syncHelpers();
+      },
+      setPanelVisible: function (visible) {
+        this.panelVisible = Boolean(visible) && this.enabled;
+        if (this.panel) this.panel.object3D.visible = this.panelVisible;
+        this.updatePanelInteractivity();
+        this.renderPanel();
+        this.refreshRaycaster();
+      },
+      togglePanel: function () {
+        this.setPanelVisible(!this.panelVisible);
+      },
+      updatePanelInteractivity: function () {
+        if (!this.panel) return;
+        var active = this.panelVisible && this.enabled;
+        this.panel.querySelectorAll('.component-ui').forEach(function (element) {
+          if (active) element.classList.add('ray-target');
+          else element.classList.remove('ray-target');
+        });
+      },
+      refreshRaycaster: function () {
+        if (!this.right) return;
+        var ray = this.right.components['trigger-ray'];
+        if (ray) window.setTimeout(function () { ray.refresh(); }, 0);
+      },
+      findIndexFromIntersection: function (intersection) {
+        if (!intersection || !intersection.object) return -1;
+        var current = intersection.object;
+        while (current) {
+          var index = this.meshToIndex.get(current);
+          if (Number.isInteger(index)) return index;
+          current = current.parent;
+        }
+        return -1;
+      },
+      selectIntersection: function (intersection) {
+        if (!this.enabled || !this.built) return false;
+        var index = this.findIndexFromIntersection(intersection);
+        if (index < 0) return false;
+        this.toggleIndex(index);
+        return true;
+      },
+      toggleIndex: function (index) {
+        if (!Number.isInteger(index) || index < 0 || index >= this.components.length) return;
+        if (this.selected.has(index)) this.selected.delete(index);
+        else this.selected.add(index);
+        this.syncHelpers();
+        this.renderPanel();
+      },
+      clearSelection: function () {
+        this.selected.clear();
+        this.helpers.forEach(function (helper) {
+          if (helper.parent) helper.parent.remove(helper);
+          if (helper.geometry) helper.geometry.dispose();
+          if (helper.material) helper.material.dispose();
+        });
+        this.helpers.clear();
+        this.renderPanel();
+      },
+      setComponentVisibility: function (index, visible) {
+        var component = this.components[index];
+        if (!component) return;
+        component.meshes.forEach(function (mesh) { mesh.visible = Boolean(visible); });
+      },
+      hideSelected: function () {
+        var self = this;
+        this.selected.forEach(function (index) { self.setComponentVisibility(index, false); });
+        this.syncHelpers();
+        this.renderPanel();
+        this.refreshRaycaster();
+      },
+      showSelected: function () {
+        var self = this;
+        this.selected.forEach(function (index) { self.setComponentVisibility(index, true); });
+        this.syncHelpers();
+        this.renderPanel();
+        this.refreshRaycaster();
+      },
+      isolateSelected: function () {
+        if (this.selected.size === 0) return;
+        var selectedMeshes = new Set();
+        var self = this;
+        this.selected.forEach(function (index) {
+          var component = self.components[index];
+          if (!component) return;
+          component.meshes.forEach(function (mesh) { selectedMeshes.add(mesh); });
+        });
+        this.meshes.forEach(function (mesh) { mesh.visible = selectedMeshes.has(mesh); });
+        this.syncHelpers();
+        this.renderPanel();
+        this.refreshRaycaster();
+      },
+      showAll: function () {
+        this.meshes.forEach(function (mesh) { mesh.visible = true; });
+        this.syncHelpers();
+        this.renderPanel();
+        this.refreshRaycaster();
+      },
+      toggleEdges: function () {
+        this.edgesVisible = !this.edgesVisible;
+        var root = this.asset && this.asset.getObject3D('mesh');
+        MOJA.setEdgesVisible(root, this.edgesVisible);
+        this.renderPanel();
+      },
+      syncHelpers: function () {
+        var self = this;
+        Array.from(this.helpers.keys()).forEach(function (index) {
+          if (!self.selected.has(index)) {
+            var helper = self.helpers.get(index);
+            if (helper.parent) helper.parent.remove(helper);
+            if (helper.geometry) helper.geometry.dispose();
+            if (helper.material) helper.material.dispose();
+            self.helpers.delete(index);
+          }
+        });
+        if (!this.enabled) {
+          this.helpers.forEach(function (helper) { helper.visible = false; });
+          return;
+        }
+        this.selected.forEach(function (index) {
+          var component = self.components[index];
+          if (!component) return;
+          var visible = component.meshes.some(function (mesh) { return mesh.visible; });
+          var helper = self.helpers.get(index);
+          if (!helper) {
+            helper = new THREE.Box3Helper(new THREE.Box3(), 0xa78bfa);
+            helper.material.transparent = true;
+            helper.material.opacity = 0.92;
+            helper.material.depthTest = false;
+            helper.renderOrder = 20;
+            self.el.object3D.add(helper);
+            self.helpers.set(index, helper);
+          }
+          helper.visible = visible;
+        });
+      },
+      updateHelpers: function () {
+        var self = this;
+        this.helpers.forEach(function (helper, index) {
+          if (!helper.visible) return;
+          var component = self.components[index];
+          if (!component) return;
+          self.tempBox.makeEmpty();
+          component.meshes.forEach(function (mesh) {
+            if (!mesh.visible) return;
+            self.tempBox.expandByObject(mesh);
+          });
+          if (!self.tempBox.isEmpty()) helper.box.copy(self.tempBox);
+        });
+      },
+      renderPanel: function () {
+        if (!this.list || !this.header || !this.summary) return;
+        while (this.list.firstChild) this.list.removeChild(this.list.firstChild);
+        var totalPages = Math.max(1, Math.ceil(this.components.length / this.data.rows));
+        this.page = MOJA.clamp(this.page, 0, totalPages - 1);
+        var start = this.page * this.data.rows;
+        var end = Math.min(this.components.length, start + this.data.rows);
+        var visibleCount = this.meshes.filter(function (mesh) { return mesh.visible; }).length;
+        this.header.setAttribute('value', 'KOMPONENTY / OBIEKTY');
+        this.summary.setAttribute(
+          'value',
+          this.selected.size + ' zazn.  •  ' + visibleCount + '/' + this.meshes.length + ' wid.  •  ' +
+          (this.page + 1) + '/' + totalPages + '  •  EDGES ' + (this.edgesVisible ? 'ON' : 'OFF')
+        );
+        for (var i = start; i < end; i += 1) {
+          var component = this.components[i];
+          var selected = this.selected.has(i);
+          var visible = component.meshes.some(function (mesh) { return mesh.visible; });
+          var y = -((i - start) * 0.078);
+          var row = createElement('a-plane', {
+            class: 'component-ui ui-click',
+            width: 0.73,
+            height: 0.066,
+            color: selected ? '#6D28D9' : (visible ? '#1E293B' : '#3F3F46'),
+            position: '0 ' + y + ' 0.012',
+            material: 'shader: flat',
+            'viewer-button': 'action: component-toggle; value: ' + i
+          }, this.list);
+          var indent = '  '.repeat(component.depth);
+          createElement('a-text', {
+            value: (selected ? '✓ ' : (visible ? '• ' : '○ ')) + indent + component.name,
+            align: 'left',
+            anchor: 'left',
+            width: 0.68,
+            color: '#F8FAFC',
+            position: '-0.345 0 0.006'
+          }, row);
+        }
+        this.updatePanelInteractivity();
+      },
+      onUIAction: function (event) {
+        var detail = event.detail || {};
+        switch (detail.action) {
+          case 'component-toggle': this.toggleIndex(Math.round(detail.value)); break;
+          case 'component-hide': this.hideSelected(); break;
+          case 'component-show': this.showSelected(); break;
+          case 'component-isolate': this.isolateSelected(); break;
+          case 'component-show-all': this.showAll(); break;
+          case 'component-clear': this.clearSelection(); break;
+          case 'component-prev': this.page -= 1; this.renderPanel(); break;
+          case 'component-next': this.page += 1; this.renderPanel(); break;
+          case 'component-close': this.setPanelVisible(false); break;
+          case 'component-edges': this.toggleEdges(); break;
+        }
+      },
+      tick: function () {
+        this.updateHelpers();
+      },
+      remove: function () {
+        this.el.removeEventListener('model-normalized', this.onNormalized);
+        this.el.removeEventListener('viewer-ui-action', this.onUIAction);
+        this.clearSelection();
+      }
+    });
+
+    AFRAME.registerComponent('mr-near-reticle', {
+      schema: {
+        camera: {type: 'selector'},
+        placementDistance: {type: 'number', default: 1.25},
+        maxDistance: {type: 'number', default: 1.8},
+        minDistance: {type: 'number', default: 0.65}
+      },
+      init: function () {
+        this.cameraWorld = new THREE.Vector3();
+        this.hitWorld = new THREE.Vector3();
+        this.adjustedWorld = new THREE.Vector3();
+        this.horizontal = new THREE.Vector3();
+      },
+      tick: function () {
+        if (window.QUEST_MODE !== 'mr' || !this.data.camera) return;
+        var viewer = this.el.components['quest-viewer'];
+        if (viewer && viewer.placed) return;
+
+        var hitTest = this.el.components['ar-hit-test'];
+        var reticleMesh = hitTest && hitTest.bboxMesh;
+        if (!reticleMesh || !reticleMesh.visible) return;
+
+        this.data.camera.object3D.getWorldPosition(this.cameraWorld);
+        reticleMesh.getWorldPosition(this.hitWorld);
+        this.horizontal.copy(this.hitWorld).sub(this.cameraWorld);
+        this.horizontal.y = 0;
+
+        var distance = this.horizontal.length();
+        if (!Number.isFinite(distance) || distance < 0.0001) return;
+
+        var desiredDistance = distance;
+        if (distance > this.data.maxDistance) desiredDistance = this.data.placementDistance;
+        else if (distance < this.data.minDistance) desiredDistance = this.data.minDistance;
+        if (Math.abs(desiredDistance - distance) < 0.001) return;
+
+        this.horizontal.multiplyScalar(desiredDistance / distance);
+        this.adjustedWorld.copy(this.cameraWorld).add(this.horizontal);
+        this.adjustedWorld.y = this.hitWorld.y;
+
+        if (reticleMesh.parent) reticleMesh.parent.worldToLocal(this.adjustedWorld);
+        reticleMesh.position.copy(this.adjustedWorld);
+      }
+    });
+
+    AFRAME.registerComponent('quest-viewer', {
+      schema: {
+        pivot: {type: 'selector'},
+        asset: {type: 'selector'},
+        rig: {type: 'selector'},
+        camera: {type: 'selector'},
+        left: {type: 'selector'},
+        right: {type: 'selector'},
+        floor: {type: 'selector'},
+        grid: {type: 'selector'},
+        reticle: {type: 'selector'},
+        info: {type: 'selector'},
+        infoText: {type: 'selector'},
+        modeText: {type: 'selector'},
+        teleportMarker: {type: 'selector'},
+        scalePanel: {type: 'selector'},
+        scaleValueText: {type: 'selector'},
+        scaleKnob: {type: 'selector'},
+        componentPanel: {type: 'selector'},
+        freeGrabButton: {type: 'selector'},
+        freeGrabButtonText: {type: 'selector'},
+        moveSpeed: {type: 'number', default: 1.8},
+        turnSpeed: {type: 'number', default: 72},
+        verticalSpeed: {type: 'number', default: 1.0},
+        modelMoveSpeed: {type: 'number', default: 0.55},
+        modelVerticalSpeed: {type: 'number', default: 0.42},
+        placementDistance: {type: 'number', default: 1.25},
+        maxPlacementDistance: {type: 'number', default: 1.8}
+      },
+      init: function () {
+        this.modeType = window.QUEST_MODE;
+        this.pivot = this.data.pivot;
+        this.asset = this.data.asset;
+        this.rig = this.data.rig;
+        this.camera = this.data.camera;
+        this.left = this.data.left;
+        this.right = this.data.right;
+        this.floor = this.data.floor;
+        this.grid = this.data.grid;
+        this.reticle = this.data.reticle;
+        this.info = this.data.info;
+        this.infoText = this.data.infoText;
+        this.modeText = this.data.modeText;
+        this.teleportMarker = this.data.teleportMarker;
+        this.scalePanel = this.data.scalePanel;
+        this.scaleValueText = this.data.scaleValueText;
+        this.scaleKnob = this.data.scaleKnob;
+        this.componentPanel = this.data.componentPanel;
+        this.freeGrabButton = this.data.freeGrabButton;
+        this.freeGrabButtonText = this.data.freeGrabButtonText;
+
+        this.ready = false;
+        this.placed = this.modeType === 'vr';
+        this.interactionMode = this.modeType === 'vr' ? 'nav' : 'move';
+        this.scalePercent = MOJA.clamp(Number(window.MOJA_START_SCALE) || 100, 10, 500);
+        this.baseSize = new THREE.Vector3(1, 1, 1);
+        this.axes = {left: new THREE.Vector2(), right: new THREE.Vector2()};
+        this.verticalUp = false;
+        this.verticalDown = false;
+        this.grips = {left: false, right: false};
+        this.grabMoving = false;
+        this.twoGripRotating = false;
+        this.scalePanelVisible = false;
+        this.freeGrab3D = false;
+        this.freeGrabMoving = false;
+        this.freeGrabHand = null;
+
+        this.cameraQuaternion = new THREE.Quaternion();
+        this.forward = new THREE.Vector3();
+        this.rightVector = new THREE.Vector3();
+        this.moveVector = new THREE.Vector3();
+        this.cameraWorldBefore = new THREE.Vector3();
+        this.cameraWorldAfter = new THREE.Vector3();
+        this.worldPosition = new THREE.Vector3();
+        this.reticleWorld = new THREE.Vector3();
+        this.controllerPosition = new THREE.Vector3();
+        this.grabStartController = new THREE.Vector3();
+        this.grabStartModel = new THREE.Vector3();
+        this.leftPosition = new THREE.Vector3();
+        this.rightPosition = new THREE.Vector3();
+        this.startHandVector = new THREE.Vector3();
+        this.currentHandVector = new THREE.Vector3();
+        this.startHandAngle = 0;
+        this.startModelRotationY = 0;
+
+        this.freeGrabStartController = new THREE.Vector3();
+        this.freeGrabCurrentController = new THREE.Vector3();
+        this.freeGrabStartModel = new THREE.Vector3();
+        this.freeGrabStartControllerQuat = new THREE.Quaternion();
+        this.freeGrabStartControllerQuatInv = new THREE.Quaternion();
+        this.freeGrabCurrentControllerQuat = new THREE.Quaternion();
+        this.freeGrabDeltaQuat = new THREE.Quaternion();
+        this.freeGrabStartModelQuat = new THREE.Quaternion();
+        this.parentWorldQuat = new THREE.Quaternion();
+        this.parentWorldQuatInv = new THREE.Quaternion();
+
+        this.onNormalized = this.onNormalized.bind(this);
+        this.onRaySelect = this.onRaySelect.bind(this);
+        this.onARSelect = this.onARSelect.bind(this);
+        this.onUIAction = this.onUIAction.bind(this);
+        this.onScaleRequest = this.onScaleRequest.bind(this);
+
+        this.configureScene();
+        this.el.addEventListener('model-normalized', this.onNormalized);
+        this.el.addEventListener('ar-hit-test-select', this.onARSelect);
+        this.el.addEventListener('viewer-ui-action', this.onUIAction);
+        if (this.right) this.right.addEventListener('moja-ray-select', this.onRaySelect);
+        window.addEventListener('moja-scale-request', this.onScaleRequest);
+        this.bindControllers();
+
+        if (this.pivot) this.pivot.object3D.visible = this.modeType === 'vr';
+        if (this.info) this.info.object3D.visible = false;
+        if (this.reticle) this.reticle.object3D.visible = false;
+        if (this.teleportMarker) this.teleportMarker.object3D.visible = false;
+        if (this.scalePanel) this.scalePanel.object3D.visible = false;
+        if (this.componentPanel) this.componentPanel.object3D.visible = false;
+        this.setScalePanelInteractive(false);
+        this.updateScalePanel();
+        this.updateFreeGrabButton();
+        this.updateModeUI();
+      },
+      configureScene: function () {
+        this.el.removeAttribute('shadow');
+        this.el.setAttribute('renderer', {
+          antialias: true,
+          alpha: this.modeType === 'mr',
+          colorManagement: true,
+          physicallyCorrectLights: false,
+          highRefreshRate: true,
+          precision: 'medium'
+        });
+        if (this.modeType === 'mr') {
+          this.el.removeAttribute('background');
+          this.el.setAttribute('xr-mode-ui', 'XRMode: ar; enterARButton: #enterXR; enterVREnabled: false');
+          this.el.setAttribute('webxr', 'referenceSpaceType: local-floor; requiredFeatures: hit-test,local-floor; optionalFeatures: anchors,bounded-floor');
+          this.el.setAttribute('ar-hit-test', 'target: #placementReticle; enabled: true; type: map; mapSize: 0.34 0.34');
+          this.el.setAttribute(
+            'mr-near-reticle',
+            'camera: #camera; placementDistance: ' + this.data.placementDistance +
+            '; maxDistance: ' + this.data.maxPlacementDistance +
+            '; minDistance: 0.65'
+          );
+          if (this.floor) {
+            this.floor.object3D.visible = false;
+            this.floor.classList.remove('ray-target', 'teleportable', 'measure-target');
+          }
+          if (this.grid) this.grid.object3D.visible = false;
+        } else {
+          this.el.setAttribute('background', 'color: #EDF2F7');
+          this.el.setAttribute('xr-mode-ui', 'XRMode: vr; enterVRButton: #enterXR; enterAREnabled: false');
+          this.el.setAttribute('webxr', 'referenceSpaceType: local-floor; requiredFeatures: local-floor; optionalFeatures: bounded-floor');
+          this.el.removeAttribute('ar-hit-test');
+          this.el.removeAttribute('mr-near-reticle');
+          if (this.floor) {
+            this.floor.object3D.visible = true;
+            this.floor.classList.add('ray-target', 'teleportable', 'measure-target');
+          }
+          if (this.grid) this.grid.object3D.visible = true;
+        }
+        var self = this;
+        this.el.addEventListener('renderstart', function () {
+          MOJA.disableShadows(self.el, self.asset && self.asset.getObject3D('mesh'));
+        });
+      },
+      bindControllers: function () {
+        var self = this;
+        if (this.left) {
+          this.left.addEventListener('thumbstickmoved', function (event) {
+            var detail = event.detail || {};
+            self.axes.left.set(detail.x || 0, detail.y || 0);
+          });
+          this.left.addEventListener('thumbsticktouchend', function () { self.axes.left.set(0, 0); });
+          this.left.addEventListener('xbuttondown', function () { self.cycleMode(); });
+          this.left.addEventListener('ybuttondown', function () { self.handleY(); });
+          this.left.addEventListener('gripdown', function () { self.setGrip('left', true); });
+          this.left.addEventListener('gripup', function () { self.setGrip('left', false); });
+        }
+        if (this.right) {
+          this.right.addEventListener('thumbstickmoved', function (event) {
+            var detail = event.detail || {};
+            self.axes.right.set(detail.x || 0, detail.y || 0);
+          });
+          this.right.addEventListener('thumbsticktouchend', function () { self.axes.right.set(0, 0); });
+          this.right.addEventListener('triggerdown', function () { self.updateRayColor(); });
+          this.right.addEventListener('abuttondown', function () { self.verticalUp = true; });
+          this.right.addEventListener('abuttonup', function () { self.verticalUp = false; });
+          this.right.addEventListener('bbuttondown', function () { self.verticalDown = true; });
+          this.right.addEventListener('bbuttonup', function () { self.verticalDown = false; });
+          this.right.addEventListener('gripdown', function () { self.setGrip('right', true); });
+          this.right.addEventListener('gripup', function () { self.setGrip('right', false); });
+        }
+      },
+      getMeasurement: function () {
+        return this.el.components['measurement-tool'];
+      },
+      getSelection: function () {
+        return this.el.components['component-selection'];
+      },
+      getAnnotation: function () {
+        return this.el.components['annotation-control'];
+      },
+      onNormalized: function (event) {
+        if (!event.detail || event.detail.asset !== this.asset) return;
+        this.baseSize.copy(event.detail.size);
+        this.ready = true;
+        MOJA.disableShadows(this.el, this.asset.getObject3D('mesh'));
+        if (this.modeType === 'mr') {
+          this.pivot.object3D.position.set(0, 0, -1.2);
+          this.pivot.object3D.rotation.set(0, 0, 0);
+          this.pivot.object3D.scale.setScalar(this.scalePercent / 100);
+          this.pivot.object3D.visible = false;
+          this.placed = false;
+        } else {
+          this.pivot.object3D.position.set(0, 0, 0);
+          this.pivot.object3D.rotation.set(0, 0, 0);
+          this.pivot.object3D.scale.set(1, 1, 1);
+          this.pivot.object3D.visible = true;
+          this.placed = true;
+          var horizontal = Math.max(this.baseSize.x, this.baseSize.z);
+          var startDistance = MOJA.clamp(horizontal * 0.68 + 2.2, 3.2, 32);
+          this.rig.object3D.position.set(0, 0, startDistance);
+          this.rig.object3D.rotation.set(0, 0, 0);
+          this.configureGrid();
+          this.updateInfo();
+        }
+        this.updateModeUI();
+        this.refreshRaycaster();
+      },
+      configureGrid: function () {
+        if (!this.grid) return;
+        var horizontal = Math.max(this.baseSize.x, this.baseSize.z);
+        var size = Math.max(12, Math.ceil(horizontal * 2.2));
+        if (size % 2 !== 0) size += 1;
+        this.grid.setAttribute('metric-grid', {
+          size: size,
+          divisions: Math.min(160, size),
+          opacity: 0.15
+        });
+        this.grid.object3D.position.set(0, 0, 0);
+        this.grid.object3D.visible = this.modeType === 'vr';
+      },
+      onARSelect: function () {
+        if (this.modeType !== 'mr' || !this.ready || this.placed || !this.reticle) return;
+        this.placeAtReticle();
+      },
+      placeAtReticle: function () {
+        this.reticle.object3D.getWorldPosition(this.worldPosition);
+        var parent = this.pivot.object3D.parent;
+        if (parent) parent.worldToLocal(this.worldPosition);
+
+        this.pivot.object3D.position.copy(this.worldPosition);
+        this.pivot.object3D.rotation.set(0, 0, 0);
+        this.pivot.object3D.scale.setScalar(this.scalePercent / 100);
+        this.pivot.object3D.visible = true;
+        this.placed = true;
+
+        this.el.setAttribute('ar-hit-test', 'enabled', false);
+        this.reticle.object3D.visible = false;
+        this.updateInfo();
+        this.updateModeUI();
+        this.refreshRaycaster();
+      },
+      resetPlacement: function () {
+        if (this.modeType !== 'mr' || !this.ready) return;
+        this.placed = false;
+        this.grabMoving = false;
+        this.twoGripRotating = false;
+        this.grips.left = false;
+        this.grips.right = false;
+        this.pivot.object3D.visible = false;
+        if (this.info) this.info.object3D.visible = false;
+        this.getMeasurement().clear();
+        this.getMeasurement().setEnabled(false);
+        var selection = this.getSelection();
+        if (selection) {
+          selection.showAll();
+          selection.clearSelection();
+          selection.setEnabled(false);
+        }
+        var annotation = this.getAnnotation();
+        if (annotation) annotation.setEnabled(false);
+        this.interactionMode = 'move';
+        this.setScalePanelVisible(false);
+        this.el.setAttribute('ar-hit-test', 'enabled', true);
+        this.updateModeUI();
+      },
+      onScaleRequest: function (event) {
+        var value = event.detail && Number(event.detail.percent);
+        if (Number.isFinite(value)) this.setScalePercent(value);
+      },
+      setScalePercent: function (percent, silent) {
+        if (this.modeType !== 'mr') return;
+        this.scalePercent = Math.round(MOJA.clamp(Number(percent) || 100, 10, 500));
+        if (this.pivot) this.pivot.object3D.scale.setScalar(this.scalePercent / 100);
+        this.updateScalePanel();
+        if (this.ready && this.placed) this.updateInfo();
+        try {
+          window.localStorage.setItem('moja-test-mr-scale', String(this.scalePercent));
+        } catch (error) {}
+        if (!silent) {
+          window.dispatchEvent(new CustomEvent('moja-scale-changed', {detail: {percent: this.scalePercent}}));
+        }
+      },
+      updateScalePanel: function () {
+        if (this.scaleValueText) {
+          var scale = this.scalePercent / 100;
+          this.scaleValueText.setAttribute('value', this.scalePercent + '%  •  ' + MOJA.formatScaleRatio(scale));
+        }
+        if (this.scaleKnob) {
+          var clamped = MOJA.clamp(this.scalePercent, 10, 300);
+          var normalized = (clamped - 10) / 290;
+          this.scaleKnob.object3D.position.x = (normalized - 0.5) * 0.42;
+        }
+      },
+      setScalePanelVisible: function (visible) {
+        this.scalePanelVisible = Boolean(visible) && this.modeType === 'mr' && this.placed && this.interactionMode === 'move';
+        if (this.scalePanel) this.scalePanel.object3D.visible = this.scalePanelVisible;
+        this.setScalePanelInteractive(this.scalePanelVisible);
+        this.refreshRaycaster();
+      },
+      setScalePanelInteractive: function (active) {
+        if (!this.scalePanel) return;
+        this.scalePanel.querySelectorAll('.scale-ui').forEach(function (control) {
+          if (active) control.classList.add('ray-target');
+          else control.classList.remove('ray-target');
+        });
+      },
+      updateInfo: function () {
+        if (!this.ready || !this.placed || !this.info || !this.infoText) {
+          if (this.info) this.info.object3D.visible = false;
+          return;
+        }
+        var scale = this.modeType === 'mr' ? this.scalePercent / 100 : 1;
+        var x = this.baseSize.x * scale;
+        var z = this.baseSize.z * scale;
+        var y = this.baseSize.y * scale;
+        var text = 'SKALA ' + Math.round(scale * 100) + '%  •  ' + MOJA.formatScaleRatio(scale) + '  •  ' +
+          MOJA.formatMetres(x) + ' × ' + MOJA.formatMetres(z) + ' × ' + MOJA.formatMetres(y) + ' m';
+        this.infoText.setAttribute('value', text);
+        this.pivot.object3D.getWorldPosition(this.worldPosition);
+        this.worldPosition.y += y + Math.max(0.10, Math.min(0.35, y * 0.045));
+        this.info.object3D.position.copy(this.worldPosition);
+        var infoScale = MOJA.clamp(Math.max(x, y, z) * 0.052, 0.24, 0.62);
+        this.info.object3D.scale.setScalar(infoScale);
+        this.info.object3D.visible = true;
+      },
+      cycleMode: function () {
+        if (!this.ready || (this.modeType === 'mr' && !this.placed)) return;
+        var selection = this.getSelection();
+        var measurement = this.getMeasurement();
+        var annotation = this.getAnnotation();
+
+        if (this.modeType === 'vr') {
+          if (this.interactionMode === 'nav') this.interactionMode = 'measure';
+          else if (this.interactionMode === 'measure') this.interactionMode = 'select';
+          else if (this.interactionMode === 'select') this.interactionMode = 'annotate';
+          else this.interactionMode = 'nav';
+        } else {
+          if (this.interactionMode === 'move') this.interactionMode = 'measure';
+          else if (this.interactionMode === 'measure') this.interactionMode = 'select';
+          else if (this.interactionMode === 'select') this.interactionMode = 'annotate';
+          else this.interactionMode = 'move';
+        }
+
+        measurement.setEnabled(this.interactionMode === 'measure');
+        if (selection) selection.setEnabled(this.interactionMode === 'select');
+        if (annotation) annotation.setEnabled(this.interactionMode === 'annotate');
+
+        if (this.interactionMode !== 'move') this.setScalePanelVisible(false);
+        if (this.teleportMarker) this.teleportMarker.object3D.visible = false;
+        this.updateModeUI();
+        this.updateRayColor();
+      },
+      handleY: function () {
+        if (!this.ready) return;
+        if (this.interactionMode === 'measure') {
+          this.getMeasurement().clear();
+          return;
+        }
+        if (this.interactionMode === 'select') {
+          var selection = this.getSelection();
+          if (selection) selection.togglePanel();
+          return;
+        }
+        if (this.interactionMode === 'annotate') {
+          var annotation = this.getAnnotation();
+          if (annotation) annotation.togglePanel();
+          return;
+        }
+        if (this.modeType === 'mr' && this.interactionMode === 'move') {
+          this.setScalePanelVisible(!this.scalePanelVisible);
+        }
+      },
+      updateModeUI: function () {
+        if (!this.modeText) return;
+        if (this.modeType === 'mr' && !this.placed) {
+          this.modeText.setAttribute('value', 'USTAWIANIE  •  TRIGGER: POSTAW MODEL');
+          this.modeText.setAttribute('color', '#D1FAE5');
+          return;
+        }
+        if (this.interactionMode === 'measure') {
+          this.modeText.setAttribute('value', 'POMIAR  •  TRIGGER: PUNKT  •  Y: WYCZYŚĆ  •  X: KOMPONENTY');
+          this.modeText.setAttribute('color', '#FBBF24');
+        } else if (this.interactionMode === 'select') {
+          this.modeText.setAttribute('value', 'KOMPONENTY  •  TRIGGER: WYBIERZ  •  Y: PANEL  •  X: ADNOTACJE');
+          this.modeText.setAttribute('color', '#C4B5FD');
+        } else if (this.interactionMode === 'annotate') {
+          this.modeText.setAttribute('value', 'ADNOTACJE 3D  •  RYSUJ: TRZYMAJ TRIGGER  •  TEKST: PUŚĆ TRIGGER W PUNKCIE LASERA  •  Y: PANEL');
+          this.modeText.setAttribute('color', '#F9A8D4');
+        } else if (this.modeType === 'mr') {
+          this.modeText.setAttribute(
+            'value',
+            this.freeGrab3D
+              ? 'MR FREE GRAB 3D  •  1 GRIP: PRZESUŃ + OBRÓĆ  •  2 GRIPY: OBRÓT Y  •  Y: SKALA'
+              : 'MR  •  L: PRZESUŃ  •  PRAWY GRIP: PRZESUŃ  •  2 GRIPY: OBRÓT Y  •  Y: SKALA'
+          );
+          this.modeText.setAttribute('color', '#D1FAE5');
+        } else {
+          this.modeText.setAttribute('value', 'NAWIGACJA  •  L: RUCH  •  R: OBRÓT  •  A/B: GÓRA/DÓŁ  •  TRIGGER: TELEPORT');
+          this.modeText.setAttribute('color', '#E0F2FE');
+        }
+      },
+      updateRayColor: function () {
+        if (!this.right) return;
+        var ray = this.right.components['trigger-ray'];
+        if (!ray) return;
+        if (this.interactionMode === 'measure') ray.setColor('#F59E0B');
+        else if (this.interactionMode === 'select') ray.setColor('#A78BFA');
+        else if (this.interactionMode === 'annotate') ray.setColor('#F472B6');
+        else ray.setColor('#38BDF8');
+      },
+      onRaySelect: function (event) {
+        if (!this.ready) return;
+        var intersection = event.detail && event.detail.intersection;
+        if (!intersection) return;
+        var targetEl = MOJA.getInteractiveEl(intersection);
+        if (targetEl && targetEl.classList && targetEl.classList.contains('ui-click')) {
+          targetEl.emit('click', {intersection: intersection}, false);
+          return;
+        }
+        if (this.modeType === 'mr' && !this.placed) return;
+        if (this.interactionMode === 'measure') {
+          if (targetEl && targetEl.classList.contains('measure-target')) this.getMeasurement().addIntersection(intersection);
+          return;
+        }
+        if (this.interactionMode === 'select') {
+          var selection = this.getSelection();
+          if (selection) selection.selectIntersection(intersection);
+          return;
+        }
+        if (this.interactionMode === 'annotate') return;
+        if (this.modeType === 'vr' && this.isValidTeleport(intersection)) this.teleportTo(intersection.point);
+      },
+      isValidTeleport: function (intersection) {
+        var targetEl = MOJA.getInteractiveEl(intersection);
+        if (!targetEl || !targetEl.classList.contains('teleportable')) return false;
+        return MOJA.intersectionNormalY(intersection) >= 0.48;
+      },
+      teleportTo: function (point) {
+        if (!this.rig || !this.camera || !point) return;
+        this.camera.object3D.getWorldPosition(this.cameraWorldBefore);
+        this.rig.object3D.position.x += point.x - this.cameraWorldBefore.x;
+        this.rig.object3D.position.z += point.z - this.cameraWorldBefore.z;
+        this.rig.object3D.position.y = point.y;
+        this.rig.object3D.updateMatrixWorld(true);
+      },
+      updateTeleportMarker: function () {
+        if (this.modeType !== 'vr' || this.interactionMode !== 'nav' || !this.teleportMarker || !this.right) {
+          if (this.teleportMarker) this.teleportMarker.object3D.visible = false;
+          return;
+        }
+        var triggerRay = this.right.components['trigger-ray'];
+        if (!triggerRay || !triggerRay.active || !triggerRay.currentIntersection) {
+          this.teleportMarker.object3D.visible = false;
+          return;
+        }
+        var intersection = triggerRay.currentIntersection;
+        if (!this.isValidTeleport(intersection)) {
+          this.teleportMarker.object3D.visible = false;
+          triggerRay.setColor('#FB7185');
+          return;
+        }
+        triggerRay.setColor('#38BDF8');
+        this.teleportMarker.object3D.position.copy(intersection.point);
+        this.teleportMarker.object3D.position.y += 0.018;
+        this.teleportMarker.object3D.visible = true;
+      },
+      onUIAction: function (event) {
+        var detail = event.detail || {};
+        switch (detail.action) {
+          case 'scale': this.setScalePercent(detail.value); break;
+          case 'scale-delta': this.setScalePercent(this.scalePercent + detail.value); break;
+          case 'replace': this.resetPlacement(); break;
+          case 'close-scale': this.setScalePanelVisible(false); break;
+          case 'free-grab-toggle': this.toggleFreeGrab3D(); break;
+          case 'measure': this.cycleMode(); break;
+        }
+      },
+      refreshRaycaster: function () {
+        if (!this.right) return;
+        var ray = this.right.components['trigger-ray'];
+        if (ray) window.setTimeout(function () { ray.refresh(); }, 0);
+      },
+      setGrip: function (hand, active) {
+        if (this.modeType !== 'mr' || !this.ready || !this.placed || this.interactionMode !== 'move') return;
+
+        this.grips[hand] = active;
+
+        if (this.grips.left && this.grips.right) {
+          this.freeGrabMoving = false;
+          this.beginTwoGripRotation();
+          return;
+        }
+
+        this.twoGripRotating = false;
+
+        if (this.freeGrab3D) {
+          var remainingHand = this.grips.right ? 'right' : (this.grips.left ? 'left' : null);
+          if (remainingHand) this.beginFreeGrab(remainingHand);
+          else {
+            this.freeGrabMoving = false;
+            this.freeGrabHand = null;
+          }
+          this.grabMoving = false;
+          return;
+        }
+
+        this.freeGrabMoving = false;
+        this.freeGrabHand = null;
+
+        if (this.grips.right) this.beginMoveGrab();
+        else this.grabMoving = false;
+      },
+      controllerPositionInPivotParent: function (controller, output) {
+        controller.object3D.getWorldPosition(output);
+        var parent = this.pivot.object3D.parent;
+        if (parent) parent.worldToLocal(output);
+        return output;
+      },
+      controllerQuaternionInPivotParent: function (controller, output) {
+        controller.object3D.getWorldQuaternion(output);
+        var parent = this.pivot.object3D.parent;
+        if (parent) {
+          parent.getWorldQuaternion(this.parentWorldQuat);
+          this.parentWorldQuatInv.copy(this.parentWorldQuat).invert();
+          output.premultiply(this.parentWorldQuatInv);
+        }
+        return output;
+      },
+
+      updateFreeGrabButton: function () {
+        if (!this.freeGrabButton || !this.freeGrabButtonText) return;
+        if (this.modeType !== 'mr') {
+          this.freeGrabButton.object3D.visible = false;
+          return;
+        }
+        this.freeGrabButton.object3D.visible = true;
+        this.freeGrabButton.setAttribute('color', this.freeGrab3D ? '#0F766E' : '#334155');
+        this.freeGrabButtonText.setAttribute(
+          'value',
+          this.freeGrab3D ? 'FREE GRAB 3D: ON' : 'FREE GRAB 3D: OFF'
+        );
+        this.freeGrabButtonText.setAttribute('color', this.freeGrab3D ? '#CCFBF1' : '#E2E8F0');
+      },
+
+      toggleFreeGrab3D: function () {
+        if (this.modeType !== 'mr') return;
+        this.freeGrab3D = !this.freeGrab3D;
+        this.freeGrabMoving = false;
+        this.freeGrabHand = null;
+        this.grabMoving = false;
+        this.twoGripRotating = false;
+        this.grips.left = false;
+        this.grips.right = false;
+        this.updateFreeGrabButton();
+        this.updateModeUI();
+      },
+
+      beginFreeGrab: function (hand) {
+        var controller = hand === 'left' ? this.left : this.right;
+        if (!controller) return;
+
+        this.freeGrabHand = hand;
+        this.freeGrabMoving = true;
+        this.grabMoving = false;
+        this.twoGripRotating = false;
+
+        this.controllerPositionInPivotParent(controller, this.freeGrabStartController);
+        this.controllerQuaternionInPivotParent(controller, this.freeGrabStartControllerQuat);
+        this.freeGrabStartControllerQuatInv.copy(this.freeGrabStartControllerQuat).invert();
+
+        this.freeGrabStartModel.copy(this.pivot.object3D.position);
+        this.freeGrabStartModelQuat.copy(this.pivot.object3D.quaternion);
+      },
+
+      updateFreeGrab: function () {
+        if (!this.freeGrab3D || !this.freeGrabMoving || !this.freeGrabHand) return;
+
+        var controller = this.freeGrabHand === 'left' ? this.left : this.right;
+        if (!controller || !this.grips[this.freeGrabHand]) {
+          this.freeGrabMoving = false;
+          this.freeGrabHand = null;
+          return;
+        }
+
+        this.controllerPositionInPivotParent(controller, this.freeGrabCurrentController);
+        this.moveVector.copy(this.freeGrabCurrentController).sub(this.freeGrabStartController);
+        this.pivot.object3D.position.copy(this.freeGrabStartModel).add(this.moveVector);
+
+        this.controllerQuaternionInPivotParent(controller, this.freeGrabCurrentControllerQuat);
+        this.freeGrabDeltaQuat.copy(this.freeGrabCurrentControllerQuat).multiply(this.freeGrabStartControllerQuatInv);
+        this.pivot.object3D.quaternion.copy(this.freeGrabDeltaQuat).multiply(this.freeGrabStartModelQuat).normalize();
+
+        this.updateInfo();
+      },
+
+      beginMoveGrab: function () {
+        if (this.freeGrab3D || !this.right || this.grips.left) return;
+        this.grabMoving = true;
+        this.twoGripRotating = false;
+        this.controllerPositionInPivotParent(this.right, this.grabStartController);
+        this.grabStartModel.copy(this.pivot.object3D.position);
+      },
+      beginTwoGripRotation: function () {
+        if (!this.left || !this.right) return;
+        this.controllerPositionInPivotParent(this.left, this.leftPosition);
+        this.controllerPositionInPivotParent(this.right, this.rightPosition);
+        this.startHandVector.copy(this.rightPosition).sub(this.leftPosition);
+        this.startHandVector.y = 0;
+        if (this.startHandVector.lengthSq() < 0.0025) return;
+        this.startHandAngle = Math.atan2(this.startHandVector.z, this.startHandVector.x);
+        this.startModelRotationY = this.pivot.object3D.rotation.y;
+        this.grabMoving = false;
+        this.twoGripRotating = true;
+      },
+      updateMoveGrab: function () {
+        if (!this.grabMoving || this.twoGripRotating || !this.grips.right) return;
+        this.controllerPositionInPivotParent(this.right, this.controllerPosition);
+        this.moveVector.copy(this.controllerPosition).sub(this.grabStartController);
+        this.pivot.object3D.position.copy(this.grabStartModel).add(this.moveVector);
+        this.updateInfo();
+      },
+      updateTwoGripRotation: function () {
+        if (!this.twoGripRotating || !this.grips.left || !this.grips.right) return;
+        this.controllerPositionInPivotParent(this.left, this.leftPosition);
+        this.controllerPositionInPivotParent(this.right, this.rightPosition);
+        this.currentHandVector.copy(this.rightPosition).sub(this.leftPosition);
+        this.currentHandVector.y = 0;
+        if (this.currentHandVector.lengthSq() < 0.0025) return;
+        var angle = Math.atan2(this.currentHandVector.z, this.currentHandVector.x);
+        this.pivot.object3D.rotation.y = this.startModelRotationY - (angle - this.startHandAngle);
+        this.updateInfo();
+      },
+      updateVRMovement: function (dt) {
+        var x = Math.abs(this.axes.left.x) > 0.12 ? this.axes.left.x : 0;
+        var y = Math.abs(this.axes.left.y) > 0.12 ? this.axes.left.y : 0;
+        if (x === 0 && y === 0) return;
+        this.camera.object3D.getWorldQuaternion(this.cameraQuaternion);
+        this.forward.set(0, 0, -1).applyQuaternion(this.cameraQuaternion);
+        this.forward.y = 0;
+        if (this.forward.lengthSq() < 0.0001) return;
+        this.forward.normalize();
+        this.rightVector.crossVectors(this.forward, MOJA.UP).normalize();
+        this.moveVector.copy(this.rightVector).multiplyScalar(x).addScaledVector(this.forward, -y);
+        if (this.moveVector.lengthSq() > 1) this.moveVector.normalize();
+        this.rig.object3D.position.addScaledVector(this.moveVector, this.data.moveSpeed * dt);
+      },
+      updateVRTurning: function (dt) {
+        var x = Math.abs(this.axes.right.x) > 0.14 ? this.axes.right.x : 0;
+        if (x === 0) return;
+        this.camera.object3D.getWorldPosition(this.cameraWorldBefore);
+        this.rig.object3D.rotation.y -= x * THREE.MathUtils.degToRad(this.data.turnSpeed) * dt;
+        this.rig.object3D.updateMatrixWorld(true);
+        this.camera.object3D.getWorldPosition(this.cameraWorldAfter);
+        this.rig.object3D.position.x += this.cameraWorldBefore.x - this.cameraWorldAfter.x;
+        this.rig.object3D.position.z += this.cameraWorldBefore.z - this.cameraWorldAfter.z;
+      },
+      updateMRMovement: function (dt) {
+        if (this.interactionMode !== 'move' || this.grabMoving || this.freeGrabMoving || this.twoGripRotating) return;
+        var x = Math.abs(this.axes.left.x) > 0.12 ? this.axes.left.x : 0;
+        var y = Math.abs(this.axes.left.y) > 0.12 ? this.axes.left.y : 0;
+        if (x === 0 && y === 0) return;
+        this.camera.object3D.getWorldQuaternion(this.cameraQuaternion);
+        this.forward.set(0, 0, -1).applyQuaternion(this.cameraQuaternion);
+        this.forward.y = 0;
+        if (this.forward.lengthSq() < 0.0001) return;
+        this.forward.normalize();
+        this.rightVector.crossVectors(this.forward, MOJA.UP).normalize();
+        this.moveVector.copy(this.rightVector).multiplyScalar(x).addScaledVector(this.forward, -y);
+        if (this.moveVector.lengthSq() > 1) this.moveVector.normalize();
+        this.pivot.object3D.position.addScaledVector(this.moveVector, this.data.modelMoveSpeed * dt);
+        this.updateInfo();
+      },
+      updateVertical: function (dt) {
+        var direction = (this.verticalUp ? 1 : 0) - (this.verticalDown ? 1 : 0);
+        if (direction === 0) return;
+        if (this.modeType === 'vr') {
+          this.rig.object3D.position.y += direction * this.data.verticalSpeed * dt;
+        } else if (this.placed && this.interactionMode === 'move') {
+          this.pivot.object3D.position.y += direction * this.data.modelVerticalSpeed * dt;
+          this.updateInfo();
+        }
+      },
+      tick: function (time, delta) {
+        if (!this.ready) return;
+        var dt = Math.min(delta / 1000, 0.05);
+        if (this.modeType === 'vr') {
+          this.updateVRMovement(dt);
+          this.updateVRTurning(dt);
+          this.updateTeleportMarker();
+        } else if (this.placed) {
+          this.updateFreeGrab();
+          this.updateMoveGrab();
+          this.updateTwoGripRotation();
+          this.updateMRMovement(dt);
+        }
+        this.updateVertical(dt);
+      },
+      remove: function () {
+        this.el.removeEventListener('model-normalized', this.onNormalized);
+        this.el.removeEventListener('ar-hit-test-select', this.onARSelect);
+        this.el.removeEventListener('viewer-ui-action', this.onUIAction);
+        if (this.right) this.right.removeEventListener('moja-ray-select', this.onRaySelect);
+        window.removeEventListener('moja-scale-request', this.onScaleRequest);
+      }
+    });
+  })();
+  </script>
+</head>
+<body>
+  <div class="topbar">
+    <a class="pill" href="index.html?v=12">← Viewer</a>
+    <div id="topTitle" class="pill title">Test • QUEST v12</div>
+    <button id="enterXR" class="pill enter" type="button">ENTER VR</button>
+  </div>
+
+  <div id="legend" class="legend"></div>
+
+  <div id="landing" class="landing">
+    <div class="card">
+      <div id="landingVersion" class="version">META QUEST 3 • v12</div>
+      <h1 id="landingTitle">Test — Virtual Reality</h1>
+      <p id="landingDescription">Model jest zakotwiczony w skali 1:1. Poruszasz się użytkownikiem, mierzysz i zarządzasz widocznością komponentów.</p>
+
+      <div id="mrScaleBox" class="scale-box" hidden>
+        <label for="scaleNumber">Skala modelu</label>
+        <div>
+          <div class="scale-input">
+            <input id="scaleNumber" type="number" min="10" max="500" step="5" value="100" inputmode="numeric" aria-label="Skala modelu w procentach">
+            <input id="scaleRange" type="range" min="10" max="300" step="5" value="100" aria-label="Suwak skali modelu">
+          </div>
+          <div class="presets">
+            <button class="preset" type="button" data-scale="50">50%</button>
+            <button class="preset" type="button" data-scale="75">75%</button>
+            <button class="preset" type="button" data-scale="100">100%</button>
+            <button class="preset" type="button" data-scale="125">125%</button>
+            <button class="preset" type="button" data-scale="150">150%</button>
+            <button class="preset" type="button" data-scale="200">200%</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="landingControls" class="controls"></div>
+      <div class="actions">
+        <a class="button" href="index.html?v=12">← Wróć</a>
+        <button id="landingEnter" class="button primary" type="button">ENTER VR — QUEST 3</button>
+      </div>
+      <div id="landingNote" class="note">Subtelne krawędzie, oświetlenie modelu 360° i brak ciężkich map cieni.</div>
+    </div>
+  </div>
+
+  <a-scene
+    id="scene"
+    quest-viewer="pivot: #modelPivot; asset: #modelAsset; rig: #rig; camera: #camera; left: #leftHand; right: #rightHand; floor: #floor; grid: #metricGrid; reticle: #placementReticle; info: #modelInfo; infoText: #modelInfoText; modeText: #modeText; teleportMarker: #teleportMarker; scalePanel: #scalePanel; scaleValueText: #scaleValueText; scaleKnob: #scaleKnob; componentPanel: #componentPanel; freeGrabButton: #freeGrabButton; freeGrabButtonText: #freeGrabButtonText"
+    component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; rows: 6"
+    lighting-control="ambient: #ambientLight; front: #lightFront; back: #lightBack; left: #lightLeft; right: #lightRight; top: #lightTop; bottom: #lightBottom; panel: #lightingPanel; valueText: #lightingValueText; detailText: #lightingDetailText; storageKey: moja-test-mr-scale-lighting360"
+    annotation-control="pivot: #modelPivot; root: #annotationRoot; camera: #camera; right: #rightHand; panel: #annotationPanel; keyboard: #annotationKeyboard; preview: #annotationTextPreview; status: #annotationStatus"
+    measurement-tool="target: #modelPivot; pointA: #measurePointA; pointB: #measurePointB; line: #measureLine; label: #measureLabel; labelText: #measureLabelText; color: #F59E0B"
+    loading-screen="backgroundColor: #0B1220; dotsColor: #60A5FA">
+
+    <a-assets timeout="120000">
+      <a-asset-item id="modelSource" src="Test.glb?v=12"></a-asset-item>
+    </a-assets>
+    <!-- OŚWIETLENIE MODELU 360° — bez map cieni -->
+    <a-entity id="ambientLight"
+      light="type: ambient; color: #EAF2FA; intensity: 0.12">
+    </a-entity>
+
+    <!-- Każde światło kierunkowe celuje w środek sceny/modelu. -->
+    <a-entity id="lightFront"
+      light="type: directional; color: #FFFFFF; intensity: 0.18"
+      position="0 4 8">
+    </a-entity>
+
+    <a-entity id="lightBack"
+      light="type: directional; color: #FFFFFF; intensity: 0.18"
+      position="0 4 -8">
+    </a-entity>
+
+    <a-entity id="lightLeft"
+      light="type: directional; color: #FFFFFF; intensity: 0.18"
+      position="-8 4 0">
+    </a-entity>
+
+    <a-entity id="lightRight"
+      light="type: directional; color: #FFFFFF; intensity: 0.18"
+      position="8 4 0">
+    </a-entity>
+
+    <a-entity id="lightTop"
+      light="type: directional; color: #FFFFFF; intensity: 0.24"
+      position="0 10 0">
+    </a-entity>
+
+    <a-entity id="lightBottom"
+      light="type: directional; color: #DDEBFA; intensity: 0.10"
+      position="0 -6 0">
+    </a-entity>
+
+<a-plane
+      id="floor"
+      class="ray-target teleportable measure-target"
+      position="0 -0.012 0"
+      rotation="-90 0 0"
+      width="120"
+      height="120"
+      color="#E1E7ED">
+    </a-plane>
+    <a-entity id="metricGrid" metric-grid="size: 20; divisions: 20; opacity: 0.15"></a-entity>
+
+    <a-ring
+      id="placementReticle"
+      radius-inner="0.11"
+      radius-outer="0.15"
+      rotation="-90 0 0"
+      color="#34D399"
+      material="shader: flat; side: double; transparent: true; opacity: 0.92"
+      visible="false">
+    </a-ring>
+
+    <a-entity id="modelPivot" position="0 0 0" rotation="0 0 0" scale="1 1 1" visible="false">
+      <a-entity
+        id="modelAsset"
+        class="ray-target teleportable measure-target"
+        gltf-model="#modelSource"
+        model-normalizer="pivot: #modelPivot">
+      </a-entity>
+      <a-entity id="annotationRoot"></a-entity>
+    </a-entity>
+
+    <a-entity id="modelInfo" look-at-camera="camera: #camera; yawOnly: true" visible="false">
+      <a-plane width="1.72" height="0.15" color="#0F172A" opacity="0.82" material="shader: flat; transparent: true"></a-plane>
+      <a-text id="modelInfoText" value="SKALA 100% • 1:1" align="center" anchor="center" baseline="center" width="1.58" color="#F8FAFC" position="0 0 0.006"></a-text>
+    </a-entity>
+
+    <a-sphere id="pointerDot" radius="0.017" color="#38BDF8" material="shader: flat" visible="false"></a-sphere>
+    <a-torus id="teleportMarker" radius="0.14" radius-tubular="0.008" rotation="-90 0 0" color="#34D399" material="shader: flat" visible="false"></a-torus>
+
+    <a-sphere id="measurePointA" radius="0.020" color="#F59E0B" material="shader: flat" visible="false"></a-sphere>
+    <a-sphere id="measurePointB" radius="0.020" color="#F59E0B" material="shader: flat" visible="false"></a-sphere>
+    <a-entity id="measureLine" line="start: 0 0 0; end: 0 0 0; color: #F59E0B; opacity: 1" visible="false"></a-entity>
+    <a-entity id="measureLabel" look-at-camera="camera: #camera; yawOnly: false" scale="0.43 0.43 0.43" visible="false">
+      <a-plane width="1.28" height="0.16" color="#111827" opacity="0.88" material="shader: flat; transparent: true"></a-plane>
+      <a-text id="measureLabelText" value="0,000 m" align="center" anchor="center" baseline="center" width="1.16" color="#FDE68A" position="0 0 0.006"></a-text>
+    </a-entity>
+
+    <a-entity id="rig" position="0 0 5">
+      <a-camera id="camera" position="0 1.65 0" look-controls wasd-controls="enabled: false">
+        <a-entity position="0 -0.46 -1.05" scale="0.68 0.68 0.68">
+          <a-plane width="1.55" height="0.105" color="#0F172A" opacity="0.66" material="shader: flat; transparent: true"></a-plane>
+          <a-text id="modeText" value="ŁADOWANIE" align="center" anchor="center" baseline="center" width="1.44" color="#E0F2FE" position="0 0 0.006"></a-text>
+        </a-entity>
+      </a-camera>
+
+      <a-entity id="leftHand" meta-touch-controls="hand: left">
+        <a-entity id="scalePanel" position="0.07 0.12 -0.29" rotation="-35 0 0" scale="0.54 0.54 0.54" visible="false">
+          <a-plane width="0.72" height="0.68" color="#0F172A" opacity="0.94" material="shader: flat; transparent: true"></a-plane>
+          <a-text value="SKALA MODELU" align="center" width="0.66" color="#E2E8F0" position="0 0.205 0.006"></a-text>
+          <a-text id="scaleValueText" value="100% • 1:1" align="center" width="0.62" color="#86EFAC" position="0 0.145 0.006"></a-text>
+
+          <a-plane class="scale-ui ui-click" width="0.18" height="0.068" color="#334155" position="-0.22 0.065 0.008" viewer-button="action: scale-delta; value: -10">
+            <a-text value="−10%" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="scale-ui ui-click" width="0.18" height="0.068" color="#16A34A" position="0 0.065 0.008" viewer-button="action: scale; value: 100">
+            <a-text value="100%" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="scale-ui ui-click" width="0.18" height="0.068" color="#334155" position="0.22 0.065 0.008" viewer-button="action: scale-delta; value: 10">
+            <a-text value="+10%" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+
+          <a-plane class="scale-ui ui-click" width="0.105" height="0.055" color="#1E3A5F" position="-0.25 -0.020 0.008" viewer-button="action: scale; value: 50">
+            <a-text value="50" align="center" width="0.22" color="#DBEAFE" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="scale-ui ui-click" width="0.105" height="0.055" color="#1E3A5F" position="-0.125 -0.020 0.008" viewer-button="action: scale; value: 75">
+            <a-text value="75" align="center" width="0.22" color="#DBEAFE" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="scale-ui ui-click" width="0.105" height="0.055" color="#166534" position="0 -0.020 0.008" viewer-button="action: scale; value: 100">
+            <a-text value="100" align="center" width="0.22" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="scale-ui ui-click" width="0.105" height="0.055" color="#1E3A5F" position="0.125 -0.020 0.008" viewer-button="action: scale; value: 150">
+            <a-text value="150" align="center" width="0.22" color="#DBEAFE" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="scale-ui ui-click" width="0.105" height="0.055" color="#1E3A5F" position="0.25 -0.020 0.008" viewer-button="action: scale; value: 200">
+            <a-text value="200" align="center" width="0.22" color="#DBEAFE" position="0 0 0.006"></a-text>
+          </a-plane>
+
+          <a-plane class="scale-ui ui-click" width="0.42" height="0.045" color="#334155" position="0 -0.100 0.008" scale-slider="min: 10; max: 300; width: 0.42">
+            <a-plane id="scaleKnob" width="0.020" height="0.070" color="#4ADE80" position="0 0 0.008"></a-plane>
+          </a-plane>
+
+          <a-plane id="freeGrabButton" class="scale-ui ui-click" width="0.50" height="0.060" color="#334155" position="0 -0.185 0.008" viewer-button="action: free-grab-toggle">
+            <a-text id="freeGrabButtonText" value="FREE GRAB 3D: OFF" align="center" width="0.62" color="#E2E8F0" position="0 0 0.006"></a-text>
+          </a-plane>
+
+          <a-plane class="scale-ui ui-click" width="0.27" height="0.060" color="#7C2D12" position="-0.155 -0.275 0.008" viewer-button="action: replace">
+            <a-text value="USTAW PONOWNIE" align="center" width="0.38" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="scale-ui ui-click" width="0.18" height="0.060" color="#475569" position="0.215 -0.275 0.008" viewer-button="action: close-scale">
+            <a-text value="ZAMKNIJ" align="center" width="0.27" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+        </a-entity>
+
+        <a-entity id="componentPanel" position="0.10 0.16 -0.37" rotation="-35 0 0" scale="0.52 0.52 0.52" visible="false">
+          <a-plane width="0.84" height="1.04" color="#0F172A" opacity="0.96" material="shader: flat; transparent: true"></a-plane>
+          <a-text id="componentHeader" value="KOMPONENTY / OBIEKTY" align="center" width="0.76" color="#EDE9FE" position="0 0.455 0.008"></a-text>
+          <a-text id="componentSummary" value="WCZYTYWANIE…" align="center" width="0.73" color="#C4B5FD" position="0 0.395 0.008"></a-text>
+          <a-entity id="componentList" position="0 0.305 0.012"></a-entity>
+
+          <a-plane class="component-ui ui-click" width="0.225" height="0.064" color="#7F1D1D" position="-0.245 -0.190 0.012" viewer-button="action: component-hide">
+            <a-text value="UKRYJ" align="center" width="0.32" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="component-ui ui-click" width="0.225" height="0.064" color="#166534" position="0 -0.190 0.012" viewer-button="action: component-show">
+            <a-text value="POKAŻ" align="center" width="0.32" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="component-ui ui-click" width="0.225" height="0.064" color="#5B21B6" position="0.245 -0.190 0.012" viewer-button="action: component-isolate">
+            <a-text value="IZOLUJ" align="center" width="0.32" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+
+          <a-plane class="component-ui ui-click" width="0.34" height="0.064" color="#1D4ED8" position="-0.18 -0.272 0.012" viewer-button="action: component-show-all">
+            <a-text value="WŁĄCZ WSZYSTKIE" align="center" width="0.47" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="component-ui ui-click" width="0.34" height="0.064" color="#334155" position="0.18 -0.272 0.012" viewer-button="action: component-clear">
+            <a-text value="WYCZYŚĆ WYBÓR" align="center" width="0.47" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+
+          <a-plane class="component-ui ui-click" width="0.20" height="0.060" color="#334155" position="-0.255 -0.354 0.012" viewer-button="action: component-prev">
+            <a-text value="◀" align="center" width="0.28" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="component-ui ui-click" width="0.23" height="0.060" color="#475569" position="0 -0.354 0.012" viewer-button="action: component-edges">
+            <a-text value="KRAWĘDZIE" align="center" width="0.33" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="component-ui ui-click" width="0.20" height="0.060" color="#334155" position="0.255 -0.354 0.012" viewer-button="action: component-next">
+            <a-text value="▶" align="center" width="0.28" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="component-ui ui-click" width="0.32" height="0.060" color="#075985" position="-0.17 -0.430 0.012" viewer-button="action: lighting-open">
+            <a-text value="OŚWIETLENIE" align="center" width="0.43" color="#BAE6FD" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="component-ui ui-click" width="0.32" height="0.060" color="#475569" position="0.17 -0.430 0.012" viewer-button="action: component-close">
+            <a-text value="ZAMKNIJ" align="center" width="0.43" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+        </a-entity>
+
+        <a-entity id="lightingPanel" position="0.10 0.16 -0.37" rotation="-35 0 0" scale="0.52 0.52 0.52" visible="false">
+          <a-plane width="0.84" height="0.52" color="#071827" opacity="0.97" material="shader: flat; transparent: true"></a-plane>
+
+          <a-text
+            value="OŚWIETLENIE MODELU"
+            align="center"
+            width="0.76"
+            color="#BAE6FD"
+            position="0 0.205 0.008">
+          </a-text>
+
+          <a-text
+            id="lightingValueText"
+            value="NATĘŻENIE  100%"
+            align="center"
+            width="0.68"
+            color="#FFFFFF"
+            position="0 0.135 0.008">
+          </a-text>
+
+          <a-text
+            id="lightingDetailText"
+            value="ŚWIATŁO 360°  •  PRZÓD / TYŁ / LEWO / PRAWO / GÓRA / DÓŁ"
+            align="center"
+            width="0.76"
+            color="#94A3B8"
+            position="0 0.080 0.008">
+          </a-text>
+
+          <a-plane class="lighting-ui ui-click"
+            width="0.20" height="0.070"
+            color="#334155"
+            position="-0.23 -0.005 0.012"
+            viewer-button="action: lighting-global; value: -50">
+            <a-text value="−50%" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+
+          <a-plane class="lighting-ui ui-click"
+            width="0.20" height="0.070"
+            color="#0E7490"
+            position="0 -0.005 0.012"
+            viewer-button="action: lighting-reset">
+            <a-text value="STANDARD" align="center" width="0.34" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+
+          <a-plane class="lighting-ui ui-click"
+            width="0.20" height="0.070"
+            color="#334155"
+            position="0.23 -0.005 0.012"
+            viewer-button="action: lighting-global; value: 50">
+            <a-text value="+50%" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+
+          <a-text
+            value="ZAKRES 25% — 1000%   •   KROK 50%"
+            align="center"
+            width="0.72"
+            color="#67E8F9"
+            position="0 -0.080 0.008">
+          </a-text>
+
+          <a-plane class="lighting-ui ui-click"
+            width="0.66" height="0.062"
+            color="#475569"
+            position="0 -0.165 0.012"
+            viewer-button="action: lighting-close">
+            <a-text value="← WRÓĆ DO KOMPONENTÓW" align="center" width="0.72" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+
+        
+
+        
+
+        </a-entity>
+
+        <a-entity id="annotationPanel" position="0.10 0.16 -0.37" rotation="-35 0 0" scale="0.52 0.52 0.52" visible="false">
+          <a-plane width="0.92" height="0.82" color="#101522" opacity="0.97" material="shader: flat; transparent: true"></a-plane>
+
+          <a-text value="ADNOTACJE 3D" align="center" width="0.82" color="#F9A8D4" position="0 0.350 0.008"></a-text>
+          <a-text id="annotationStatus" value="RYSOWANIE 3D • LINIA 10 mm • TEKST 140 mm" align="center" width="0.82" color="#FF3B30" position="0 0.295 0.008"></a-text>
+
+          <a-plane class="annotation-ui ui-click" width="0.34" height="0.064" color="#BE123C" position="-0.18 0.215 0.012" viewer-button="action: annotation-tool-draw">
+            <a-text value="RYSUJ 3D" align="center" width="0.44" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="annotation-ui ui-click" width="0.34" height="0.064" color="#7C3AED" position="0.18 0.215 0.012" viewer-button="action: annotation-tool-text">
+            <a-text value="TEKST 3D" align="center" width="0.44" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+
+          <a-text value="KOLOR" align="left" anchor="left" width="0.60" color="#CBD5E1" position="-0.41 0.135 0.008"></a-text>
+
+          <a-plane class="annotation-ui ui-click" width="0.105" height="0.060" color="#FF3B30" position="-0.30 0.090 0.012" viewer-button="action: annotation-color; value: 1"></a-plane>
+          <a-plane class="annotation-ui ui-click" width="0.105" height="0.060" color="#FFD60A" position="-0.18 0.090 0.012" viewer-button="action: annotation-color; value: 2"></a-plane>
+          <a-plane class="annotation-ui ui-click" width="0.105" height="0.060" color="#34C759" position="-0.06 0.090 0.012" viewer-button="action: annotation-color; value: 3"></a-plane>
+          <a-plane class="annotation-ui ui-click" width="0.105" height="0.060" color="#00D9FF" position="0.06 0.090 0.012" viewer-button="action: annotation-color; value: 4"></a-plane>
+          <a-plane class="annotation-ui ui-click" width="0.105" height="0.060" color="#FFFFFF" position="0.18 0.090 0.012" viewer-button="action: annotation-color; value: 5"></a-plane>
+          <a-plane class="annotation-ui ui-click" width="0.105" height="0.060" color="#FF2DFF" position="0.30 0.090 0.012" viewer-button="action: annotation-color; value: 6"></a-plane>
+
+          <a-text value="GRUBOŚĆ LINII" align="left" anchor="left" width="0.60" color="#CBD5E1" position="-0.41 0.020 0.008"></a-text>
+          <a-plane class="annotation-ui ui-click" width="0.20" height="0.060" color="#334155" position="-0.24 -0.030 0.012" viewer-button="action: annotation-thickness; value: 3">
+            <a-text value="3 mm" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="annotation-ui ui-click" width="0.20" height="0.060" color="#334155" position="0 -0.030 0.012" viewer-button="action: annotation-thickness; value: 10">
+            <a-text value="10 mm" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="annotation-ui ui-click" width="0.20" height="0.060" color="#334155" position="0.24 -0.030 0.012" viewer-button="action: annotation-thickness; value: 25">
+            <a-text value="25 mm" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+
+          <a-text value="WIELKOŚĆ TEKSTU" align="left" anchor="left" width="0.60" color="#CBD5E1" position="-0.41 -0.105 0.008"></a-text>
+          <a-plane class="annotation-ui ui-click" width="0.20" height="0.060" color="#334155" position="-0.24 -0.155 0.012" viewer-button="action: annotation-text-size; value: 80">
+            <a-text value="80 mm" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="annotation-ui ui-click" width="0.20" height="0.060" color="#334155" position="0 -0.155 0.012" viewer-button="action: annotation-text-size; value: 140">
+            <a-text value="140 mm" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="annotation-ui ui-click" width="0.20" height="0.060" color="#334155" position="0.24 -0.155 0.012" viewer-button="action: annotation-text-size; value: 220">
+            <a-text value="220 mm" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+
+          <a-plane class="annotation-ui ui-click" width="0.42" height="0.064" color="#7C3AED" position="0 -0.240 0.012" viewer-button="action: annotation-keyboard">
+            <a-text value="WPISZ TEKST" align="center" width="0.52" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+
+          <a-plane class="annotation-ui ui-click" width="0.24" height="0.060" color="#475569" position="-0.27 -0.325 0.012" viewer-button="action: annotation-undo">
+            <a-text value="COFNIJ" align="center" width="0.32" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="annotation-ui ui-click" width="0.24" height="0.060" color="#7F1D1D" position="0 -0.325 0.012" viewer-button="action: annotation-clear">
+            <a-text value="WYCZYŚĆ" align="center" width="0.32" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="annotation-ui ui-click" width="0.24" height="0.060" color="#334155" position="0.27 -0.325 0.012" viewer-button="action: annotation-close">
+            <a-text value="ZAMKNIJ" align="center" width="0.32" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+        </a-entity>
+
+        <a-entity id="annotationKeyboard" position="0.10 0.15 -0.38" rotation="-32 0 0" scale="0.60 0.60 0.60" visible="false">
+          <a-plane width="1.30" height="1.08" color="#07111F" opacity="0.99" material="shader: flat; transparent: true"></a-plane>
+          <a-text value="KLAWIATURA 3D" align="center" anchor="center" baseline="center" width="1.16" color="#E9D5FF" position="0 0.465 0.010"></a-text>
+
+          <a-plane width="1.16" height="0.120" color="#111827" position="0 0.365 0.012" material="shader: flat"></a-plane>
+          <a-text id="annotationTextPreview" value="UWAGA" align="center" anchor="center" baseline="center" width="1.06" color="#FF3B30" position="0 0.365 0.020"></a-text>
+
+          <a-text value="Trigger: wybierz znak  •  GOTOWE: wróć do adnotacji" align="center" width="1.08" color="#94A3B8" position="0 -0.500 0.010"></a-text>
+        </a-entity>
+      </a-entity>
+
+      <a-entity
+        id="rightHand"
+        laser-controls="hand: right"
+        raycaster="objects: .ray-target; far: 50; showLine: false; lineColor: #38BDF8; lineOpacity: 0.95"
+        trigger-ray="objects: .ray-target; marker: #pointerDot; color: #38BDF8; far: 50">
+      </a-entity>
+    </a-entity>
+  </a-scene>
+
+  <script>
+    (function () {
+      'use strict';
+      var mode = window.QUEST_MODE;
+      var scene = document.getElementById('scene');
+      var landing = document.getElementById('landing');
+      var topTitle = document.getElementById('topTitle');
+      var enterXR = document.getElementById('enterXR');
+      var landingEnter = document.getElementById('landingEnter');
+      var landingVersion = document.getElementById('landingVersion');
+      var landingTitle = document.getElementById('landingTitle');
+      var landingDescription = document.getElementById('landingDescription');
+      var landingControls = document.getElementById('landingControls');
+      var landingNote = document.getElementById('landingNote');
+      var legend = document.getElementById('legend');
+      var mrScaleBox = document.getElementById('mrScaleBox');
+      var numberInput = document.getElementById('scaleNumber');
+      var rangeInput = document.getElementById('scaleRange');
+
+      function pills(values, target) {
+        target.innerHTML = '';
+        values.forEach(function (value) {
+          var span = document.createElement('span');
+          span.textContent = value;
+          target.appendChild(span);
+        });
+      }
+
+      if (mode === 'mr') {
+        document.title = 'Test — Meta Quest MR v12';
+        topTitle.textContent = 'Test • MIXED REALITY • v12';
+        enterXR.textContent = 'ENTER MR';
+        enterXR.classList.add('mr');
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v12';
+        landingVersion.classList.add('mr');
+        landingTitle.textContent = 'Test — Mixed Reality';
+        landingDescription.textContent = 'Postaw model w pokoju, ustaw dokładną skalę, przesuń go i obróć wokół osi pionowej gestem dwóch gripów.';
+        landingEnter.textContent = 'ENTER MR — QUEST 3';
+        landingEnter.classList.add('mr');
+        mrScaleBox.hidden = false;
+        landingNote.textContent = 'Dwa gripy obracają model wokół jego geometrycznego środka — bez zmiany skali.';
+        pills([
+          'L joystick: przesuń model',
+          'Prawy grip: przesunięcie / FREE GRAB 3D',
+          '2 gripy: obrót osi Y',
+          'A / B: góra / dół',
+          'X: ruch → pomiar → komponenty → adnotacje',
+          'Y: panel / wyczyść'
+        ], landingControls);
+        pills([
+          'L: przesuń model',
+          '2 gripy: obrót modelu',
+          'A/B: góra/dół',
+          'X: tryb',
+          'Y: panel',
+          'Trigger: wskaż'
+        ], legend);
+      } else {
+        document.title = 'Test — Meta Quest VR v12';
+        topTitle.textContent = 'Test • VR WALKAROUND • v12';
+        enterXR.textContent = 'ENTER VR';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v12';
+        landingTitle.textContent = 'Test — Virtual Reality';
+        landingDescription.textContent = 'Model pozostaje zakotwiczony w skali 1:1. Chodzisz, obracasz użytkownika, teleportujesz się, mierzysz i izolujesz komponenty.';
+        landingEnter.textContent = 'ENTER VR — QUEST 3';
+        landingNote.textContent = 'Model jest stały: 100% / 1:1 / środek układu współrzędnych.';
+        pills([
+          'L joystick: chodzenie',
+          'R joystick: obrót użytkownika',
+          'A / B: góra / dół',
+          'Trigger: teleport / punkt',
+          'X: nawigacja → pomiar → komponenty → adnotacje',
+          'Y: wyczyść / panel'
+        ], landingControls);
+        pills([
+          'L: chodzenie',
+          'R: obrót użytkownika',
+          'A/B: góra/dół',
+          'Trigger: teleport',
+          'X: tryb',
+          'Y: panel'
+        ], legend);
+      }
+
+      function clampScale(value) {
+        var parsed = Number(value);
+        if (!Number.isFinite(parsed)) return Math.round(window.MOJA_START_SCALE || 100);
+        return Math.max(10, Math.min(500, Math.round(parsed)));
+      }
+
+      function updateScaleInputs(value, emit) {
+        var current = clampScale(value);
+        window.MOJA_START_SCALE = current;
+        numberInput.value = String(current);
+        rangeInput.value = String(Math.max(10, Math.min(300, current)));
+        try { window.localStorage.setItem('moja-test-mr-scale', String(current)); } catch (error) {}
+        if (emit) window.dispatchEvent(new CustomEvent('moja-scale-request', {detail: {percent: current}}));
+      }
+
+      updateScaleInputs(window.MOJA_START_SCALE, false);
+      numberInput.addEventListener('change', function () { updateScaleInputs(numberInput.value, true); });
+      numberInput.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          updateScaleInputs(numberInput.value, true);
+          numberInput.blur();
+        }
+      });
+      rangeInput.addEventListener('input', function () { updateScaleInputs(rangeInput.value, true); });
+      document.querySelectorAll('[data-scale]').forEach(function (button) {
+        button.addEventListener('click', function () { updateScaleInputs(button.getAttribute('data-scale'), true); });
+      });
+      window.addEventListener('moja-scale-changed', function (event) {
+        updateScaleInputs(event.detail && event.detail.percent, false);
+      });
+
+      landingEnter.addEventListener('click', function () { enterXR.click(); });
+      scene.addEventListener('enter-vr', function () { landing.style.display = 'none'; });
+      scene.addEventListener('exit-vr', function () { landing.style.display = 'grid'; });
+    })();
+  </script>
+</body>
+</html>

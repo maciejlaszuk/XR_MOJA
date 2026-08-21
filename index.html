@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test — Meta Quest Viewer v12</title>
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      background: #e7edf3;
+    }
+    model-viewer {
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at 50% 34%, #fbfdff 0%, #e8eef4 66%, #cdd7e1 100%);
+    }
+    .head {
+      position: fixed;
+      z-index: 20;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 9px 14px;
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 999px;
+      background: rgba(15,23,42,.86);
+      color: #fff;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 14px 34px rgba(15,23,42,.18);
+      white-space: nowrap;
+    }
+    .head strong { font-size: 14px; }
+    .head span { color: #93c5fd; font-size: 11px; font-weight: 900; letter-spacing: .09em; }
+    .hint {
+      position: fixed;
+      z-index: 20;
+      left: 50%;
+      top: 59px;
+      transform: translateX(-50%);
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(248,250,252,.92);
+      color: #334155;
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+      backdrop-filter: blur(8px);
+    }
+    .actions {
+      position: fixed;
+      z-index: 20;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      display: grid;
+      grid-template-columns: repeat(3, minmax(190px, 1fr));
+      gap: 10px;
+      width: min(94vw, 900px);
+    }
+    .action {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      min-height: 78px;
+      padding: 13px 16px;
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 18px;
+      color: #fff;
+      text-decoration: none;
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 14px 32px rgba(15,23,42,.22);
+    }
+    button.action { width: 100%; font-family: inherit; text-align: left; }
+    .action strong { font-size: 16px; }
+    .action span { margin-top: 5px; color: rgba(255,255,255,.82); font-size: 11px; line-height: 1.35; }
+    .phone { background: rgba(2,132,199,.91); }
+    .mr { background: rgba(22,163,74,.94); }
+    .vr { background: rgba(37,99,235,.94); }
+    @media (max-width: 760px) {
+      .actions { grid-template-columns: 1fr; bottom: 10px; gap: 7px; width: min(94vw, 440px); }
+      .action { min-height: 55px; padding: 10px 14px; border-radius: 15px; }
+      .action span, .hint { display: none; }
+      .head { top: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="head"><strong>Test</strong><span>QUEST VIEWER v12</span></div>
+  <div class="hint">Quest: jaśniejsze światło bez cieni, subtelne krawędzie, pomiar L + ΔX/ΔY/ΔZ i komponenty</div>
+
+  <model-viewer
+    id="viewer"
+    src="Test.glb?v=11"
+    ios-src="Test.usdz?v=11"
+    ar
+    ar-modes="webxr scene-viewer quick-look"
+    ar-placement="floor"
+    camera-controls
+    auto-rotate
+    shadow-intensity="0"
+    exposure="1.05"
+    interaction-prompt="auto">
+    <button id="nativeAR" slot="ar-button" style="display:none;">AR</button>
+  </model-viewer>
+
+  <div class="actions">
+    <button class="action phone" type="button" onclick="document.getElementById('nativeAR').click()">
+      <strong>AR — telefon</strong>
+      <span>Dotychczasowy tryb Quick Look / Scene Viewer.</span>
+    </button>
+    <a class="action mr" href="quest.html?mode=mr&v=11">
+      <strong>MR — Meta Quest 3</strong>
+      <span>Passthrough, skala %, pozycja, obrót dwoma gripami, pomiar L + ΔX/ΔY/ΔZ i komponenty.</span>
+    </a>
+    <a class="action vr" href="quest.html?mode=vr&v=11">
+      <strong>VR — Meta Quest 3</strong>
+      <span>Walkaround, teleport, pomiar L + ΔX/ΔY/ΔZ, komponenty oraz zakotwiczony model 1:1.</span>
+    </a>
+  </div>
+</body>
+</html>
