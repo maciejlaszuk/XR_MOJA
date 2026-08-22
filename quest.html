@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="mobile-web-app-capable" content="yes">
-  <title>CK-207-74-5000_VR — Meta Quest Viewer v12</title>
+  <title>CK-207-74-5000_VR — Meta Quest Viewer v13</title>
   <script>
     (function () {
       var params = new URLSearchParams(window.location.search);
@@ -1594,8 +1594,12 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         list: {type: 'selector'},
         header: {type: 'selector'},
         summary: {type: 'selector'},
-        rows: {type: 'int', default: 6}
+        scrollTrack: {type: 'selector'},
+        scrollThumb: {type: 'selector'},
+        structureUrl: {default: ''},
+        rows: {type: 'int', default: 8}
       },
+
       init: function () {
         this.asset = this.data.asset;
         this.pivot = this.data.pivot;
@@ -1605,28 +1609,67 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         this.list = this.data.list;
         this.header = this.data.header;
         this.summary = this.data.summary;
+        this.scrollTrack = this.data.scrollTrack;
+        this.scrollThumb = this.data.scrollThumb;
+
         this.enabled = false;
         this.panelVisible = false;
         this.built = false;
-        this.page = 0;
-        this.components = [];
+        this.buildToken = 0;
+        this.structureSource = 'GLB';
+
+        this.treeNodes = [];
+        this.rootIndexes = [];
+        this.flatRows = [];
+        this.scrollOffset = 0;
         this.meshes = [];
         this.meshToIndex = new WeakMap();
+        this.objectAssigned = new WeakSet();
+        this.namedObjects = [];
+
         this.selected = new Set();
         this.helpers = new Map();
         this.edgesVisible = true;
         this.tempBox = new THREE.Box3();
+        this.lastScrollAt = 0;
+        this.thumbstickArmed = true;
+
         this.onNormalized = this.onNormalized.bind(this);
         this.onUIAction = this.onUIAction.bind(this);
+        this.onRightThumbstickMoved = this.onRightThumbstickMoved.bind(this);
+
         this.el.addEventListener('model-normalized', this.onNormalized);
         this.el.addEventListener('viewer-ui-action', this.onUIAction);
+        if (this.right) this.right.addEventListener('thumbstickmoved', this.onRightThumbstickMoved);
+
         if (this.panel) this.panel.object3D.visible = false;
-        if (this.asset && this.asset.getObject3D('mesh')) window.setTimeout(this.buildComponents.bind(this), 0);
+        if (this.asset && this.asset.getObject3D('mesh')) {
+          window.setTimeout(this.buildComponents.bind(this), 0);
+        }
       },
+
       onNormalized: function (event) {
         if (!event.detail || event.detail.asset !== this.asset) return;
         this.buildComponents();
       },
+
+      setLoadingText: function (value) {
+        if (this.header) this.header.setAttribute('value', 'STRUKTURA / PART NUMBER');
+        if (this.summary) this.summary.setAttribute('value', value || 'WCZYTYWANIE DRZEWA…');
+      },
+
+      loadStructure: function () {
+        var url = String(this.data.structureUrl || '').trim();
+        if (!url || typeof window.fetch !== 'function') return Promise.resolve(null);
+
+        return window.fetch(url, {cache: 'no-store'}).then(function (response) {
+          if (!response.ok) return null;
+          return response.json();
+        }).catch(function () {
+          return null;
+        });
+      },
+
       isMeaningfulName: function (name) {
         if (!name) return false;
         var value = String(name).trim();
@@ -1635,80 +1678,366 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
           !/^(mesh|node|object|primitive|geometry|material)[_\-.]/i.test(value) &&
           value !== '__MOJA_EDGES__';
       },
-      displayName: function (object, fallbackIndex) {
-        var value = object && object.name ? String(object.name).trim() : '';
-        if (!this.isMeaningfulName(value)) value = 'Obiekt ' + String(fallbackIndex + 1).padStart(3, '0');
-        value = value.replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim();
-        return value || ('Obiekt ' + String(fallbackIndex + 1).padStart(3, '0'));
+
+      cleanDisplayName: function (value) {
+        return String(value || '')
+          .replace(/\\/g, '/')
+          .split('/')
+          .pop()
+          .replace(/\.(iam|ipt)$/i, '')
+          .replace(/[_]+/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
       },
-      findComponentObject: function (mesh, root) {
-        var current = mesh;
-        while (current && current !== root) {
-          if (this.isMeaningfulName(current.name)) return current;
-          current = current.parent;
-        }
-        current = mesh;
-        while (current && current.parent && current.parent !== root) current = current.parent;
-        return current || mesh;
+
+      compactName: function (value, removeOccurrenceSuffix) {
+        var text = String(value || '')
+          .replace(/\\/g, '/')
+          .split('/')
+          .pop()
+          .replace(/\.(iam|ipt)$/i, '')
+          .trim();
+
+        if (removeOccurrenceSuffix) text = text.replace(/:\d+$/i, '');
+
+        return text.toUpperCase().replace(/[^A-Z0-9]/g, '');
       },
-      hierarchyDepth: function (object, root) {
+
+      collectAliases: function (data) {
+        var aliases = [];
+        var values = [
+          data && data.occurrenceName,
+          data && data.partNumber,
+          data && data.fileName,
+          data && data.displayName,
+          data && data.name
+        ];
+
+        if (data && Array.isArray(data.aliases)) values = values.concat(data.aliases);
+
+        values.forEach(function (value) {
+          var text = String(value || '').trim();
+          if (!text) return;
+          if (aliases.indexOf(text) < 0) aliases.push(text);
+        });
+
+        return aliases;
+      },
+
+      objectDepthFrom: function (object, parentObject) {
         var depth = 0;
-        var current = object && object.parent;
-        while (current && current !== root) {
-          if (this.isMeaningfulName(current.name)) depth += 1;
+        var current = object;
+
+        while (current && current !== parentObject) {
+          depth += 1;
           current = current.parent;
         }
-        return Math.min(depth, 4);
+
+        return current === parentObject ? depth : 1000;
       },
-      buildComponents: function () {
-        var root = this.asset && this.asset.getObject3D('mesh');
-        if (!root) return;
-        this.clearSelection();
-        this.components = [];
-        this.meshes = [];
-        this.meshToIndex = new WeakMap();
-        var objectMap = new Map();
-        var sequence = 0;
+
+      findBestObject: function (data, parentObject, rootObject, allowParent) {
+        var aliases = this.collectAliases(data);
+        var exactAliases = aliases.map(function (value) {
+          return this.compactName(value, false);
+        }, this).filter(Boolean);
+        var baseAliases = aliases.map(function (value) {
+          return this.compactName(value, true);
+        }, this).filter(Boolean);
+
+        var searchRoot = parentObject || rootObject;
+        var candidates = [];
         var self = this;
-        root.traverse(function (node) {
-          if (!node.isMesh || (node.userData && node.userData.mojaEdgeOverlay)) return;
-          node.castShadow = false;
-          node.receiveShadow = false;
-          self.meshes.push(node);
-          var componentObject = self.findComponentObject(node, root);
-          var entry = objectMap.get(componentObject);
-          if (!entry) {
-            entry = {
-              object: componentObject,
-              rawName: self.displayName(componentObject, sequence),
-              name: '',
-              depth: self.hierarchyDepth(componentObject, root),
-              meshes: [],
-              order: sequence++
-            };
-            objectMap.set(componentObject, entry);
+
+        if (allowParent && searchRoot && searchRoot.name && this.isMeaningfulName(searchRoot.name)) {
+          candidates.push(searchRoot);
+        }
+
+        if (searchRoot) {
+          searchRoot.traverse(function (object) {
+            if (object === searchRoot) return;
+            if (!self.isMeaningfulName(object.name)) return;
+            if (self.objectAssigned.has(object)) return;
+            candidates.push(object);
+          });
+        }
+
+        function scoreObject(object) {
+          var exact = self.compactName(object.name, false);
+          var base = self.compactName(object.name, true);
+          var score = 0;
+
+          if (exact && exactAliases.indexOf(exact) >= 0) score = 1000;
+          else if (base && baseAliases.indexOf(base) >= 0) score = 700;
+          else {
+            exactAliases.forEach(function (alias) {
+              if (!alias || !exact) return;
+              if (exact.indexOf(alias) >= 0 || alias.indexOf(exact) >= 0) score = Math.max(score, 320);
+            });
           }
-          entry.meshes.push(node);
+
+          if (score > 0 && parentObject) {
+            var depth = self.objectDepthFrom(object, parentObject);
+            if (depth < 1000) score += Math.max(0, 80 - depth * 6);
+          }
+
+          return score;
+        }
+
+        var best = null;
+        var bestScore = 0;
+
+        candidates.forEach(function (candidate) {
+          var score = scoreObject(candidate);
+          if (score > bestScore) {
+            best = candidate;
+            bestScore = score;
+          }
         });
-        this.components = Array.from(objectMap.values()).sort(function (a, b) { return a.order - b.order; });
-        var totals = Object.create(null);
-        var used = Object.create(null);
-        this.components.forEach(function (component) {
-          totals[component.rawName] = (totals[component.rawName] || 0) + 1;
+
+        if (!best && searchRoot !== rootObject && rootObject) {
+          rootObject.traverse(function (object) {
+            if (best || object === rootObject || !self.isMeaningfulName(object.name)) return;
+            if (self.objectAssigned.has(object)) return;
+            if (scoreObject(object) >= 700) best = object;
+          });
+        }
+
+        if (best && best !== rootObject) this.objectAssigned.add(best);
+        return best;
+      },
+
+      createNode: function (data, parentIndex, depth, object) {
+        var partNumber = this.cleanDisplayName(data && data.partNumber);
+        var occurrenceName = this.cleanDisplayName(data && data.occurrenceName);
+        var fileName = this.cleanDisplayName(data && data.fileName);
+        var objectName = this.cleanDisplayName(object && object.name);
+        var labelBase = partNumber || fileName || occurrenceName || objectName || 'Obiekt';
+        var index = this.treeNodes.length;
+        var node = {
+          index: index,
+          id: String((data && data.id) || ('node-' + index)),
+          parentIndex: Number.isInteger(parentIndex) ? parentIndex : -1,
+          children: [],
+          depth: Math.max(0, depth || 0),
+          object: object || null,
+          meshes: [],
+          partNumber: partNumber,
+          occurrenceName: occurrenceName,
+          fileName: fileName,
+          description: String((data && data.description) || '').trim(),
+          material: String((data && data.material) || '').trim(),
+          massKg: data && Number.isFinite(Number(data.massKg)) ? Number(data.massKg) : null,
+          documentType: String((data && data.documentType) || '').toLowerCase(),
+          suppressed: Boolean(data && data.suppressed),
+          sourceVisible: !(data && data.visible === false),
+          labelBase: labelBase,
+          label: labelBase,
+          expanded: depth === 0
+        };
+
+        this.treeNodes.push(node);
+
+        if (node.parentIndex >= 0 && this.treeNodes[node.parentIndex]) {
+          this.treeNodes[node.parentIndex].children.push(index);
+        } else {
+          this.rootIndexes.push(index);
+        }
+
+        return index;
+      },
+
+      buildStructureNode: function (data, parentIndex, parentObject, rootObject, depth, isRoot) {
+        data = data || {};
+        var mappedObject = isRoot
+          ? (this.findBestObject(data, rootObject, rootObject, true) || rootObject)
+          : this.findBestObject(data, parentObject || rootObject, rootObject, false);
+
+        var nodeIndex = this.createNode(data, parentIndex, depth, mappedObject);
+        var children = Array.isArray(data.children) ? data.children : [];
+        var nextParentObject = mappedObject || parentObject || rootObject;
+
+        children.forEach(function (child) {
+          this.buildStructureNode(child, nodeIndex, nextParentObject, rootObject, depth + 1, false);
+        }, this);
+
+        return nodeIndex;
+      },
+
+      buildFromStructure: function (structure, rootObject) {
+        this.structureSource = 'IAM';
+        this.objectAssigned = new WeakSet();
+        this.buildStructureNode(structure.root, -1, rootObject, rootObject, 0, true);
+      },
+
+      buildFromGlb: function (rootObject) {
+        var self = this;
+        this.structureSource = 'GLB';
+        var rootIndex = this.createNode({
+          id: 'root',
+          partNumber: 'CK-207-74-5000_VR',
+          occurrenceName: rootObject.name || 'CK-207-74-5000_VR',
+          documentType: 'assembly'
+        }, -1, 0, rootObject);
+
+        function hasMesh(object) {
+          var found = false;
+          object.traverse(function (child) {
+            if (child.isMesh && !(child.userData && child.userData.mojaEdgeOverlay)) found = true;
+          });
+          return found;
+        }
+
+        function walk(object, parentIndex, depth) {
+          var nextParent = parentIndex;
+
+          if (object !== rootObject && self.isMeaningfulName(object.name) && hasMesh(object)) {
+            nextParent = self.createNode({
+              id: 'glb-' + self.treeNodes.length,
+              partNumber: self.cleanDisplayName(object.name),
+              occurrenceName: object.name,
+              documentType: object.isMesh ? 'part' : 'assembly'
+            }, parentIndex, depth, object);
+          }
+
+          object.children.forEach(function (child) {
+            walk(child, nextParent, nextParent === parentIndex ? depth : depth + 1);
+          });
+        }
+
+        rootObject.children.forEach(function (child) {
+          walk(child, rootIndex, 1);
         });
-        this.components.forEach(function (component, index) {
-          used[component.rawName] = (used[component.rawName] || 0) + 1;
-          component.name = totals[component.rawName] > 1
-            ? component.rawName + ' [' + used[component.rawName] + ']'
-            : component.rawName;
-          component.index = index;
-          component.meshes.forEach(function (mesh) { self.meshToIndex.set(mesh, index); });
+
+        if (this.treeNodes[rootIndex].children.length === 0) {
+          this.meshes.forEach(function (mesh, index) {
+            self.createNode({
+              id: 'mesh-' + index,
+              partNumber: self.cleanDisplayName(mesh.name) || ('Obiekt ' + String(index + 1).padStart(3, '0')),
+              occurrenceName: mesh.name,
+              documentType: 'part'
+            }, rootIndex, 1, mesh);
+          });
+        }
+      },
+
+      collectNodeMeshes: function (node) {
+        var meshSet = new Set();
+
+        if (node.object) {
+          node.object.traverse(function (object) {
+            if (object.isMesh && !(object.userData && object.userData.mojaEdgeOverlay)) meshSet.add(object);
+          });
+        }
+
+        node.children.forEach(function (childIndex) {
+          var child = this.treeNodes[childIndex];
+          if (!child) return;
+          child.meshes.forEach(function (mesh) { meshSet.add(mesh); });
+        }, this);
+
+        node.meshes = Array.from(meshSet);
+      },
+
+      assignSiblingLabels: function () {
+        var self = this;
+        var parentGroups = new Map();
+
+        this.treeNodes.forEach(function (node) {
+          var key = String(node.parentIndex);
+          if (!parentGroups.has(key)) parentGroups.set(key, []);
+          parentGroups.get(key).push(node);
         });
+
+        parentGroups.forEach(function (siblings) {
+          var totals = Object.create(null);
+          var used = Object.create(null);
+
+          siblings.forEach(function (node) {
+            var key = node.labelBase.toUpperCase();
+            totals[key] = (totals[key] || 0) + 1;
+          });
+
+          siblings.forEach(function (node) {
+            var key = node.labelBase.toUpperCase();
+            used[key] = (used[key] || 0) + 1;
+
+            if (totals[key] > 1) {
+              var match = String(node.occurrenceName || '').match(/:(\d+)$/);
+              node.label = node.labelBase + ' [' + (match ? match[1] : used[key]) + ']';
+            } else {
+              node.label = node.labelBase;
+            }
+
+            if (!node.label) node.label = 'Obiekt ' + String(node.index + 1).padStart(3, '0');
+          });
+        });
+      },
+
+      finalizeTree: function () {
+        for (var index = this.treeNodes.length - 1; index >= 0; index -= 1) {
+          this.collectNodeMeshes(this.treeNodes[index]);
+        }
+
+        this.assignSiblingLabels();
+        this.meshToIndex = new WeakMap();
+
+        this.treeNodes.slice().sort(function (a, b) {
+          if (a.depth !== b.depth) return b.depth - a.depth;
+          if (a.children.length !== b.children.length) return a.children.length - b.children.length;
+          return a.index - b.index;
+        }).forEach(function (node) {
+          node.meshes.forEach(function (mesh) {
+            if (!this.meshToIndex.has(mesh)) this.meshToIndex.set(mesh, node.index);
+          }, this);
+        }, this);
+
         this.built = true;
-        this.page = 0;
+        this.scrollOffset = 0;
         this.renderPanel();
         this.refreshRaycaster();
       },
+
+      buildComponents: function () {
+        var root = this.asset && this.asset.getObject3D('mesh');
+        if (!root) return;
+
+        var token = ++this.buildToken;
+        var self = this;
+        this.built = false;
+        this.setLoadingText('WCZYTYWANIE DRZEWA…');
+        this.clearSelection(false);
+        this.treeNodes = [];
+        this.rootIndexes = [];
+        this.flatRows = [];
+        this.scrollOffset = 0;
+        this.meshes = [];
+        this.namedObjects = [];
+        this.meshToIndex = new WeakMap();
+
+        root.traverse(function (node) {
+          if (node.isMesh && !(node.userData && node.userData.mojaEdgeOverlay)) {
+            node.castShadow = false;
+            node.receiveShadow = false;
+            self.meshes.push(node);
+          }
+          if (self.isMeaningfulName(node.name)) self.namedObjects.push(node);
+        });
+
+        this.loadStructure().then(function (structure) {
+          if (token !== self.buildToken) return;
+
+          if (structure && structure.root) self.buildFromStructure(structure, root);
+          else self.buildFromGlb(root);
+
+          self.finalizeTree();
+        }).catch(function () {
+          if (token !== self.buildToken) return;
+          self.buildFromGlb(root);
+          self.finalizeTree();
+        });
+      },
+
       setEnabled: function (enabled) {
         this.enabled = Boolean(enabled);
         this.setPanelVisible(this.enabled);
@@ -1718,6 +2047,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         }
         this.syncHelpers();
       },
+
       setPanelVisible: function (visible) {
         this.panelVisible = Boolean(visible) && this.enabled;
         if (this.panel) this.panel.object3D.visible = this.panelVisible;
@@ -1725,47 +2055,146 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         this.renderPanel();
         this.refreshRaycaster();
       },
+
       togglePanel: function () {
         this.setPanelVisible(!this.panelVisible);
       },
+
       updatePanelInteractivity: function () {
         if (!this.panel) return;
         var active = this.panelVisible && this.enabled;
+
         this.panel.querySelectorAll('.component-ui').forEach(function (element) {
           if (active) element.classList.add('ray-target');
           else element.classList.remove('ray-target');
         });
       },
+
       refreshRaycaster: function () {
         if (!this.right) return;
         var ray = this.right.components['trigger-ray'];
         if (ray) window.setTimeout(function () { ray.refresh(); }, 0);
       },
+
       findIndexFromIntersection: function (intersection) {
         if (!intersection || !intersection.object) return -1;
         var current = intersection.object;
+
         while (current) {
           var index = this.meshToIndex.get(current);
           if (Number.isInteger(index)) return index;
           current = current.parent;
         }
+
         return -1;
       },
+
       selectIntersection: function (intersection) {
         if (!this.enabled || !this.built) return false;
         var index = this.findIndexFromIntersection(intersection);
         if (index < 0) return false;
-        this.toggleIndex(index);
+        this.toggleIndex(index, true);
         return true;
       },
-      toggleIndex: function (index) {
-        if (!Number.isInteger(index) || index < 0 || index >= this.components.length) return;
+
+      revealIndex: function (index) {
+        var node = this.treeNodes[index];
+        if (!node) return;
+        var current = node.parentIndex;
+
+        while (current >= 0 && this.treeNodes[current]) {
+          this.treeNodes[current].expanded = true;
+          current = this.treeNodes[current].parentIndex;
+        }
+
+        var rows = this.flattenTree();
+        var rowIndex = rows.indexOf(index);
+        if (rowIndex < 0) return;
+
+        if (rowIndex < this.scrollOffset) this.scrollOffset = rowIndex;
+        if (rowIndex >= this.scrollOffset + this.data.rows) {
+          this.scrollOffset = rowIndex - this.data.rows + 1;
+        }
+      },
+
+      toggleIndex: function (index, reveal) {
+        if (!Number.isInteger(index) || index < 0 || index >= this.treeNodes.length) return;
+        var node = this.treeNodes[index];
+        if (!node || node.meshes.length === 0) return;
+
         if (this.selected.has(index)) this.selected.delete(index);
         else this.selected.add(index);
+
+        if (reveal) this.revealIndex(index);
         this.syncHelpers();
         this.renderPanel();
       },
-      clearSelection: function () {
+
+      toggleExpanded: function (index) {
+        var node = this.treeNodes[index];
+        if (!node || node.children.length === 0) return;
+        node.expanded = !node.expanded;
+        this.renderPanel();
+      },
+
+      expandAll: function () {
+        this.treeNodes.forEach(function (node) {
+          if (node.children.length > 0) node.expanded = true;
+        });
+        this.scrollOffset = 0;
+        this.renderPanel();
+      },
+
+      collapseAll: function () {
+        this.treeNodes.forEach(function (node) {
+          node.expanded = node.depth === 0;
+        });
+        this.scrollOffset = 0;
+        this.renderPanel();
+      },
+
+      flattenTree: function () {
+        var rows = [];
+        var self = this;
+
+        function visit(index) {
+          var node = self.treeNodes[index];
+          if (!node) return;
+          rows.push(index);
+          if (!node.expanded) return;
+          node.children.forEach(visit);
+        }
+
+        this.rootIndexes.forEach(visit);
+        this.flatRows = rows;
+        return rows;
+      },
+
+      scrollBy: function (delta) {
+        var rows = this.flattenTree();
+        var maximum = Math.max(0, rows.length - this.data.rows);
+        this.scrollOffset = MOJA.clamp(this.scrollOffset + Number(delta || 0), 0, maximum);
+        this.renderPanel();
+      },
+
+      onRightThumbstickMoved: function (event) {
+        if (!this.panelVisible || !this.enabled || !this.built) return;
+        var y = Number(event.detail && event.detail.y) || 0;
+
+        if (Math.abs(y) < 0.45) {
+          this.thumbstickArmed = true;
+          return;
+        }
+
+        var now = window.performance.now();
+        if (!this.thumbstickArmed && now - this.lastScrollAt < 220) return;
+
+        this.scrollBy(y > 0 ? -1 : 1);
+        this.lastScrollAt = now;
+        this.thumbstickArmed = false;
+      },
+
+      clearSelection: function (render) {
         this.selected.clear();
         this.helpers.forEach(function (helper) {
           if (helper.parent) helper.parent.remove(helper);
@@ -1773,13 +2202,15 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
           if (helper.material) helper.material.dispose();
         });
         this.helpers.clear();
-        this.renderPanel();
+        if (render !== false) this.renderPanel();
       },
+
       setComponentVisibility: function (index, visible) {
-        var component = this.components[index];
-        if (!component) return;
-        component.meshes.forEach(function (mesh) { mesh.visible = Boolean(visible); });
+        var node = this.treeNodes[index];
+        if (!node) return;
+        node.meshes.forEach(function (mesh) { mesh.visible = Boolean(visible); });
       },
+
       hideSelected: function () {
         var self = this;
         this.selected.forEach(function (index) { self.setComponentVisibility(index, false); });
@@ -1787,6 +2218,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         this.renderPanel();
         this.refreshRaycaster();
       },
+
       showSelected: function () {
         var self = this;
         this.selected.forEach(function (index) { self.setComponentVisibility(index, true); });
@@ -1794,34 +2226,50 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         this.renderPanel();
         this.refreshRaycaster();
       },
+
       isolateSelected: function () {
         if (this.selected.size === 0) return;
         var selectedMeshes = new Set();
         var self = this;
+
         this.selected.forEach(function (index) {
-          var component = self.components[index];
-          if (!component) return;
-          component.meshes.forEach(function (mesh) { selectedMeshes.add(mesh); });
+          var node = self.treeNodes[index];
+          if (!node) return;
+          node.meshes.forEach(function (mesh) { selectedMeshes.add(mesh); });
         });
+
         this.meshes.forEach(function (mesh) { mesh.visible = selectedMeshes.has(mesh); });
         this.syncHelpers();
         this.renderPanel();
         this.refreshRaycaster();
       },
+
       showAll: function () {
         this.meshes.forEach(function (mesh) { mesh.visible = true; });
         this.syncHelpers();
         this.renderPanel();
         this.refreshRaycaster();
       },
+
       toggleEdges: function () {
         this.edgesVisible = !this.edgesVisible;
         var root = this.asset && this.asset.getObject3D('mesh');
         MOJA.setEdgesVisible(root, this.edgesVisible);
         this.renderPanel();
       },
+
+      nodeVisibilityState: function (node) {
+        if (!node || node.meshes.length === 0) return node && node.suppressed ? 'suppressed' : 'empty';
+        var visible = 0;
+        node.meshes.forEach(function (mesh) { if (mesh.visible) visible += 1; });
+        if (visible === 0) return 'hidden';
+        if (visible === node.meshes.length) return 'visible';
+        return 'mixed';
+      },
+
       syncHelpers: function () {
         var self = this;
+
         Array.from(this.helpers.keys()).forEach(function (index) {
           if (!self.selected.has(index)) {
             var helper = self.helpers.get(index);
@@ -1831,15 +2279,18 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
             self.helpers.delete(index);
           }
         });
+
         if (!this.enabled) {
           this.helpers.forEach(function (helper) { helper.visible = false; });
           return;
         }
+
         this.selected.forEach(function (index) {
-          var component = self.components[index];
-          if (!component) return;
-          var visible = component.meshes.some(function (mesh) { return mesh.visible; });
+          var node = self.treeNodes[index];
+          if (!node) return;
+          var visible = node.meshes.some(function (mesh) { return mesh.visible; });
           var helper = self.helpers.get(index);
+
           if (!helper) {
             helper = new THREE.Box3Helper(new THREE.Box3(), 0xa78bfa);
             helper.material.transparent = true;
@@ -1849,87 +2300,175 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
             self.el.object3D.add(helper);
             self.helpers.set(index, helper);
           }
+
           helper.visible = visible;
         });
       },
+
       updateHelpers: function () {
         var self = this;
+
         this.helpers.forEach(function (helper, index) {
           if (!helper.visible) return;
-          var component = self.components[index];
-          if (!component) return;
+          var node = self.treeNodes[index];
+          if (!node) return;
           self.tempBox.makeEmpty();
-          component.meshes.forEach(function (mesh) {
+
+          node.meshes.forEach(function (mesh) {
             if (!mesh.visible) return;
             self.tempBox.expandByObject(mesh);
           });
+
           if (!self.tempBox.isEmpty()) helper.box.copy(self.tempBox);
         });
       },
+
+      updateScrollBar: function (rowCount) {
+        if (!this.scrollTrack || !this.scrollThumb) return;
+        var trackHeight = 0.49;
+        var visibleRows = Math.max(1, this.data.rows);
+        var ratio = Math.min(1, visibleRows / Math.max(1, rowCount));
+        var thumbHeight = Math.max(0.055, trackHeight * ratio);
+        var maximum = Math.max(0, rowCount - visibleRows);
+        var progress = maximum > 0 ? this.scrollOffset / maximum : 0;
+        var travel = trackHeight - thumbHeight;
+        var y = travel * 0.5 - progress * travel;
+
+        this.scrollThumb.setAttribute('height', thumbHeight);
+        this.scrollThumb.object3D.position.set(0, y, 0.006);
+        this.scrollTrack.object3D.visible = rowCount > visibleRows;
+      },
+
       renderPanel: function () {
         if (!this.list || !this.header || !this.summary) return;
         while (this.list.firstChild) this.list.removeChild(this.list.firstChild);
-        var totalPages = Math.max(1, Math.ceil(this.components.length / this.data.rows));
-        this.page = MOJA.clamp(this.page, 0, totalPages - 1);
-        var start = this.page * this.data.rows;
-        var end = Math.min(this.components.length, start + this.data.rows);
-        var visibleCount = this.meshes.filter(function (mesh) { return mesh.visible; }).length;
-        this.header.setAttribute('value', 'KOMPONENTY / OBIEKTY');
+
+        if (!this.built) {
+          this.setLoadingText('WCZYTYWANIE DRZEWA…');
+          this.updateScrollBar(0);
+          return;
+        }
+
+        var rows = this.flattenTree();
+        var maximum = Math.max(0, rows.length - this.data.rows);
+        this.scrollOffset = MOJA.clamp(this.scrollOffset, 0, maximum);
+        var start = this.scrollOffset;
+        var end = Math.min(rows.length, start + this.data.rows);
+        var visibleMeshCount = this.meshes.filter(function (mesh) { return mesh.visible; }).length;
+        var sourceLabel = this.structureSource === 'IAM' ? 'IAM' : 'GLB';
+
+        this.header.setAttribute('value', 'STRUKTURA / PART NUMBER');
         this.summary.setAttribute(
           'value',
-          this.selected.size + ' zazn.  •  ' + visibleCount + '/' + this.meshes.length + ' wid.  •  ' +
-          (this.page + 1) + '/' + totalPages + '  •  EDGES ' + (this.edgesVisible ? 'ON' : 'OFF')
+          this.selected.size + ' zazn.  •  ' + visibleMeshCount + '/' + this.meshes.length + ' wid.  •  ' +
+          (rows.length === 0 ? '0' : (start + 1) + '-' + end) + '/' + rows.length + '  •  ' + sourceLabel
         );
-        for (var i = start; i < end; i += 1) {
-          var component = this.components[i];
-          var selected = this.selected.has(i);
-          var visible = component.meshes.some(function (mesh) { return mesh.visible; });
-          var y = -((i - start) * 0.078);
+
+        for (var rowIndex = start; rowIndex < end; rowIndex += 1) {
+          var nodeIndex = rows[rowIndex];
+          var node = this.treeNodes[nodeIndex];
+          if (!node) continue;
+
+          var selected = this.selected.has(nodeIndex);
+          var visibility = this.nodeVisibilityState(node);
+          var y = -((rowIndex - start) * 0.064);
+          var color = '#1E293B';
+          var status = '●';
+
+          if (selected) color = '#6D28D9';
+          else if (visibility === 'hidden') color = '#3F3F46';
+          else if (visibility === 'mixed') color = '#854D0E';
+          else if (visibility === 'suppressed') color = '#4C0519';
+          else if (visibility === 'empty') color = '#27272A';
+
+          if (visibility === 'hidden') status = '○';
+          else if (visibility === 'mixed') status = '◐';
+          else if (visibility === 'suppressed') status = '×';
+          else if (visibility === 'empty') status = '·';
+          if (selected) status = '✓';
+
           var row = createElement('a-plane', {
-            class: 'component-ui ui-click',
-            width: 0.73,
-            height: 0.066,
-            color: selected ? '#6D28D9' : (visible ? '#1E293B' : '#3F3F46'),
-            position: '0 ' + y + ' 0.012',
+            class: node.meshes.length > 0 ? 'component-ui ui-click' : '',
+            width: 0.78,
+            height: 0.057,
+            color: color,
+            position: '-0.025 ' + y + ' 0.012',
             material: 'shader: flat',
-            'viewer-button': 'action: component-toggle; value: ' + i
+            'viewer-button': node.meshes.length > 0 ? ('action: component-toggle; value: ' + nodeIndex) : ''
           }, this.list);
-          var indent = '  '.repeat(component.depth);
+
+          var indentation = Math.min(node.depth, 7) * 0.040;
+          var hasChildren = node.children.length > 0;
+          var textX = -0.355 + indentation + (hasChildren ? 0.052 : 0.020);
+
+          if (hasChildren) {
+            var expander = createElement('a-plane', {
+              class: 'component-ui ui-click',
+              width: 0.038,
+              height: 0.044,
+              color: node.expanded ? '#0F766E' : '#334155',
+              position: (-0.365 + indentation) + ' ' + y + ' 0.020',
+              material: 'shader: flat',
+              'viewer-button': 'action: component-expand; value: ' + nodeIndex
+            }, this.list);
+
+            createElement('a-text', {
+              value: node.expanded ? '−' : '+',
+              align: 'center',
+              anchor: 'center',
+              width: 0.16,
+              color: '#FFFFFF',
+              position: '0 0 0.006'
+            }, expander);
+          }
+
           createElement('a-text', {
-            value: (selected ? '✓ ' : (visible ? '• ' : '○ ')) + indent + component.name,
+            value: status + ' ' + node.label,
             align: 'left',
             anchor: 'left',
-            width: 0.68,
-            color: '#F8FAFC',
-            position: '-0.345 0 0.006'
+            width: Math.max(0.36, 0.70 - indentation),
+            'wrap-count': 34,
+            color: node.suppressed ? '#FDA4AF' : '#F8FAFC',
+            position: textX + ' 0 0.006'
           }, row);
         }
+
+        this.updateScrollBar(rows.length);
         this.updatePanelInteractivity();
       },
+
       onUIAction: function (event) {
         var detail = event.detail || {};
+
         switch (detail.action) {
-          case 'component-toggle': this.toggleIndex(Math.round(detail.value)); break;
+          case 'component-toggle': this.toggleIndex(Math.round(detail.value), false); break;
+          case 'component-expand': this.toggleExpanded(Math.round(detail.value)); break;
           case 'component-hide': this.hideSelected(); break;
           case 'component-show': this.showSelected(); break;
           case 'component-isolate': this.isolateSelected(); break;
           case 'component-show-all': this.showAll(); break;
           case 'component-clear': this.clearSelection(); break;
-          case 'component-prev': this.page -= 1; this.renderPanel(); break;
-          case 'component-next': this.page += 1; this.renderPanel(); break;
+          case 'component-scroll-up': this.scrollBy(-(this.data.rows - 1)); break;
+          case 'component-scroll-down': this.scrollBy(this.data.rows - 1); break;
+          case 'component-expand-all': this.expandAll(); break;
+          case 'component-collapse-all': this.collapseAll(); break;
           case 'component-close': this.setPanelVisible(false); break;
           case 'component-edges': this.toggleEdges(); break;
         }
       },
+
       tick: function () {
         this.updateHelpers();
       },
+
       remove: function () {
         this.el.removeEventListener('model-normalized', this.onNormalized);
         this.el.removeEventListener('viewer-ui-action', this.onUIAction);
-        this.clearSelection();
+        if (this.right) this.right.removeEventListener('thumbstickmoved', this.onRightThumbstickMoved);
+        this.clearSelection(false);
       }
     });
+
 
     AFRAME.registerComponent('mr-near-reticle', {
       schema: {
@@ -2379,7 +2918,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
           this.modeText.setAttribute('value', 'POMIAR  •  TRIGGER: PUNKT  •  Y: WYCZYŚĆ  •  X: KOMPONENTY');
           this.modeText.setAttribute('color', '#FBBF24');
         } else if (this.interactionMode === 'select') {
-          this.modeText.setAttribute('value', 'KOMPONENTY  •  TRIGGER: WYBIERZ  •  Y: PANEL  •  X: ADNOTACJE');
+          this.modeText.setAttribute('value', 'DRZEWO  •  TRIGGER: WYBIERZ  •  Y: PANEL  •  PRAWY JOYSTICK: PRZEWIJAJ  •  +/−: ROZWIŃ');
           this.modeText.setAttribute('color', '#C4B5FD');
         } else if (this.interactionMode === 'annotate') {
           this.modeText.setAttribute('value', 'ADNOTACJE 3D  •  RYSUJ: TRZYMAJ TRIGGER  •  TEKST: PUŚĆ TRIGGER W PUNKCIE LASERA  •  Y: PANEL');
@@ -2706,8 +3245,8 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
 </head>
 <body>
   <div class="topbar">
-    <a class="pill" href="index.html?v=12">← Viewer</a>
-    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v12</div>
+    <a class="pill" href="index.html?v=13">← Viewer</a>
+    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v13</div>
     <button id="enterXR" class="pill enter" type="button">ENTER VR</button>
   </div>
 
@@ -2715,7 +3254,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
 
   <div id="landing" class="landing">
     <div class="card">
-      <div id="landingVersion" class="version">META QUEST 3 • v12</div>
+      <div id="landingVersion" class="version">META QUEST 3 • v13</div>
       <h1 id="landingTitle">CK-207-74-5000_VR — Virtual Reality</h1>
       <p id="landingDescription">Model jest zakotwiczony w skali 1:1. Poruszasz się użytkownikiem, mierzysz i zarządzasz widocznością komponentów.</p>
 
@@ -2739,7 +3278,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
 
       <div id="landingControls" class="controls"></div>
       <div class="actions">
-        <a class="button" href="index.html?v=12">← Wróć</a>
+        <a class="button" href="index.html?v=13">← Wróć</a>
         <button id="landingEnter" class="button primary" type="button">ENTER VR — QUEST 3</button>
       </div>
       <div id="landingNote" class="note">Subtelne krawędzie, oświetlenie modelu 360° i brak ciężkich map cieni.</div>
@@ -2749,14 +3288,14 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
   <a-scene
     id="scene"
     quest-viewer="pivot: #modelPivot; asset: #modelAsset; rig: #rig; camera: #camera; left: #leftHand; right: #rightHand; floor: #floor; grid: #metricGrid; reticle: #placementReticle; info: #modelInfo; infoText: #modelInfoText; modeText: #modeText; teleportMarker: #teleportMarker; scalePanel: #scalePanel; scaleValueText: #scaleValueText; scaleKnob: #scaleKnob; componentPanel: #componentPanel; freeGrabButton: #freeGrabButton; freeGrabButtonText: #freeGrabButtonText"
-    component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; rows: 6"
+    component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; scrollTrack: #componentScrollTrack; scrollThumb: #componentScrollThumb; structureUrl: CK-207-74-5000_VR.structure.json?v=13; rows: 8"
     lighting-control="ambient: #ambientLight; front: #lightFront; back: #lightBack; left: #lightLeft; right: #lightRight; top: #lightTop; bottom: #lightBottom; panel: #lightingPanel; valueText: #lightingValueText; detailText: #lightingDetailText; storageKey: moja-ck-207-74-5000_vr-mr-scale-lighting360"
     annotation-control="pivot: #modelPivot; root: #annotationRoot; camera: #camera; right: #rightHand; panel: #annotationPanel; keyboard: #annotationKeyboard; preview: #annotationTextPreview; status: #annotationStatus"
     measurement-tool="target: #modelPivot; pointA: #measurePointA; pointB: #measurePointB; line: #measureLine; label: #measureLabel; labelText: #measureLabelText; color: #F59E0B"
     loading-screen="backgroundColor: #0B1220; dotsColor: #60A5FA">
 
     <a-assets timeout="120000">
-      <a-asset-item id="modelSource" src="CK-207-74-5000_VR.glb?v=12"></a-asset-item>
+      <a-asset-item id="modelSource" src="CK-207-74-5000_VR.glb?v=13"></a-asset-item>
     </a-assets>
     <!-- OŚWIETLENIE MODELU 360° — bez map cieni -->
     <a-entity id="ambientLight"
@@ -2897,43 +3436,54 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
           </a-plane>
         </a-entity>
 
-        <a-entity id="componentPanel" position="0.10 0.16 -0.37" rotation="-35 0 0" scale="0.52 0.52 0.52" visible="false">
-          <a-plane width="0.84" height="1.04" color="#0F172A" opacity="0.96" material="shader: flat; transparent: true"></a-plane>
-          <a-text id="componentHeader" value="KOMPONENTY / OBIEKTY" align="center" width="0.76" color="#EDE9FE" position="0 0.455 0.008"></a-text>
-          <a-text id="componentSummary" value="WCZYTYWANIE…" align="center" width="0.73" color="#C4B5FD" position="0 0.395 0.008"></a-text>
-          <a-entity id="componentList" position="0 0.305 0.012"></a-entity>
+        <a-entity id="componentPanel" position="0.11 0.17 -0.40" rotation="-35 0 0" scale="0.52 0.52 0.52" visible="false">
+          <a-plane width="0.94" height="1.12" color="#0F172A" opacity="0.97" material="shader: flat; transparent: true"></a-plane>
+          <a-text id="componentHeader" value="STRUKTURA / PART NUMBER" align="center" width="0.84" color="#EDE9FE" position="-0.01 0.505 0.008"></a-text>
+          <a-text id="componentSummary" value="WCZYTYWANIE DRZEWA…" align="center" width="0.82" color="#C4B5FD" position="-0.01 0.450 0.008"></a-text>
+          <a-entity id="componentList" position="-0.025 0.365 0.012"></a-entity>
 
-          <a-plane class="component-ui ui-click" width="0.225" height="0.064" color="#7F1D1D" position="-0.245 -0.190 0.012" viewer-button="action: component-hide">
-            <a-text value="UKRYJ" align="center" width="0.32" color="#FFFFFF" position="0 0 0.006"></a-text>
-          </a-plane>
-          <a-plane class="component-ui ui-click" width="0.225" height="0.064" color="#166534" position="0 -0.190 0.012" viewer-button="action: component-show">
-            <a-text value="POKAŻ" align="center" width="0.32" color="#FFFFFF" position="0 0 0.006"></a-text>
-          </a-plane>
-          <a-plane class="component-ui ui-click" width="0.225" height="0.064" color="#5B21B6" position="0.245 -0.190 0.012" viewer-button="action: component-isolate">
-            <a-text value="IZOLUJ" align="center" width="0.32" color="#FFFFFF" position="0 0 0.006"></a-text>
+          <a-plane id="componentScrollTrack" width="0.020" height="0.49" color="#1E293B" opacity="0.88" position="0.435 0.140 0.014" material="shader: flat; transparent: true">
+            <a-plane id="componentScrollThumb" width="0.016" height="0.12" color="#A78BFA" position="0 0.185 0.006" material="shader: flat"></a-plane>
           </a-plane>
 
-          <a-plane class="component-ui ui-click" width="0.34" height="0.064" color="#1D4ED8" position="-0.18 -0.272 0.012" viewer-button="action: component-show-all">
-            <a-text value="WŁĄCZ WSZYSTKIE" align="center" width="0.47" color="#FFFFFF" position="0 0 0.006"></a-text>
+          <a-plane class="component-ui ui-click" width="0.225" height="0.060" color="#7F1D1D" position="-0.250 -0.155 0.012" viewer-button="action: component-hide">
+            <a-text value="UKRYJ" align="center" width="0.31" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
-          <a-plane class="component-ui ui-click" width="0.34" height="0.064" color="#334155" position="0.18 -0.272 0.012" viewer-button="action: component-clear">
-            <a-text value="WYCZYŚĆ WYBÓR" align="center" width="0.47" color="#FFFFFF" position="0 0 0.006"></a-text>
+          <a-plane class="component-ui ui-click" width="0.225" height="0.060" color="#166534" position="0 -0.155 0.012" viewer-button="action: component-show">
+            <a-text value="POKAŻ" align="center" width="0.31" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="component-ui ui-click" width="0.225" height="0.060" color="#5B21B6" position="0.250 -0.155 0.012" viewer-button="action: component-isolate">
+            <a-text value="IZOLUJ" align="center" width="0.31" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
 
-          <a-plane class="component-ui ui-click" width="0.20" height="0.060" color="#334155" position="-0.255 -0.354 0.012" viewer-button="action: component-prev">
-            <a-text value="◀" align="center" width="0.28" color="#FFFFFF" position="0 0 0.006"></a-text>
+          <a-plane class="component-ui ui-click" width="0.36" height="0.060" color="#1D4ED8" position="-0.195 -0.235 0.012" viewer-button="action: component-show-all">
+            <a-text value="WŁĄCZ WSZYSTKIE" align="center" width="0.48" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
-          <a-plane class="component-ui ui-click" width="0.23" height="0.060" color="#475569" position="0 -0.354 0.012" viewer-button="action: component-edges">
+          <a-plane class="component-ui ui-click" width="0.36" height="0.060" color="#334155" position="0.195 -0.235 0.012" viewer-button="action: component-clear">
+            <a-text value="WYCZYŚĆ WYBÓR" align="center" width="0.48" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+
+          <a-plane class="component-ui ui-click" width="0.11" height="0.060" color="#334155" position="-0.390 -0.315 0.012" viewer-button="action: component-scroll-up">
+            <a-text value="▲" align="center" width="0.23" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="component-ui ui-click" width="0.22" height="0.060" color="#0F766E" position="-0.210 -0.315 0.012" viewer-button="action: component-expand-all">
+            <a-text value="ROZWIŃ" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="component-ui ui-click" width="0.22" height="0.060" color="#475569" position="0.070 -0.315 0.012" viewer-button="action: component-collapse-all">
+            <a-text value="ZWIŃ" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+          <a-plane class="component-ui ui-click" width="0.11" height="0.060" color="#334155" position="0.390 -0.315 0.012" viewer-button="action: component-scroll-down">
+            <a-text value="▼" align="center" width="0.23" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+
+          <a-plane class="component-ui ui-click" width="0.24" height="0.060" color="#4338CA" position="-0.290 -0.430 0.012" viewer-button="action: component-edges">
             <a-text value="KRAWĘDZIE" align="center" width="0.33" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
-          <a-plane class="component-ui ui-click" width="0.20" height="0.060" color="#334155" position="0.255 -0.354 0.012" viewer-button="action: component-next">
-            <a-text value="▶" align="center" width="0.28" color="#FFFFFF" position="0 0 0.006"></a-text>
+          <a-plane class="component-ui ui-click" width="0.26" height="0.060" color="#075985" position="0 -0.430 0.012" viewer-button="action: lighting-open">
+            <a-text value="ŚWIATŁO" align="center" width="0.34" color="#BAE6FD" position="0 0 0.006"></a-text>
           </a-plane>
-          <a-plane class="component-ui ui-click" width="0.32" height="0.060" color="#075985" position="-0.17 -0.430 0.012" viewer-button="action: lighting-open">
-            <a-text value="OŚWIETLENIE" align="center" width="0.43" color="#BAE6FD" position="0 0 0.006"></a-text>
-          </a-plane>
-          <a-plane class="component-ui ui-click" width="0.32" height="0.060" color="#475569" position="0.17 -0.430 0.012" viewer-button="action: component-close">
-            <a-text value="ZAMKNIJ" align="center" width="0.43" color="#FFFFFF" position="0 0 0.006"></a-text>
+          <a-plane class="component-ui ui-click" width="0.24" height="0.060" color="#475569" position="0.290 -0.430 0.012" viewer-button="action: component-close">
+            <a-text value="ZAMKNIJ" align="center" width="0.33" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
         </a-entity>
 
@@ -3120,11 +3670,11 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
       }
 
       if (mode === 'mr') {
-        document.title = 'CK-207-74-5000_VR — Meta Quest MR v12';
-        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v12';
+        document.title = 'CK-207-74-5000_VR — Meta Quest MR v13';
+        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v13';
         enterXR.textContent = 'ENTER MR';
         enterXR.classList.add('mr');
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v12';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v13';
         landingVersion.classList.add('mr');
         landingTitle.textContent = 'CK-207-74-5000_VR — Mixed Reality';
         landingDescription.textContent = 'Postaw model w pokoju, ustaw dokładną skalę, przesuń go i obróć wokół osi pionowej gestem dwóch gripów.';
@@ -3149,10 +3699,10 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
           'Trigger: wskaż'
         ], legend);
       } else {
-        document.title = 'CK-207-74-5000_VR — Meta Quest VR v12';
-        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v12';
+        document.title = 'CK-207-74-5000_VR — Meta Quest VR v13';
+        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v13';
         enterXR.textContent = 'ENTER VR';
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v12';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v13';
         landingTitle.textContent = 'CK-207-74-5000_VR — Virtual Reality';
         landingDescription.textContent = 'Model pozostaje zakotwiczony w skali 1:1. Chodzisz, obracasz użytkownika, teleportujesz się, mierzysz i izolujesz komponenty.';
         landingEnter.textContent = 'ENTER VR — QUEST 3';
