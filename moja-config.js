@@ -17,10 +17,10 @@ window.MOJA_XR_CONFIG = {
   version: "14",
 
   collaboration: {
-    enabled: false,
+    enabled: true,
 
-    supabaseUrl: "https://TWOJ-PROJEKT.supabase.co",
-    supabasePublishableKey: "WKLEJ_TUTAJ_PUBLISHABLE_LUB_ANON_KEY",
+    supabaseUrl: "https://ipabjgqemrnxjnxzdvcv.supabase.co",
+    supabasePublishableKey: "sb_publishable_uvt7TuUg8u5k5f48y61hXw_F7nIv_LK",
 
     // Publiczne kanały są najprostsze do uruchomienia bez logowania Supabase.
     // Dostęp do samych modeli ograniczysz później przez Cloudflare Access.
