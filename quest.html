@@ -4,14 +4,22 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="mobile-web-app-capable" content="yes">
-  <title>CK-207-74-5000_VR — Meta Quest Viewer v13</title>
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="referrer" content="no-referrer">
+  <title>CK-207-74-5000_VR — Meta Quest Viewer v14</title>
+  <script>
+    window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
+  </script>
+  <script src="moja-config.js?v=14"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.4"></script>
+  <script src="moja-collab.js?v=14" defer></script>
   <script>
     (function () {
       var params = new URLSearchParams(window.location.search);
       window.QUEST_MODE = params.get('mode') === 'mr' ? 'mr' : 'vr';
       var stored = 100;
       try {
-        var parsed = Number(window.localStorage.getItem('moja-ck-207-74-5000_vr-mr-scale'));
+        var parsed = Number(window.localStorage.getItem('moja-ck-207-74-5000_vr-v14'));
         if (Number.isFinite(parsed)) stored = parsed;
       } catch (error) {
         stored = 100;
@@ -835,7 +843,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         panel: {type: 'selector'},
         valueText: {type: 'selector'},
         detailText: {type: 'selector'},
-        storageKey: {default: 'moja-ck-207-74-5000_vr-mr-scale-lighting360'}
+        storageKey: {default: 'moja-ck-207-74-5000_vr-v14-lighting360'}
       },
 
       init: function () {
@@ -2811,7 +2819,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         this.updateScalePanel();
         if (this.ready && this.placed) this.updateInfo();
         try {
-          window.localStorage.setItem('moja-ck-207-74-5000_vr-mr-scale', String(this.scalePercent));
+          window.localStorage.setItem('moja-ck-207-74-5000_vr-v14', String(this.scalePercent));
         } catch (error) {}
         if (!silent) {
           window.dispatchEvent(new CustomEvent('moja-scale-changed', {detail: {percent: this.scalePercent}}));
@@ -3245,8 +3253,8 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
 </head>
 <body>
   <div class="topbar">
-    <a class="pill" href="index.html?v=13">← Viewer</a>
-    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v13</div>
+    <a class="pill" href="index.html?v=14">← Viewer</a>
+    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v14</div>
     <button id="enterXR" class="pill enter" type="button">ENTER VR</button>
   </div>
 
@@ -3254,7 +3262,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
 
   <div id="landing" class="landing">
     <div class="card">
-      <div id="landingVersion" class="version">META QUEST 3 • v13</div>
+      <div id="landingVersion" class="version">META QUEST 3 • v14</div>
       <h1 id="landingTitle">CK-207-74-5000_VR — Virtual Reality</h1>
       <p id="landingDescription">Model jest zakotwiczony w skali 1:1. Poruszasz się użytkownikiem, mierzysz i zarządzasz widocznością komponentów.</p>
 
@@ -3278,7 +3286,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
 
       <div id="landingControls" class="controls"></div>
       <div class="actions">
-        <a class="button" href="index.html?v=13">← Wróć</a>
+        <a class="button" href="index.html?v=14">← Wróć</a>
         <button id="landingEnter" class="button primary" type="button">ENTER VR — QUEST 3</button>
       </div>
       <div id="landingNote" class="note">Subtelne krawędzie, oświetlenie modelu 360° i brak ciężkich map cieni.</div>
@@ -3288,14 +3296,14 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
   <a-scene
     id="scene"
     quest-viewer="pivot: #modelPivot; asset: #modelAsset; rig: #rig; camera: #camera; left: #leftHand; right: #rightHand; floor: #floor; grid: #metricGrid; reticle: #placementReticle; info: #modelInfo; infoText: #modelInfoText; modeText: #modeText; teleportMarker: #teleportMarker; scalePanel: #scalePanel; scaleValueText: #scaleValueText; scaleKnob: #scaleKnob; componentPanel: #componentPanel; freeGrabButton: #freeGrabButton; freeGrabButtonText: #freeGrabButtonText"
-    component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; scrollTrack: #componentScrollTrack; scrollThumb: #componentScrollThumb; structureUrl: CK-207-74-5000_VR.structure.json?v=13; rows: 8"
-    lighting-control="ambient: #ambientLight; front: #lightFront; back: #lightBack; left: #lightLeft; right: #lightRight; top: #lightTop; bottom: #lightBottom; panel: #lightingPanel; valueText: #lightingValueText; detailText: #lightingDetailText; storageKey: moja-ck-207-74-5000_vr-mr-scale-lighting360"
+    component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; scrollTrack: #componentScrollTrack; scrollThumb: #componentScrollThumb; structureUrl: CK-207-74-5000_VR.structure.json?v=14; rows: 8"
+    lighting-control="ambient: #ambientLight; front: #lightFront; back: #lightBack; left: #lightLeft; right: #lightRight; top: #lightTop; bottom: #lightBottom; panel: #lightingPanel; valueText: #lightingValueText; detailText: #lightingDetailText; storageKey: moja-ck-207-74-5000_vr-v14-lighting360"
     annotation-control="pivot: #modelPivot; root: #annotationRoot; camera: #camera; right: #rightHand; panel: #annotationPanel; keyboard: #annotationKeyboard; preview: #annotationTextPreview; status: #annotationStatus"
     measurement-tool="target: #modelPivot; pointA: #measurePointA; pointB: #measurePointB; line: #measureLine; label: #measureLabel; labelText: #measureLabelText; color: #F59E0B"
     loading-screen="backgroundColor: #0B1220; dotsColor: #60A5FA">
 
     <a-assets timeout="120000">
-      <a-asset-item id="modelSource" src="CK-207-74-5000_VR.glb?v=13"></a-asset-item>
+      <a-asset-item id="modelSource" src="CK-207-74-5000_VR.glb?v=14"></a-asset-item>
     </a-assets>
     <!-- OŚWIETLENIE MODELU 360° — bez map cieni -->
     <a-entity id="ambientLight"
@@ -3670,11 +3678,11 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
       }
 
       if (mode === 'mr') {
-        document.title = 'CK-207-74-5000_VR — Meta Quest MR v13';
-        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v13';
+        document.title = 'CK-207-74-5000_VR — Meta Quest MR v14';
+        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v14';
         enterXR.textContent = 'ENTER MR';
         enterXR.classList.add('mr');
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v13';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v14';
         landingVersion.classList.add('mr');
         landingTitle.textContent = 'CK-207-74-5000_VR — Mixed Reality';
         landingDescription.textContent = 'Postaw model w pokoju, ustaw dokładną skalę, przesuń go i obróć wokół osi pionowej gestem dwóch gripów.';
@@ -3699,10 +3707,10 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
           'Trigger: wskaż'
         ], legend);
       } else {
-        document.title = 'CK-207-74-5000_VR — Meta Quest VR v13';
-        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v13';
+        document.title = 'CK-207-74-5000_VR — Meta Quest VR v14';
+        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v14';
         enterXR.textContent = 'ENTER VR';
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v13';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v14';
         landingTitle.textContent = 'CK-207-74-5000_VR — Virtual Reality';
         landingDescription.textContent = 'Model pozostaje zakotwiczony w skali 1:1. Chodzisz, obracasz użytkownika, teleportujesz się, mierzysz i izolujesz komponenty.';
         landingEnter.textContent = 'ENTER VR — QUEST 3';
@@ -3736,7 +3744,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         window.MOJA_START_SCALE = current;
         numberInput.value = String(current);
         rangeInput.value = String(Math.max(10, Math.min(300, current)));
-        try { window.localStorage.setItem('moja-ck-207-74-5000_vr-mr-scale', String(current)); } catch (error) {}
+        try { window.localStorage.setItem('moja-ck-207-74-5000_vr-v14', String(current)); } catch (error) {}
         if (emit) window.dispatchEvent(new CustomEvent('moja-scale-request', {detail: {percent: current}}));
       }
 
