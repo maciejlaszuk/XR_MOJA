@@ -2,132 +2,906 @@
 <html lang="pl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CK-207-74-5000_VR — Meta Quest Viewer v13</title>
-  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="referrer" content="no-referrer">
+  <title>CK-207-74-5000_VR — MOJA XR v14</title>
+
+  <script>
+    window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
+  </script>
+  <script src="moja-config.js?v=14"></script>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.3.1/dist/model-viewer.min.js"></script>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+    }
+  }
+  </script>
+
   <style>
-    :root { color-scheme: dark; }
+    :root {
+      color-scheme: dark;
+      --bg: #e8eef4;
+      --panel: rgba(15, 23, 42, .94);
+      --panel2: rgba(30, 41, 59, .94);
+      --line: rgba(148, 163, 184, .25);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+    }
+
     * { box-sizing: border-box; }
-    html, body {
-      margin: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      font-family: Inter, "Segoe UI", Arial, sans-serif;
-      background: #e7edf3;
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; font-family: Inter, "Segoe UI", Arial, sans-serif; background: var(--bg); }
+    button, input { font: inherit; }
+    button { color: inherit; }
+
+    #viewport { position: fixed; inset: 0; }
+    #viewport canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+    .topbar {
+      position: fixed; z-index: 50; top: 12px; left: 12px; right: 12px;
+      display: flex; align-items: center; gap: 8px; pointer-events: none;
     }
-    model-viewer {
-      width: 100%;
-      height: 100%;
-      background: radial-gradient(circle at 50% 34%, #fbfdff 0%, #e8eef4 66%, #cdd7e1 100%);
+    .pill {
+      pointer-events: auto; display: inline-flex; align-items: center; gap: 8px; min-height: 42px;
+      padding: 0 14px; border: 1px solid rgba(255,255,255,.13); border-radius: 999px;
+      background: rgba(15,23,42,.88); color: #fff; box-shadow: 0 12px 30px rgba(15,23,42,.20);
+      backdrop-filter: blur(12px); text-decoration: none; font-size: 13px; font-weight: 800;
     }
-    .head {
-      position: fixed;
-      z-index: 20;
-      top: 14px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      padding: 9px 14px;
-      border: 1px solid rgba(255,255,255,.15);
-      border-radius: 999px;
-      background: rgba(15,23,42,.86);
-      color: #fff;
-      backdrop-filter: blur(12px);
-      box-shadow: 0 14px 34px rgba(15,23,42,.18);
-      white-space: nowrap;
+    .pill strong { color: #fff; }
+    .pill small { color: #93c5fd; font-size: 10px; letter-spacing: .10em; }
+    .pill.status { margin-left: auto; color: #cbd5e1; }
+    .pill.status.ok { color: #86efac; }
+    .pill.status.error { color: #fca5a5; }
+
+    .panel {
+      position: fixed; z-index: 40; top: 66px; bottom: 92px; width: min(360px, calc(100vw - 24px));
+      display: flex; flex-direction: column; overflow: hidden;
+      border: 1px solid rgba(255,255,255,.12); border-radius: 20px;
+      background: var(--panel); color: var(--text); box-shadow: 0 24px 70px rgba(15,23,42,.33);
+      backdrop-filter: blur(16px);
     }
-    .head strong { font-size: 14px; }
-    .head span { color: #93c5fd; font-size: 11px; font-weight: 900; letter-spacing: .09em; }
-    .hint {
-      position: fixed;
-      z-index: 20;
-      left: 50%;
-      top: 59px;
-      transform: translateX(-50%);
-      padding: 6px 10px;
-      border-radius: 999px;
-      background: rgba(248,250,252,.92);
-      color: #334155;
-      font-size: 11px;
-      font-weight: 800;
-      white-space: nowrap;
-      backdrop-filter: blur(8px);
+    #treePanel { left: 12px; }
+    #propsPanel { right: 12px; }
+    .panel-head { padding: 14px; border-bottom: 1px solid var(--line); }
+    .panel-head h2 { margin: 0; font-size: 14px; }
+    .panel-head p { margin: 5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.35; }
+    .panel-body { min-height: 0; flex: 1; overflow: auto; padding: 10px; }
+    .panel-foot { padding: 10px; border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; }
+
+    .search { width: 100%; min-height: 38px; margin-top: 10px; padding: 0 11px; border: 1px solid #475569; border-radius: 10px; background: #0f172a; color: #fff; outline: none; }
+    .search:focus { border-color: var(--accent); }
+
+    .tree-row {
+      display: grid; grid-template-columns: 28px 1fr 24px; align-items: center; gap: 4px;
+      min-height: 38px; padding: 3px 4px; margin-bottom: 3px; border: 1px solid transparent; border-radius: 10px;
+      background: rgba(30,41,59,.70); cursor: pointer; user-select: none;
     }
-    .actions {
-      position: fixed;
-      z-index: 20;
-      left: 50%;
-      bottom: 18px;
-      transform: translateX(-50%);
-      display: grid;
-      grid-template-columns: repeat(3, minmax(190px, 1fr));
-      gap: 10px;
-      width: min(94vw, 900px);
+    .tree-row:hover { border-color: rgba(56,189,248,.45); }
+    .tree-row.selected { background: rgba(109,40,217,.58); border-color: #a78bfa; }
+    .tree-row.hidden { opacity: .48; }
+    .tree-row.mixed { border-color: #f59e0b; }
+    .tree-row.suppressed { opacity: .38; }
+    .tree-label { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; font-weight: 700; }
+    .tree-state { text-align: center; font-size: 12px; }
+    .expander { width: 26px; height: 28px; border: 0; border-radius: 8px; background: #334155; cursor: pointer; }
+    .expander.empty { visibility: hidden; }
+
+    .btn {
+      min-height: 38px; padding: 0 11px; border: 1px solid rgba(255,255,255,.12); border-radius: 11px;
+      background: #334155; color: #fff; font-weight: 800; font-size: 11px; cursor: pointer;
     }
-    .action {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      justify-content: center;
-      min-height: 78px;
-      padding: 13px 16px;
-      border: 1px solid rgba(255,255,255,.14);
-      border-radius: 18px;
-      color: #fff;
-      text-decoration: none;
-      cursor: pointer;
-      backdrop-filter: blur(12px);
-      box-shadow: 0 14px 32px rgba(15,23,42,.22);
+    .btn:hover { filter: brightness(1.12); }
+    .btn.primary { background: #2563eb; }
+    .btn.ok { background: #15803d; }
+    .btn.warn { background: #b45309; }
+    .btn.danger { background: #b91c1c; }
+    .btn:disabled { opacity: .35; cursor: default; }
+
+    .property-title { font-size: 17px; font-weight: 900; color: #fff; word-break: break-word; }
+    .property-subtitle { margin-top: 4px; color: #93c5fd; font-size: 11px; }
+    .property-grid { margin-top: 12px; display: grid; gap: 7px; }
+    .property-row { padding: 9px 10px; border: 1px solid var(--line); border-radius: 11px; background: rgba(30,41,59,.65); }
+    .property-row .name { color: var(--muted); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+    .property-row .value { margin-top: 3px; color: #fff; font-size: 12px; line-height: 1.35; word-break: break-word; }
+    .group-title { margin: 16px 2px 6px; color: #67e8f9; font-size: 10px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+    .empty-state { display: grid; place-items: center; min-height: 180px; color: var(--muted); text-align: center; line-height: 1.5; font-size: 12px; }
+
+    .toolbar {
+      position: fixed; z-index: 50; left: 50%; bottom: 12px; transform: translateX(-50%);
+      width: min(1120px, calc(100vw - 24px)); display: grid; grid-template-columns: repeat(8, minmax(76px, 1fr)); gap: 7px;
+      padding: 8px; border: 1px solid rgba(255,255,255,.13); border-radius: 18px;
+      background: rgba(15,23,42,.90); box-shadow: 0 18px 45px rgba(15,23,42,.28); backdrop-filter: blur(16px);
     }
-    button.action { width: 100%; font-family: inherit; text-align: left; }
-    .action strong { font-size: 16px; }
-    .action span { margin-top: 5px; color: rgba(255,255,255,.82); font-size: 11px; line-height: 1.35; }
-    .phone { background: rgba(2,132,199,.91); }
-    .mr { background: rgba(22,163,74,.94); }
-    .vr { background: rgba(37,99,235,.94); }
+    .tool { min-height: 52px; border: 0; border-radius: 12px; background: #334155; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+    .tool strong { font-size: 11px; }
+    .tool span { color: #cbd5e1; font-size: 9px; }
+    .tool.blue { background: #1d4ed8; }
+    .tool.green { background: #15803d; }
+    .tool.cyan { background: #0369a1; }
+    .tool.violet { background: #6d28d9; }
+
+    .explode-wrap { grid-column: span 2; display: grid; grid-template-columns: 62px 1fr 42px; align-items: center; gap: 8px; padding: 0 11px; border-radius: 12px; background: #1e293b; }
+    .explode-wrap label { font-size: 10px; font-weight: 900; }
+    .explode-wrap output { font-size: 10px; color: #fde68a; text-align: right; }
+    input[type="range"] { width: 100%; accent-color: #f59e0b; }
+
+    .mobile-toggle { display: none; }
+    .mobile-explode { display: none; margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: rgba(15,23,42,.58); }
+    .mobile-explode-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; color: #f8fafc; font-size: 10px; font-weight: 900; }
+    .mobile-explode output { color: #fde68a; }
+
+    dialog {
+      width: min(520px, calc(100vw - 24px)); border: 1px solid rgba(255,255,255,.16); border-radius: 20px;
+      padding: 0; background: #0f172a; color: #fff; box-shadow: 0 30px 90px rgba(0,0,0,.5);
+    }
+    dialog::backdrop { background: rgba(2,6,23,.72); backdrop-filter: blur(7px); }
+    .dialog-head { display: flex; align-items: center; justify-content: space-between; padding: 16px; border-bottom: 1px solid var(--line); }
+    .dialog-head h2 { margin: 0; font-size: 16px; }
+    .dialog-body { padding: 16px; display: grid; gap: 12px; }
+    .field label { display: block; margin-bottom: 5px; color: #cbd5e1; font-size: 11px; font-weight: 800; }
+    .field input { width: 100%; min-height: 42px; padding: 0 11px; border: 1px solid #475569; border-radius: 11px; background: #111827; color: #fff; }
+    .dialog-actions { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; }
+    .dialog-note { color: #94a3b8; font-size: 11px; line-height: 1.45; }
+    .dialog-status { min-height: 18px; color: #86efac; font-size: 11px; }
+
+    #arViewer { position: fixed; width: 1px; height: 1px; left: -20px; bottom: -20px; opacity: 0; pointer-events: none; }
+
+    @media (max-width: 1100px) {
+      #propsPanel { display: none; }
+      #propsPanel.open { display: flex; }
+      #propsToggle { display: inline-flex; }
+      .mobile-explode { display: block; }
+      .toolbar { grid-template-columns: repeat(6, minmax(78px,1fr)); }
+    }
+
     @media (max-width: 760px) {
-      .actions { grid-template-columns: 1fr; bottom: 10px; gap: 7px; width: min(94vw, 440px); }
-      .action { min-height: 55px; padding: 10px 14px; border-radius: 15px; }
-      .action span, .hint { display: none; }
-      .head { top: 10px; }
+      .topbar { top: max(8px, env(safe-area-inset-top)); left: 8px; right: 8px; }
+      .pill { min-height: 38px; padding: 0 11px; }
+      .pill small, .pill.status span { display: none; }
+      .panel { top: 56px; left: 8px !important; right: 8px !important; bottom: 80px; width: auto; display: none; }
+      .panel.open { display: flex !important; }
+      .toolbar { bottom: max(8px, env(safe-area-inset-bottom)); width: calc(100vw - 16px); grid-template-columns: repeat(6,1fr); gap: 5px; padding: 6px; }
+      .tool { min-height: 48px; }
+      .tool span { display: none; }
+      .explode-wrap { display: none; }
+      .mobile-toggle { display: flex; }
+      #propsPanel { display: none; }
+      #propsPanel.open { display: flex; }
+      .desktop-only { display: none !important; }
     }
   </style>
 </head>
 <body>
-  <div class="head"><strong>CK-207-74-5000_VR</strong><span>QUEST VIEWER v13</span></div>
-  <div class="hint">Quest: pomiary, wybór komponentów oraz rozwijane drzewo IAM z Part Number</div>
+  <div id="viewport" aria-label="Widok modelu 3D"></div>
+
+  <div class="topbar">
+    <button id="treeToggle" class="pill mobile-toggle" type="button">☰ Drzewo</button>
+    <div class="pill"><strong>CK-207-74-5000_VR</strong><small>MOJA XR v14</small></div>
+    <button id="propsToggle" class="pill mobile-toggle" type="button">iProperties</button>
+    <div id="loadStatus" class="pill status"><span>Ładowanie modelu…</span></div>
+  </div>
+
+  <aside id="treePanel" class="panel">
+    <div class="panel-head">
+      <h2>Struktura IAM / Part Number</h2>
+      <p>Kliknij wiersz albo element modelu. Ctrl pozwala zaznaczyć kilka pozycji.</p>
+      <input id="treeSearch" class="search" type="search" placeholder="Szukaj Part Number / Description…">
+      <div class="mobile-explode">
+        <div class="mobile-explode-head"><span>Rozsuń model</span><output id="explodeValueMobile">0%</output></div>
+        <input id="explodeRangeMobile" type="range" min="0" max="100" step="1" value="0">
+      </div>
+    </div>
+    <div id="treeList" class="panel-body"><div class="empty-state">Wczytywanie drzewa…</div></div>
+    <div class="panel-foot">
+      <button id="expandAll" class="btn" type="button">Rozwiń wszystko</button>
+      <button id="collapseAll" class="btn" type="button">Zwiń wszystko</button>
+    </div>
+  </aside>
+
+  <aside id="propsPanel" class="panel">
+    <div class="panel-head">
+      <h2>iProperties</h2>
+      <p>Standardowe właściwości Inventora oraz zakładka Custom.</p>
+    </div>
+    <div id="propertyList" class="panel-body"><div class="empty-state">Wybierz komponent.</div></div>
+    <div class="panel-foot">
+      <button id="hideSelected" class="btn danger" type="button">Ukryj</button>
+      <button id="isolateSelected" class="btn warn" type="button">Izoluj</button>
+      <button id="showSelected" class="btn ok" type="button">Pokaż</button>
+      <button id="showAll" class="btn" type="button">Włącz wszystko</button>
+    </div>
+  </aside>
+
+  <nav class="toolbar" aria-label="Narzędzia widoku">
+    <button id="fitView" class="tool" type="button"><strong>Dopasuj</strong><span>cały model</span></button>
+    <button id="showAllBottom" class="tool" type="button"><strong>Włącz</strong><span>wszystko</span></button>
+    <div class="explode-wrap desktop-only">
+      <label for="explodeRange">Rozsuń</label>
+      <input id="explodeRange" type="range" min="0" max="100" step="1" value="0">
+      <output id="explodeValue">0%</output>
+    </div>
+    <button id="arButton" class="tool cyan" type="button"><strong>AR</strong><span>telefon</span></button>
+    <a id="mrButton" class="tool green" href="quest.html?mode=mr&v=14" style="text-decoration:none;color:#fff"><strong>MR</strong><span>Quest 3</span></a>
+    <a id="vrButton" class="tool blue" href="quest.html?mode=vr&v=14" style="text-decoration:none;color:#fff"><strong>VR</strong><span>Quest 3</span></a>
+    <button id="roomButton" class="tool violet" type="button"><strong>Pokój VR</strong><span>współpraca</span></button>
+  </nav>
 
   <model-viewer
-    id="viewer"
-    src="CK-207-74-5000_VR.glb?v=13"
-    ios-src="CK-207-74-5000_VR.usdz?v=13"
+    id="arViewer"
+    src="CK-207-74-5000_VR.glb?v=14"
+    ios-src="CK-207-74-5000_VR.usdz?v=14"
     ar
     ar-modes="webxr scene-viewer quick-look"
     ar-placement="floor"
-    camera-controls
-    auto-rotate
-    shadow-intensity="0"
-    exposure="1.05"
-    interaction-prompt="auto">
-    <button id="nativeAR" slot="ar-button" style="display:none;">AR</button>
+    shadow-intensity="0">
   </model-viewer>
 
-  <div class="actions">
-    <button class="action phone" type="button" onclick="document.getElementById('nativeAR').click()">
-      <strong>AR — telefon</strong>
-      <span>Dotychczasowy tryb Quick Look / Scene Viewer.</span>
-    </button>
-    <a class="action mr" href="quest.html?mode=mr&v=13">
-      <strong>MR — Meta Quest 3</strong>
-      <span>Passthrough, pomiary oraz przewijane drzewo IAM z Part Number, +/−, ukrywaniem i izolacją.</span>
-    </a>
-    <a class="action vr" href="quest.html?mode=vr&v=13">
-      <strong>VR — Meta Quest 3</strong>
-      <span>Walkaround, teleport, pomiary oraz przewijane drzewo IAM z Part Number, +/− i izolacją.</span>
-    </a>
-  </div>
+  <dialog id="roomDialog">
+    <div class="dialog-head">
+      <h2>Wspólny pokój VR</h2>
+      <button id="closeRoom" class="btn" type="button">Zamknij</button>
+    </div>
+    <div class="dialog-body">
+      <div class="field">
+        <label for="userName">Twoja nazwa widoczna w VR</label>
+        <input id="userName" maxlength="32" autocomplete="nickname" placeholder="Maciek">
+      </div>
+      <div class="field">
+        <label for="guestName">Nazwa uczestnika wpisana do linku</label>
+        <input id="guestName" maxlength="32" autocomplete="off" placeholder="Klient">
+      </div>
+      <div class="field">
+        <label for="roomCode">Kod pokoju — ten sam u wszystkich</label>
+        <div style="display:grid;grid-template-columns:1fr 120px;gap:8px">
+          <input id="roomCode" maxlength="64" autocomplete="off">
+          <button id="newRoom" class="btn" type="button">Nowy kod</button>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="enterHostVr" class="btn primary" type="button">Wejdź jako prowadzący VR</button>
+        <button id="copyGuestVr" class="btn ok" type="button">Kopiuj link dla gościa VR</button>
+        <button id="enterHostMr" class="btn" type="button">Wejdź jako prowadzący MR</button>
+        <button id="copyGuestMr" class="btn" type="button">Kopiuj link dla gościa MR</button>
+      </div>
+      <div id="roomStatus" class="dialog-status"></div>
+      <div class="dialog-note">
+        Pokój działa po uzupełnieniu <b>moja-config.js</b> danymi Supabase. W wersji testowej kod pokoju jest częścią zabezpieczenia — wysyłaj pełny link tylko zaproszonym osobom.
+      </div>
+    </div>
+  </dialog>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    const MODEL = 'CK-207-74-5000_VR';
+    const VERSION = '14';
+    const viewport = document.getElementById('viewport');
+    const loadStatus = document.getElementById('loadStatus');
+    const treePanel = document.getElementById('treePanel');
+    const propsPanel = document.getElementById('propsPanel');
+    const treeList = document.getElementById('treeList');
+    const propertyList = document.getElementById('propertyList');
+    const searchInput = document.getElementById('treeSearch');
+    const explodeRange = document.getElementById('explodeRange');
+    const explodeValue = document.getElementById('explodeValue');
+    const explodeRangeMobile = document.getElementById('explodeRangeMobile');
+    const explodeValueMobile = document.getElementById('explodeValueMobile');
+
+    const state = {
+      modelRoot: null,
+      structure: null,
+      treeNodes: [],
+      rootIndexes: [],
+      meshes: [],
+      namedObjects: [],
+      objectAssigned: new WeakSet(),
+      meshToNodeIndex: new WeakMap(),
+      selected: new Set(),
+      helpers: new Map(),
+      explodable: [],
+      explodeFactor: 0,
+      query: ''
+    };
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xe8eef4);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    viewport.appendChild(renderer.domElement);
+
+    const camera = new THREE.PerspectiveCamera(44, 1, 0.01, 5000);
+    camera.position.set(4, 3, 6);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.screenSpacePanning = true;
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x7b8794, 2.0));
+    const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(6, 10, 8); scene.add(key);
+    const fill = new THREE.DirectionalLight(0xffffff, 1.3); fill.position.set(-8, 5, -5); scene.add(fill);
+    const rim = new THREE.DirectionalLight(0xdbeafe, 0.9); rim.position.set(0, -4, 6); scene.add(rim);
+
+    const grid = new THREE.GridHelper(20, 20, 0x64748b, 0x94a3b8);
+    grid.material.transparent = true;
+    grid.material.opacity = 0.28;
+    scene.add(grid);
+
+    function resize() {
+      const rect = viewport.getBoundingClientRect();
+      renderer.setSize(rect.width, rect.height, false);
+      camera.aspect = rect.width / Math.max(1, rect.height);
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function setStatus(text, kind) {
+      loadStatus.classList.remove('ok', 'error');
+      if (kind) loadStatus.classList.add(kind);
+      loadStatus.innerHTML = '<span>' + escapeHtml(text) + '</span>';
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+    }
+
+    function cleanName(value) {
+      return String(value || '').replace(/\\/g, '/').split('/').pop().replace(/\.(iam|ipt)$/i, '').replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    function compactName(value, removeOccurrenceSuffix) {
+      let text = String(value || '').replace(/\\/g, '/').split('/').pop().replace(/\.(iam|ipt)$/i, '').trim();
+      if (removeOccurrenceSuffix) text = text.replace(/:\d+$/i, '');
+      return text.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    }
+
+    function isMeaningfulName(name) {
+      const value = String(name || '').trim();
+      if (!value) return false;
+      return !/^(mesh|node|object|primitive|geometry|group|scene|root|default|material)[\s_.-]*\d*$/i.test(value) &&
+             !/^(mesh|node|object|primitive|geometry|material)[_\-.]/i.test(value) &&
+             value !== '__MOJA_EDGES__';
+    }
+
+    function collectAliases(data) {
+      let values = [data?.occurrenceName, data?.partNumber, data?.fileName, data?.displayName, data?.name];
+      if (Array.isArray(data?.aliases)) values = values.concat(data.aliases);
+      return [...new Set(values.map(v => String(v || '').trim()).filter(Boolean))];
+    }
+
+    function objectDepthFrom(object, parentObject) {
+      let depth = 0;
+      let current = object;
+      while (current && current !== parentObject) { depth += 1; current = current.parent; }
+      return current === parentObject ? depth : 1000;
+    }
+
+    function findBestObject(data, parentObject, rootObject, allowParent) {
+      const aliases = collectAliases(data);
+      const exactAliases = aliases.map(v => compactName(v, false)).filter(Boolean);
+      const baseAliases = aliases.map(v => compactName(v, true)).filter(Boolean);
+      const searchRoot = parentObject || rootObject;
+      const candidates = [];
+
+      if (allowParent && searchRoot && isMeaningfulName(searchRoot.name)) candidates.push(searchRoot);
+      if (searchRoot) {
+        searchRoot.traverse(object => {
+          if (object === searchRoot) return;
+          if (!isMeaningfulName(object.name)) return;
+          if (state.objectAssigned.has(object)) return;
+          candidates.push(object);
+        });
+      }
+
+      const scoreObject = object => {
+        const exact = compactName(object.name, false);
+        const base = compactName(object.name, true);
+        let score = 0;
+        if (exact && exactAliases.includes(exact)) score = 1000;
+        else if (base && baseAliases.includes(base)) score = 700;
+        else {
+          exactAliases.forEach(alias => {
+            if (alias && exact && (exact.includes(alias) || alias.includes(exact))) score = Math.max(score, 320);
+          });
+        }
+        if (score > 0 && parentObject) {
+          const depth = objectDepthFrom(object, parentObject);
+          if (depth < 1000) score += Math.max(0, 80 - depth * 6);
+        }
+        return score;
+      };
+
+      let best = null;
+      let bestScore = 0;
+      candidates.forEach(candidate => {
+        const score = scoreObject(candidate);
+        if (score > bestScore) { best = candidate; bestScore = score; }
+      });
+
+      if (!best && searchRoot !== rootObject && rootObject) {
+        rootObject.traverse(object => {
+          if (best || object === rootObject || !isMeaningfulName(object.name) || state.objectAssigned.has(object)) return;
+          if (scoreObject(object) >= 700) best = object;
+        });
+      }
+
+      if (best && best !== rootObject) state.objectAssigned.add(best);
+      return best;
+    }
+
+    function createNode(data, parentIndex, depth, object) {
+      const label = cleanName(data?.partNumber) || cleanName(data?.fileName) || cleanName(data?.occurrenceName) || cleanName(object?.name) || 'Obiekt';
+      const index = state.treeNodes.length;
+      const node = {
+        index,
+        id: String(data?.id || ('node-' + index)),
+        parentIndex: Number.isInteger(parentIndex) ? parentIndex : -1,
+        children: [],
+        depth: Math.max(0, depth || 0),
+        object: object || null,
+        meshes: [],
+        label,
+        expanded: depth === 0,
+        raw: data || {},
+        suppressed: Boolean(data?.suppressed)
+      };
+      state.treeNodes.push(node);
+      if (node.parentIndex >= 0 && state.treeNodes[node.parentIndex]) state.treeNodes[node.parentIndex].children.push(index);
+      else state.rootIndexes.push(index);
+      return index;
+    }
+
+    function buildStructureNode(data, parentIndex, parentObject, rootObject, depth, isRoot) {
+      data = data || {};
+      const mapped = isRoot ? (findBestObject(data, rootObject, rootObject, true) || rootObject) : findBestObject(data, parentObject || rootObject, rootObject, false);
+      const nodeIndex = createNode(data, parentIndex, depth, mapped);
+      const nextParent = mapped || parentObject || rootObject;
+      const children = Array.isArray(data.children) ? data.children : [];
+      children.forEach(child => buildStructureNode(child, nodeIndex, nextParent, rootObject, depth + 1, false));
+      return nodeIndex;
+    }
+
+    function buildFallbackTree(rootObject) {
+      const rootIndex = createNode({ id: 'root', partNumber: MODEL, documentType: 'assembly' }, -1, 0, rootObject);
+      const walk = (object, parentIndex, depth) => {
+        let nextParent = parentIndex;
+        const hasMesh = (() => { let found = false; object.traverse(child => { if (child.isMesh) found = true; }); return found; })();
+        if (object !== rootObject && isMeaningfulName(object.name) && hasMesh) {
+          nextParent = createNode({ id: 'glb-' + state.treeNodes.length, partNumber: cleanName(object.name), occurrenceName: object.name, documentType: object.isMesh ? 'part' : 'assembly' }, parentIndex, depth, object);
+        }
+        object.children.forEach(child => walk(child, nextParent, nextParent === parentIndex ? depth : depth + 1));
+      };
+      rootObject.children.forEach(child => walk(child, rootIndex, 1));
+      if (!state.treeNodes[rootIndex].children.length) {
+        state.meshes.forEach((mesh, index) => createNode({ id:'mesh-'+index, partNumber: cleanName(mesh.name) || ('Obiekt ' + String(index + 1).padStart(3,'0')), occurrenceName: mesh.name, documentType:'part' }, rootIndex, 1, mesh));
+      }
+    }
+
+    function collectNodeMeshes(node) {
+      const set = new Set();
+      if (node.object) node.object.traverse(object => { if (object.isMesh) set.add(object); });
+      node.children.forEach(childIndex => state.treeNodes[childIndex]?.meshes.forEach(mesh => set.add(mesh)));
+      node.meshes = [...set];
+    }
+
+    function finalizeTree() {
+      for (let i = state.treeNodes.length - 1; i >= 0; i -= 1) collectNodeMeshes(state.treeNodes[i]);
+      state.meshToNodeIndex = new WeakMap();
+      [...state.treeNodes].sort((a,b) => b.depth - a.depth || a.children.length - b.children.length).forEach(node => {
+        node.meshes.forEach(mesh => { if (!state.meshToNodeIndex.has(mesh)) state.meshToNodeIndex.set(mesh, node.index); });
+      });
+      prepareExplode();
+      renderTree();
+    }
+
+    async function loadStructure() {
+      try {
+        const response = await fetch(MODEL + '.structure.json?v=' + VERSION, { cache: 'no-store' });
+        if (!response.ok) return null;
+        return await response.json();
+      } catch { return null; }
+    }
+
+    function flattenVisible() {
+      const rows = [];
+      const query = state.query.trim().toLowerCase();
+      const matches = node => {
+        if (!query) return true;
+        const raw = node.raw || {};
+        return [node.label, raw.description, raw.material, raw.fileName, raw.occurrenceName]
+          .some(value => String(value || '').toLowerCase().includes(query));
+      };
+      const subtreeMatches = index => {
+        const node = state.treeNodes[index];
+        if (!node) return false;
+        return matches(node) || node.children.some(subtreeMatches);
+      };
+      const visit = index => {
+        const node = state.treeNodes[index];
+        if (!node) return;
+        if (!query || subtreeMatches(index)) rows.push(index);
+        if ((query || node.expanded)) node.children.forEach(visit);
+      };
+      state.rootIndexes.forEach(visit);
+      return rows;
+    }
+
+    function visibilityState(node) {
+      if (!node || !node.meshes.length) return node?.suppressed ? 'suppressed' : 'empty';
+      const visible = node.meshes.reduce((sum, mesh) => sum + (mesh.visible ? 1 : 0), 0);
+      if (visible === 0) return 'hidden';
+      if (visible === node.meshes.length) return 'visible';
+      return 'mixed';
+    }
+
+    function renderTree() {
+      treeList.innerHTML = '';
+      const rows = flattenVisible();
+      if (!rows.length) {
+        treeList.innerHTML = '<div class="empty-state">Brak wyników.</div>';
+        return;
+      }
+      rows.forEach(index => {
+        const node = state.treeNodes[index];
+        const vis = visibilityState(node);
+        const row = document.createElement('div');
+        row.className = 'tree-row ' + (state.selected.has(index) ? 'selected ' : '') + vis + (node.suppressed ? ' suppressed' : '');
+        row.style.paddingLeft = (4 + Math.min(node.depth, 8) * 16) + 'px';
+        row.title = node.label;
+
+        const expander = document.createElement('button');
+        expander.type = 'button';
+        expander.className = 'expander' + (node.children.length ? '' : ' empty');
+        expander.textContent = node.expanded ? '−' : '+';
+        expander.addEventListener('click', event => { event.stopPropagation(); node.expanded = !node.expanded; renderTree(); });
+
+        const label = document.createElement('div');
+        label.className = 'tree-label';
+        label.textContent = node.label;
+
+        const status = document.createElement('div');
+        status.className = 'tree-state';
+        status.textContent = vis === 'hidden' ? '○' : vis === 'mixed' ? '◐' : vis === 'suppressed' ? '×' : '●';
+
+        row.append(expander, label, status);
+        row.addEventListener('click', event => selectNode(index, event.ctrlKey || event.metaKey));
+        treeList.appendChild(row);
+      });
+    }
+
+    function selectNode(index, additive) {
+      if (!Number.isInteger(index) || !state.treeNodes[index]) return;
+      if (!additive) state.selected.clear();
+      if (additive && state.selected.has(index)) state.selected.delete(index);
+      else state.selected.add(index);
+      syncHelpers();
+      renderTree();
+      renderProperties();
+      if (window.innerWidth <= 1100) {
+        if (window.innerWidth <= 760) treePanel.classList.remove('open');
+        propsPanel.classList.add('open');
+      }
+    }
+
+    function syncHelpers() {
+      [...state.helpers.keys()].forEach(index => {
+        if (!state.selected.has(index)) {
+          const helper = state.helpers.get(index);
+          scene.remove(helper); helper.geometry?.dispose(); helper.material?.dispose(); state.helpers.delete(index);
+        }
+      });
+      state.selected.forEach(index => {
+        const node = state.treeNodes[index];
+        if (!node || !node.meshes.some(mesh => mesh.visible)) return;
+        let helper = state.helpers.get(index);
+        if (!helper) {
+          helper = new THREE.Box3Helper(new THREE.Box3(), 0x7c3aed);
+          helper.material.depthTest = false;
+          helper.renderOrder = 100;
+          scene.add(helper);
+          state.helpers.set(index, helper);
+        }
+        const box = new THREE.Box3();
+        node.meshes.forEach(mesh => { if (mesh.visible) box.expandByObject(mesh); });
+        if (!box.isEmpty()) helper.box.copy(box);
+      });
+    }
+
+    function renderProperties() {
+      const indexes = [...state.selected];
+      if (!indexes.length) {
+        propertyList.innerHTML = '<div class="empty-state">Wybierz komponent z drzewa albo kliknij model.</div>';
+        return;
+      }
+      const node = state.treeNodes[indexes[0]];
+      const raw = node.raw || {};
+      const fixed = [
+        ['Part Number', raw.partNumber || node.label],
+        ['Description', raw.description],
+        ['Material', raw.material],
+        ['Mass', Number.isFinite(Number(raw.massKg)) ? Number(raw.massKg).toLocaleString('pl-PL', {maximumFractionDigits:3}) + ' kg' : ''],
+        ['Occurrence', raw.occurrenceName],
+        ['File', raw.fileName],
+        ['Document type', raw.documentType],
+        ['Node ID', raw.id]
+      ].filter(item => String(item[1] || '').trim());
+
+      let html = '<div class="property-title">' + escapeHtml(node.label) + '</div>';
+      html += '<div class="property-subtitle">' + indexes.length + ' zaznaczonych komponentów</div>';
+      html += '<div class="property-grid">';
+      fixed.forEach(([name,value]) => { html += '<div class="property-row"><div class="name">' + escapeHtml(name) + '</div><div class="value">' + escapeHtml(value) + '</div></div>'; });
+      html += '</div>';
+
+      const props = Array.isArray(raw.iProperties) ? raw.iProperties : [];
+      const seen = new Set(fixed.map(item => item[0].toLowerCase()));
+      const groups = new Map();
+      props.forEach(prop => {
+        const name = String(prop?.name || '').trim();
+        const value = String(prop?.value || '').trim();
+        if (!name || !value || seen.has(name.toLowerCase())) return;
+        const group = String(prop?.group || 'Other');
+        if (!groups.has(group)) groups.set(group, []);
+        groups.get(group).push({name,value});
+      });
+      groups.forEach((items, group) => {
+        html += '<div class="group-title">' + escapeHtml(group) + '</div><div class="property-grid">';
+        items.forEach(item => { html += '<div class="property-row"><div class="name">' + escapeHtml(item.name) + '</div><div class="value">' + escapeHtml(item.value) + '</div></div>'; });
+        html += '</div>';
+      });
+      propertyList.innerHTML = html;
+    }
+
+    function setNodeVisibility(index, visible) {
+      const node = state.treeNodes[index];
+      if (!node) return;
+      node.meshes.forEach(mesh => { mesh.visible = Boolean(visible); });
+    }
+
+    function hideSelected() { state.selected.forEach(index => setNodeVisibility(index, false)); afterVisibilityChange(); }
+    function showSelected() { state.selected.forEach(index => setNodeVisibility(index, true)); afterVisibilityChange(); }
+    function isolateSelected() {
+      if (!state.selected.size) return;
+      const selectedMeshes = new Set();
+      state.selected.forEach(index => state.treeNodes[index]?.meshes.forEach(mesh => selectedMeshes.add(mesh)));
+      state.meshes.forEach(mesh => { mesh.visible = selectedMeshes.has(mesh); });
+      afterVisibilityChange();
+    }
+    function showAll() { state.meshes.forEach(mesh => { mesh.visible = true; }); afterVisibilityChange(); }
+    function afterVisibilityChange() { syncHelpers(); renderTree(); }
+
+    function fitView() {
+      if (!state.modelRoot) return;
+      const box = new THREE.Box3().setFromObject(state.modelRoot);
+      if (box.isEmpty()) return;
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const maxSize = Math.max(size.x, size.y, size.z, 0.1);
+      const distance = maxSize / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5))) * 1.35;
+      const direction = new THREE.Vector3(1, 0.7, 1).normalize();
+      controls.target.copy(center);
+      camera.position.copy(center).addScaledVector(direction, distance);
+      camera.near = Math.max(0.001, distance / 1000);
+      camera.far = Math.max(1000, distance * 30);
+      camera.updateProjectionMatrix();
+      controls.update();
+    }
+
+    function prepareExplode() {
+      state.explodable = [];
+      if (!state.modelRoot) return;
+      state.modelRoot.updateMatrixWorld(true);
+      const modelBox = new THREE.Box3().setFromObject(state.modelRoot);
+      const modelCenter = modelBox.getCenter(new THREE.Vector3());
+      const diagonal = modelBox.getSize(new THREE.Vector3()).length();
+      const used = new WeakSet();
+      state.treeNodes.filter(node => node.children.length === 0 && node.object && node.object !== state.modelRoot && node.meshes.length).forEach((node, idx) => {
+        const object = node.object;
+        if (!object.parent || used.has(object)) return;
+        used.add(object);
+        const box = new THREE.Box3();
+        node.meshes.forEach(mesh => box.expandByObject(mesh));
+        if (box.isEmpty()) return;
+        const center = box.getCenter(new THREE.Vector3());
+        const direction = center.clone().sub(modelCenter);
+        if (direction.lengthSq() < 1e-8) direction.set((idx % 3) - 1, ((idx + 1) % 3) - 1, ((idx + 2) % 3) - 1);
+        direction.normalize();
+        state.explodable.push({
+          object,
+          originalLocal: object.position.clone(),
+          originalWorld: object.getWorldPosition(new THREE.Vector3()),
+          direction,
+          distance: diagonal * 0.42
+        });
+      });
+    }
+
+    function applyExplode(percent) {
+      const factor = THREE.MathUtils.clamp(Number(percent) || 0, 0, 100) / 100;
+      state.explodeFactor = factor;
+      state.explodable.forEach(item => {
+        item.object.position.copy(item.originalLocal);
+        item.object.parent.updateMatrixWorld(true);
+        const targetWorld = item.originalWorld.clone().addScaledVector(item.direction, item.distance * factor);
+        item.object.position.copy(item.object.parent.worldToLocal(targetWorld));
+      });
+      state.modelRoot?.updateMatrixWorld(true);
+      syncHelpers();
+    }
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    let pointerDown = null;
+    renderer.domElement.addEventListener('pointerdown', event => {
+      pointerDown = { x: event.clientX, y: event.clientY };
+    });
+    renderer.domElement.addEventListener('pointerup', event => {
+      if (!state.modelRoot || event.button !== 0 || !pointerDown) return;
+      const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
+      pointerDown = null;
+      if (moved > 6) return;
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+      const hit = raycaster.intersectObjects(state.meshes.filter(mesh => mesh.visible), false)[0];
+      if (!hit) return;
+      let current = hit.object;
+      let index = -1;
+      while (current) {
+        const mapped = state.meshToNodeIndex.get(current);
+        if (Number.isInteger(mapped)) { index = mapped; break; }
+        current = current.parent;
+      }
+      if (index >= 0) selectNode(index, event.ctrlKey || event.metaKey);
+    });
+
+    searchInput.addEventListener('input', () => { state.query = searchInput.value; renderTree(); });
+    document.getElementById('expandAll').addEventListener('click', () => { state.treeNodes.forEach(node => { if (node.children.length) node.expanded = true; }); renderTree(); });
+    document.getElementById('collapseAll').addEventListener('click', () => { state.treeNodes.forEach(node => { node.expanded = node.depth === 0; }); renderTree(); });
+    document.getElementById('hideSelected').addEventListener('click', hideSelected);
+    document.getElementById('showSelected').addEventListener('click', showSelected);
+    document.getElementById('isolateSelected').addEventListener('click', isolateSelected);
+    document.getElementById('showAll').addEventListener('click', showAll);
+    document.getElementById('showAllBottom').addEventListener('click', showAll);
+    document.getElementById('fitView').addEventListener('click', fitView);
+    function setExplodeValue(value) {
+      const percent = Math.round(THREE.MathUtils.clamp(Number(value) || 0, 0, 100));
+      explodeRange.value = String(percent);
+      explodeValue.textContent = percent + '%';
+      if (explodeRangeMobile) explodeRangeMobile.value = String(percent);
+      if (explodeValueMobile) explodeValueMobile.textContent = percent + '%';
+      applyExplode(percent);
+    }
+    explodeRange.addEventListener('input', () => setExplodeValue(explodeRange.value));
+    if (explodeRangeMobile) explodeRangeMobile.addEventListener('input', () => setExplodeValue(explodeRangeMobile.value));
+
+    document.getElementById('treeToggle').addEventListener('click', () => { propsPanel.classList.remove('open'); treePanel.classList.toggle('open'); });
+    document.getElementById('propsToggle').addEventListener('click', () => { treePanel.classList.remove('open'); propsPanel.classList.toggle('open'); });
+
+    document.getElementById('arButton').addEventListener('click', async () => {
+      const arViewer = document.getElementById('arViewer');
+      try {
+        if (typeof arViewer.activateAR === 'function') await arViewer.activateAR();
+        else arViewer.click();
+      } catch (error) {
+        alert('Na tym urządzeniu/przeglądarce nie udało się uruchomić natywnego AR. Otwórz stronę w Safari na iPhone albo Chrome na Androidzie.');
+      }
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      state.helpers.forEach(helper => helper.updateMatrixWorld(true));
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    const loader = new GLTFLoader();
+    Promise.all([
+      new Promise((resolve, reject) => loader.load(MODEL + '.glb?v=' + VERSION, resolve, progress => {
+        if (progress.total) setStatus('Model ' + Math.round(progress.loaded / progress.total * 100) + '%');
+      }, reject)),
+      loadStructure()
+    ]).then(([gltf, structure]) => {
+      state.modelRoot = gltf.scene;
+      scene.add(state.modelRoot);
+      state.modelRoot.updateMatrixWorld(true);
+      state.modelRoot.traverse(object => {
+        if (object.isMesh) {
+          object.castShadow = false; object.receiveShadow = false;
+          state.meshes.push(object);
+          if (object.material) {
+            const materials = Array.isArray(object.material) ? object.material : [object.material];
+            materials.forEach(material => { material.side = THREE.DoubleSide; material.needsUpdate = true; });
+          }
+        }
+        if (isMeaningfulName(object.name)) state.namedObjects.push(object);
+      });
+
+      state.structure = structure;
+      if (structure?.root) buildStructureNode(structure.root, -1, state.modelRoot, state.modelRoot, 0, true);
+      else buildFallbackTree(state.modelRoot);
+      finalizeTree();
+      fitView();
+      setStatus((structure?.root ? 'Drzewo IAM' : 'Nazwy GLB') + ' • ' + state.meshes.length + ' brył', 'ok');
+    }).catch(error => {
+      console.error(error);
+      setStatus('Błąd wczytywania modelu', 'error');
+      treeList.innerHTML = '<div class="empty-state">Nie udało się wczytać ' + escapeHtml(MODEL) + '.glb.<br>Sprawdź nazwy plików i publikację Pages.</div>';
+    });
+
+    // ---------------------------------------------------------------------
+    // Pokój współpracy — generowanie linków. Sama synchronizacja działa w
+    // quest.html przez moja-collab.js.
+    // ---------------------------------------------------------------------
+    const roomDialog = document.getElementById('roomDialog');
+    const userName = document.getElementById('userName');
+    const guestName = document.getElementById('guestName');
+    const roomCode = document.getElementById('roomCode');
+    const roomStatus = document.getElementById('roomStatus');
+
+    function randomRoom() {
+      const bytes = new Uint8Array(12);
+      crypto.getRandomValues(bytes);
+      return [...bytes].map(value => value.toString(16).padStart(2, '0')).join('').toUpperCase();
+    }
+
+    function safeRoom(value) { return String(value || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0,64); }
+    function safeName(value) { return String(value || '').trim().slice(0,32) || 'Użytkownik'; }
+
+    userName.value = localStorage.getItem('moja-ck-207-74-5000_vr-v14-user-name') || 'Maciek';
+    guestName.value = localStorage.getItem('moja-ck-207-74-5000_vr-v14-guest-name') || 'Klient';
+    roomCode.value = localStorage.getItem('moja-ck-207-74-5000_vr-v14-room') || randomRoom();
+
+    function saveRoomInputs() {
+      userName.value = safeName(userName.value);
+      guestName.value = safeName(guestName.value);
+      roomCode.value = safeRoom(roomCode.value) || randomRoom();
+      localStorage.setItem('moja-ck-207-74-5000_vr-v14-user-name', userName.value);
+      localStorage.setItem('moja-ck-207-74-5000_vr-v14-guest-name', guestName.value);
+      localStorage.setItem('moja-ck-207-74-5000_vr-v14-room', roomCode.value);
+    }
+
+    function questUrl(mode, role) {
+      saveRoomInputs();
+      const url = new URL('quest.html', window.location.href);
+      url.searchParams.set('mode', mode);
+      url.searchParams.set('v', VERSION);
+      url.searchParams.set('room', roomCode.value);
+      url.searchParams.set('name', role === 'host' ? userName.value : guestName.value);
+      url.searchParams.set('role', role);
+      if (role !== 'host') url.searchParams.set('follow', '1');
+      return url.toString();
+    }
+
+    async function copyText(value, message) {
+      try { await navigator.clipboard.writeText(value); roomStatus.textContent = message; }
+      catch { window.prompt('Skopiuj link:', value); }
+    }
+
+    document.getElementById('roomButton').addEventListener('click', () => roomDialog.showModal());
+    document.getElementById('closeRoom').addEventListener('click', () => roomDialog.close());
+    document.getElementById('newRoom').addEventListener('click', () => { roomCode.value = randomRoom(); saveRoomInputs(); roomStatus.textContent = 'Utworzono nowy kod pokoju.'; });
+    document.getElementById('enterHostVr').addEventListener('click', () => { window.location.href = questUrl('vr','host'); });
+    document.getElementById('enterHostMr').addEventListener('click', () => { window.location.href = questUrl('mr','host'); });
+    document.getElementById('copyGuestVr').addEventListener('click', () => copyText(questUrl('vr','guest'), 'Skopiowano link VR dla uczestnika.'));
+    document.getElementById('copyGuestMr').addEventListener('click', () => copyText(questUrl('mr','guest'), 'Skopiowano link MR dla uczestnika.'));
+  </script>
 </body>
 </html>
