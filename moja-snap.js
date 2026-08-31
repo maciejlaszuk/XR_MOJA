@@ -1,7 +1,7 @@
 (function (global) {
   'use strict';
 
-  var VERSION = '17';
+  var VERSION = '19';
 
   function createEngine(THREE, userOptions) {
     if (!THREE) throw new Error('MOJA SNAP: brak biblioteki THREE.');
