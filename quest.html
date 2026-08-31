@@ -6,7 +6,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — Meta Quest Viewer v16</title>
+  <title>CK-207-74-5000_VR — Meta Quest Viewer v17</title>
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
@@ -25,7 +25,8 @@
     })();
   </script>
   <script src="https://aframe.io/releases/1.8.0/aframe.min.js"></script>
-  <script src="moja-snap.js?v=16"></script>
+  <script src="moja-snap.js?v=17"></script>
+  <script src="moja-measure.js?v=17"></script>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
@@ -475,19 +476,36 @@
     AFRAME.registerComponent('measurement-tool', {
       schema: {
         target: {type: 'selector'},
+        right: {type: 'selector'},
         pointA: {type: 'selector'},
         pointB: {type: 'selector'},
+        pointC: {type: 'selector'},
         line: {type: 'selector'},
+        line2: {type: 'selector'},
         label: {type: 'selector'},
         labelText: {type: 'selector'},
-        color: {type: 'color', default: '#F59E0B'}
+        snapLabel: {type: 'selector'},
+        snapLabelText: {type: 'selector'},
+        panel: {type: 'selector'},
+        status: {type: 'selector'},
+        color: {type: 'color', default: '#2563EB'}
       },
 
       init: function () {
         this.enabled = false;
-        this.points = [null, null];
+        this.panelVisible = false;
+        this.mode = 'distance';
+        this.snapEnabled = true;
+        this.filters = {vertex: true, midpoint: true, center: true, edge: true, perpendicular: true, surface: true};
+        this.points = [];
+        this.preview = null;
+        this.previewIntersection = null;
+        this.result = null;
+        this.busy = false;
+        this.computeToken = 0;
         this.worldA = new THREE.Vector3();
         this.worldB = new THREE.Vector3();
+        this.worldC = new THREE.Vector3();
         this.pathX = new THREE.Vector3();
         this.pathXY = new THREE.Vector3();
         this.midpoint = new THREE.Vector3();
@@ -496,76 +514,121 @@
         this.localPathX = new THREE.Vector3();
         this.localPathXY = new THREE.Vector3();
         this.targetScale = new THREE.Vector3(1, 1, 1);
+        this.controllerWorld = new THREE.Vector3();
+        this.coordinate = new THREE.Vector3();
+        this.arcAxis = new THREE.Vector3();
+        this.arcVector = new THREE.Vector3();
+        this.arcPositions = new Float32Array(33 * 3);
         this.axisVisuals = {};
         this.snapEngine = window.MOJA_SNAP
           ? window.MOJA_SNAP.createEngine(THREE, {maxAngleRad: 0.018, featureAngleDeg: 18})
           : null;
+        this.measureEngine = window.MOJA_MEASURE
+          ? window.MOJA_MEASURE.createEngine(THREE, {surfaceSmoothAngleDeg: 14, minDistanceMaxTrianglesPerSet: 2800})
+          : null;
+        this.onUIAction = this.onUIAction.bind(this);
+        this.onSelectionChanged = this.onSelectionChanged.bind(this);
+        this.el.addEventListener('viewer-ui-action', this.onUIAction);
+        this.el.addEventListener('moja-selection-changed', this.onSelectionChanged);
         this.createAxisVisuals();
+        this.createAngleArc();
         this.styleMainLabel();
+        this.setPanelVisible(false);
         this.clear();
       },
 
       createElement: function (tag, attributes, parent) {
         var element = document.createElement(tag);
-        Object.keys(attributes || {}).forEach(function (name) {
-element.setAttribute(name, attributes[name]);
-        });
+        Object.keys(attributes || {}).forEach(function (name) { element.setAttribute(name, attributes[name]); });
         (parent || this.el).appendChild(element);
         return element;
       },
 
       createAxisVisual: function (axis, color) {
         var line = this.createElement('a-entity', {
-line: 'start: 0 0 0; end: 0 0 0; color: ' + color + '; opacity: 0.96',
-visible: 'false'
+          line: 'start: 0 0 0; end: 0 0 0; color: ' + color + '; opacity: 0.96',
+          visible: 'false'
         });
         var label = this.createElement('a-entity', {
-'look-at-camera': 'camera: #camera; yawOnly: false',
-scale: '0.34 0.34 0.34',
-visible: 'false'
+          'look-at-camera': 'camera: #camera; yawOnly: false',
+          scale: '0.25 0.25 0.25',
+          visible: 'false'
         });
         this.createElement('a-plane', {
-width: '1.06',
-height: '0.145',
-color: '#0B1220',
-opacity: '0.48',
-material: 'shader: flat; transparent: true; depthWrite: false'
+          width: '0.88', height: '0.13', color: '#F8FAFC', opacity: '0.94',
+          material: 'shader: flat; transparent: true; depthWrite: false'
         }, label);
         var text = this.createElement('a-text', {
-value: axis,
-align: 'center',
-anchor: 'center',
-baseline: 'center',
-width: '0.98',
-color: color,
-position: '0 0 0.006'
+          value: axis, align: 'center', anchor: 'center', baseline: 'center', width: '0.82',
+          color: color, position: '0 0 0.006'
         }, label);
         return {line: line, label: label, text: text, color: color};
       },
 
       createAxisVisuals: function () {
-        this.axisVisuals.x = this.createAxisVisual('ΔX', '#EF4444');
-        this.axisVisuals.y = this.createAxisVisual('ΔY', '#22C55E');
-        this.axisVisuals.z = this.createAxisVisual('ΔZ', '#3B82F6');
+        this.axisVisuals.x = this.createAxisVisual('X', '#EF4444');
+        this.axisVisuals.y = this.createAxisVisual('Y', '#22C55E');
+        this.axisVisuals.z = this.createAxisVisual('Z', '#3B82F6');
+      },
+
+      createAngleArc: function () {
+        var geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(this.arcPositions, 3));
+        var material = new THREE.LineBasicMaterial({color: 0x2563eb, depthTest: false, transparent: true, opacity: 0.96});
+        this.angleArc = new THREE.Line(geometry, material);
+        this.angleArc.visible = false;
+        this.angleArc.frustumCulled = false;
+        this.angleArc.renderOrder = 30;
+        this.el.object3D.add(this.angleArc);
       },
 
       styleMainLabel: function () {
         if (!this.data.label) return;
         var plane = this.data.label.querySelector('a-plane');
         if (plane) {
-plane.setAttribute('width', 1.78);
-plane.setAttribute('height', 0.315);
-plane.setAttribute('opacity', 0.58);
-plane.setAttribute('material', 'shader: flat; transparent: true; depthWrite: false');
+          plane.setAttribute('width', 1.22);
+          plane.setAttribute('height', 0.22);
+          plane.setAttribute('color', '#F8FAFC');
+          plane.setAttribute('opacity', 0.96);
+          plane.setAttribute('material', 'shader: flat; transparent: true; depthWrite: false');
         }
         if (this.data.labelText) {
-this.data.labelText.setAttribute('width', 1.64);
-this.data.labelText.setAttribute('color', '#FDE68A');
+          this.data.labelText.setAttribute('width', 1.12);
+          this.data.labelText.setAttribute('color', '#2563EB');
         }
+      },
+
+      getModeLabel: function () {
+        return ({
+          distance: 'DYSTANS', xyz: 'XYZ', angle: 'KĄT', point: 'PUNKT XYZ', laser: 'LASER', area: 'POWIERZCHNIA', 'min-distance': 'MIN. PART–PART'
+        })[this.mode] || 'POMIAR';
+      },
+
+      shortSnapLabel: function (kind) {
+        return ({vertex:'NODE', midpoint:'MID', center:'CENTER', edge:'EDGE', perpendicular:'PERP ⟂', surface:'FACE'})[kind] || 'POINT';
+      },
+
+      snapSymbol: function (kind) {
+        return ({vertex:'◇', midpoint:'△', center:'⊙', edge:'─', perpendicular:'⟂', surface:'●'})[kind] || '●';
+      },
+
+      formatMm: function (metres, approximate) {
+        if (!Number.isFinite(metres)) return '—';
+        return (approximate ? '≈ ' : '') + Math.round(metres * 1000) + ' mm';
+      },
+
+      formatArea: function (squareMetres, approximate) {
+        if (!Number.isFinite(squareMetres)) return '—';
+        return (approximate ? '≈ ' : '') + squareMetres.toFixed(3).replace('.', ',') + ' m²';
       },
 
       setEnabled: function (enabled) {
         this.enabled = Boolean(enabled);
+        this.setPanelVisible(this.enabled);
+        if (!this.enabled) {
+          this.clearPreview();
+          this.hideAllVisuals();
+        }
       },
 
       toggle: function () {
@@ -573,8 +636,93 @@ this.data.labelText.setAttribute('color', '#FDE68A');
         return this.enabled;
       },
 
-      isEnabled: function () {
-        return this.enabled;
+      isEnabled: function () { return this.enabled; },
+
+      setPanelVisible: function (visible) {
+        this.panelVisible = Boolean(visible) && this.enabled;
+        if (this.data.panel) this.data.panel.object3D.visible = this.panelVisible;
+        this.updatePanelInteractivity();
+        this.updatePanel();
+        this.refreshRaycaster();
+      },
+
+      togglePanel: function () { this.setPanelVisible(!this.panelVisible); },
+
+      updatePanelInteractivity: function () {
+        if (!this.data.panel) return;
+        var active = this.panelVisible && this.enabled;
+        this.data.panel.querySelectorAll('.measure-ui').forEach(function (element) {
+          if (active) element.classList.add('ray-target');
+          else element.classList.remove('ray-target');
+        });
+      },
+
+      refreshRaycaster: function () {
+        var right = this.data.right;
+        var ray = right && right.components && right.components['trigger-ray'];
+        if (ray) window.setTimeout(function () { ray.refresh(); }, 0);
+      },
+
+      updatePanel: function () {
+        if (this.data.status) {
+          var line1 = this.getModeLabel() + '  •  SNAP ' + (this.snapEnabled ? 'ON' : 'OFF');
+          var line2 = '';
+          if (this.mode === 'distance' || this.mode === 'xyz') line2 = this.points.length === 0 ? 'TRIGGER: A' : (this.points.length === 1 ? 'CELUJ: B — PODGLĄD LIVE • TRIGGER: ZAPISZ' : 'GOTOWE');
+          else if (this.mode === 'angle') line2 = ['TRIGGER: A', 'TRIGGER: WIERZCHOŁEK', 'CELUJ: B — PODGLĄD LIVE • TRIGGER: ZAPISZ', 'GOTOWE'][Math.min(this.points.length, 3)];
+          else if (this.mode === 'point') line2 = 'TRIGGER: WSPÓŁRZĘDNE PUNKTU';
+          else if (this.mode === 'laser') line2 = 'CELUJ: PODGLĄD LIVE • TRIGGER: PRZYPNIJ';
+          else if (this.mode === 'area') line2 = 'TRIGGER: POWIERZCHNIA SIATKI';
+          else if (this.mode === 'min-distance') line2 = this.busy ? 'OBLICZANIE…' : 'ZAZNACZ 2 CZĘŚCI → OBLICZ';
+          this.data.status.setAttribute('value', line1 + '\n' + line2);
+        }
+
+        var modeButtons = {
+          distance: 'measureBtnDistance', xyz: 'measureBtnXYZ', angle: 'measureBtnAngle',
+          point: 'measureBtnPoint', laser: 'measureBtnLaser', area: 'measureBtnArea',
+          'min-distance': 'measureBtnMin'
+        };
+        Object.keys(modeButtons).forEach(function (mode) {
+          var button = document.getElementById(modeButtons[mode]);
+          if (!button) return;
+          button.setAttribute('color', mode === this.mode ? '#0284C7' : '#075985');
+        }, this);
+        var snapButton = document.getElementById('measureBtnSnap');
+        if (snapButton) snapButton.setAttribute('color', this.snapEnabled ? '#0F766E' : '#9A3412');
+        var snapButtonText = document.getElementById('measureBtnSnapText');
+        if (snapButtonText) snapButtonText.setAttribute('value', this.snapEnabled ? 'SNAP: ON' : 'SNAP: OFF');
+        var computeButton = document.getElementById('measureBtnCompute');
+        if (computeButton) computeButton.setAttribute('color', this.mode === 'min-distance' ? '#166534' : '#334155');
+
+        var viewer = this.el.components['quest-viewer'];
+        if (viewer && viewer.updateModeUI) viewer.updateModeUI();
+      },
+
+      setMode: function (mode) {
+        if (['distance','xyz','angle','point','laser','area','min-distance'].indexOf(mode) < 0) return;
+        this.mode = mode;
+        this.clear();
+        this.updatePanel();
+      },
+
+      toggleSnap: function () {
+        this.snapEnabled = !this.snapEnabled;
+        this.clearPreview();
+        this.updatePanel();
+      },
+
+      onSelectionChanged: function () {
+        if (this.mode !== 'min-distance') return;
+        this.computeToken += 1;
+        this.busy = false;
+        this.result = null;
+        this.hideAllVisuals();
+        this.updatePanel();
+      },
+
+      getBasePoint: function () {
+        if (!this.points.length) return null;
+        var source = this.mode === 'angle' && this.points.length > 1 ? this.points[1] : this.points[this.points.length - 1];
+        return this.resolvePoint(source, this.worldC) ? this.worldC.clone() : null;
       },
 
       pointFromIntersection: function (intersection, ray, intersections) {
@@ -589,6 +737,9 @@ this.data.labelText.setAttribute('color', '#FDE68A');
 
         var snap = this.snapEngine && ray
           ? this.snapEngine.snapFromIntersections(usableIntersections, ray, {
+              enabled: this.snapEnabled,
+              filters: this.filters,
+              basePoint: this.getBasePoint(),
               maxAngleRad: 0.018,
               searchRoot: targetObject
             })
@@ -596,41 +747,123 @@ this.data.labelText.setAttribute('color', '#FDE68A');
         if ((!snap || !snap.point) && (!intersection || !intersection.point)) return null;
 
         var worldPoint = snap && snap.point ? snap.point.clone() : intersection.point.clone();
-        var snapLabel = snap && snap.label ? snap.label : 'PUNKT POWIERZCHNI';
-        var snapKind = snap && snap.kind ? snap.kind : 'surface';
         var sourceObject = snap && snap.object ? snap.object : (intersection && intersection.object);
-
+        var stored = {
+          space: 'world', value: worldPoint,
+          snapKind: snap && snap.kind ? snap.kind : 'surface',
+          snapLabel: snap && snap.label ? snap.label : 'PUNKT POWIERZCHNI',
+          sourceIntersection: snap && snap.sourceIntersection ? snap.sourceIntersection : intersection
+        };
         if (targetObject && sourceObject && MOJA.isObjectInside(sourceObject, targetObject)) {
           targetObject.updateMatrixWorld(true);
-          return {
-            space: 'target',
-            value: targetObject.worldToLocal(worldPoint),
-            snapKind: snapKind,
-            snapLabel: snapLabel
-          };
+          stored.space = 'target';
+          stored.value = targetObject.worldToLocal(worldPoint);
         }
-        return {space: 'world', value: worldPoint, snapKind: snapKind, snapLabel: snapLabel};
+        return stored;
+      },
+
+      createWorldStoredPoint: function (point, object, kind, label) {
+        var target = object || (this.data.target && this.data.target.object3D);
+        if (!target) return {space:'world', value:point.clone(), snapKind:kind, snapLabel:label};
+        target.updateMatrixWorld(true);
+        return {space:'object', object:target, value:target.worldToLocal(point.clone()), snapKind:kind, snapLabel:label};
       },
 
       resolvePoint: function (stored, output) {
         if (!stored) return null;
         output.copy(stored.value);
         if (stored.space === 'target' && this.data.target) {
-this.data.target.object3D.updateMatrixWorld(true);
-this.data.target.object3D.localToWorld(output);
+          this.data.target.object3D.updateMatrixWorld(true);
+          this.data.target.object3D.localToWorld(output);
+        } else if (stored.space === 'object' && stored.object) {
+          stored.object.updateMatrixWorld(true);
+          stored.object.localToWorld(output);
         }
         return output;
       },
 
+      previewFromIntersection: function (intersection, ray, intersections) {
+        if (!this.enabled || this.mode === 'min-distance') return;
+        this.preview = this.pointFromIntersection(intersection, ray, intersections);
+        this.previewIntersection = this.preview && this.preview.sourceIntersection;
+        this.updateVisual();
+      },
+
+      clearPreview: function () {
+        var hadPreview = Boolean(this.preview || this.previewIntersection);
+        this.preview = null;
+        this.previewIntersection = null;
+        if (this.data.snapLabel) this.data.snapLabel.object3D.visible = false;
+        if (hadPreview) this.updateVisual();
+      },
+
       addIntersection: function (intersection, ray, intersections) {
-        if (!this.enabled) return false;
+        if (!this.enabled || this.mode === 'min-distance') return false;
         var point = this.pointFromIntersection(intersection, ray, intersections);
         if (!point) return false;
-        if (this.points[0] && this.points[1]) this.clear();
-        if (!this.points[0]) this.points[0] = point;
-        else this.points[1] = point;
+        this.preview = point;
+        this.previewIntersection = point.sourceIntersection;
+
+        if (this.mode === 'distance' || this.mode === 'xyz') {
+          if (this.points.length >= 2) this.points = [];
+          this.points.push(point);
+        } else if (this.mode === 'angle') {
+          if (this.points.length >= 3) this.points = [];
+          this.points.push(point);
+        } else if (this.mode === 'point' || this.mode === 'laser') {
+          this.points = [point];
+        } else if (this.mode === 'area') {
+          var surface = this.measureEngine && this.measureEngine.surfacePatchFromIntersection(point.sourceIntersection, {smoothAngleDeg:14});
+          if (!surface) return false;
+          this.result = {
+            type:'area', area:surface.area, approximate:surface.approximate, triangleCount:surface.triangleCount,
+            storedCentroid:this.createWorldStoredPoint(surface.centroid, surface.object, 'surface', 'ŚRODEK POWIERZCHNI')
+          };
+        }
+        this.updatePanel();
         this.updateVisual();
         return true;
+      },
+
+      getSelectedEntries: function () {
+        var selection = this.el.components['component-selection'];
+        return selection && selection.getSelectedEntries ? selection.getSelectedEntries() : [];
+      },
+
+      computeMinimumDistance: async function () {
+        if (this.mode !== 'min-distance' || this.busy || !this.measureEngine) return;
+        var entries = this.getSelectedEntries();
+        if (entries.length !== 2) {
+          if (this.data.status) this.data.status.setAttribute('value', 'MIN. PART–PART\nZAZNACZ DOKŁADNIE 2 CZĘŚCI');
+          return;
+        }
+        var computeToken = ++this.computeToken;
+        this.busy = true;
+        this.result = null;
+        this.updatePanel();
+        try {
+          var result = await this.measureEngine.closestDistanceBetweenObjectSets(entries[0].meshes, entries[1].meshes, {
+            maxTrianglesPerSet: 2800,
+            yieldEvery: 700
+          });
+          if (computeToken !== this.computeToken) return;
+          if (!result) throw new Error('Brak rozłącznych siatek.');
+          this.result = {
+            type:'min-distance', distance:result.distance, approximate:result.approximate,
+            nameA:entries[0].node.label, nameB:entries[1].node.label,
+            storedA:this.createWorldStoredPoint(result.pointA, result.objectA, 'calculated', 'MINIMUM A'),
+            storedB:this.createWorldStoredPoint(result.pointB, result.objectB, 'calculated', 'MINIMUM B')
+          };
+        } catch (error) {
+          if (computeToken !== this.computeToken) return;
+          if (this.data.status) this.data.status.setAttribute('value', 'BŁĄD MIN. DYSTANSU\n' + error.message);
+        } finally {
+          if (computeToken === this.computeToken) {
+            this.busy = false;
+            this.updatePanel();
+            this.updateVisual();
+          }
+        }
       },
 
       hideAxisVisual: function (visual) {
@@ -639,162 +872,233 @@ this.data.target.object3D.localToWorld(output);
         visual.label.object3D.visible = false;
       },
 
-      clear: function () {
-        this.points[0] = null;
-        this.points[1] = null;
+      hideAllVisuals: function () {
         if (this.data.pointA) this.data.pointA.object3D.visible = false;
         if (this.data.pointB) this.data.pointB.object3D.visible = false;
+        if (this.data.pointC) this.data.pointC.object3D.visible = false;
         if (this.data.line) this.data.line.object3D.visible = false;
+        if (this.data.line2) this.data.line2.object3D.visible = false;
         if (this.data.label) this.data.label.object3D.visible = false;
+        if (this.data.snapLabel) this.data.snapLabel.object3D.visible = false;
         this.hideAxisVisual(this.axisVisuals.x);
         this.hideAxisVisual(this.axisVisuals.y);
         this.hideAxisVisual(this.axisVisuals.z);
+        if (this.angleArc) this.angleArc.visible = false;
+      },
+
+      clear: function () {
+        this.computeToken += 1;
+        this.points = [];
+        this.preview = null;
+        this.previewIntersection = null;
+        this.result = null;
+        this.busy = false;
+        this.hideAllVisuals();
+        this.updatePanel();
       },
 
       setLine: function (element, start, end, color) {
-        element.setAttribute('line', {
-start: start,
-end: end,
-color: color,
-opacity: 0.96
-        });
+        if (!element) return;
+        element.setAttribute('line', {start:start, end:end, color:color || this.data.color, opacity:0.96});
         element.object3D.visible = true;
       },
 
       setAxisVisual: function (visual, start, end, value, axis) {
         var length = start.distanceTo(end);
-        if (length < 0.00005) {
-this.hideAxisVisual(visual);
-return;
-        }
+        if (length < 0.00005) { this.hideAxisVisual(visual); return; }
         this.setLine(visual.line, start, end, visual.color);
         this.midpoint.copy(start).add(end).multiplyScalar(0.5);
-        var offset = Math.max(0.018, Math.min(0.085, length * 0.035));
-        if (axis === 'y') this.midpoint.x += offset;
-        else this.midpoint.y += offset;
+        var offset = Math.max(0.012, Math.min(0.06, length * 0.025));
+        if (axis === 'y') this.midpoint.x += offset; else this.midpoint.y += offset;
         visual.label.object3D.position.copy(this.midpoint);
-        var labelScale = MOJA.clamp(length * 0.075, 0.24, 0.46);
-        visual.label.object3D.scale.setScalar(labelScale);
-        visual.text.setAttribute('value', 'Δ' + axis.toUpperCase() + '  ' + Math.round(value * 1000) + ' mm');
+        visual.label.object3D.scale.setScalar(MOJA.clamp(length * 0.055, 0.18, 0.34));
+        visual.text.setAttribute('value', axis.toUpperCase() + '  ' + this.formatMm(value, false));
         visual.label.object3D.visible = true;
       },
 
-      calculateOrthogonalPath: function () {
-        var first = this.points[0];
-        var second = this.points[1];
+      calculateComponents: function (first, second) {
         var targetObject = this.data.target && this.data.target.object3D;
-        var localMode = first.space === 'target' && second.space === 'target' && targetObject;
-        var dx;
-        var dy;
-        var dz;
-
+        var localMode = first && second && first.space === 'target' && second.space === 'target' && targetObject;
+        var dx, dy, dz;
         if (localMode) {
-this.localA.copy(first.value);
-this.localB.copy(second.value);
-this.localPathX.set(this.localB.x, this.localA.y, this.localA.z);
-this.localPathXY.set(this.localB.x, this.localB.y, this.localA.z);
-
-this.worldA.copy(this.localA);
-this.pathX.copy(this.localPathX);
-this.pathXY.copy(this.localPathXY);
-this.worldB.copy(this.localB);
-targetObject.updateMatrixWorld(true);
-targetObject.localToWorld(this.worldA);
-targetObject.localToWorld(this.pathX);
-targetObject.localToWorld(this.pathXY);
-targetObject.localToWorld(this.worldB);
-targetObject.getWorldScale(this.targetScale);
-
-dx = Math.abs(this.localB.x - this.localA.x) * Math.abs(this.targetScale.x);
-dy = Math.abs(this.localB.y - this.localA.y) * Math.abs(this.targetScale.y);
-dz = Math.abs(this.localB.z - this.localA.z) * Math.abs(this.targetScale.z);
+          this.localA.copy(first.value); this.localB.copy(second.value);
+          this.localPathX.set(this.localB.x, this.localA.y, this.localA.z);
+          this.localPathXY.set(this.localB.x, this.localB.y, this.localA.z);
+          this.worldA.copy(this.localA); this.pathX.copy(this.localPathX); this.pathXY.copy(this.localPathXY); this.worldB.copy(this.localB);
+          targetObject.updateMatrixWorld(true);
+          targetObject.localToWorld(this.worldA); targetObject.localToWorld(this.pathX); targetObject.localToWorld(this.pathXY); targetObject.localToWorld(this.worldB);
+          targetObject.getWorldScale(this.targetScale);
+          dx = Math.abs(this.localB.x-this.localA.x)*Math.abs(this.targetScale.x);
+          dy = Math.abs(this.localB.y-this.localA.y)*Math.abs(this.targetScale.y);
+          dz = Math.abs(this.localB.z-this.localA.z)*Math.abs(this.targetScale.z);
         } else {
-this.resolvePoint(first, this.worldA);
-this.resolvePoint(second, this.worldB);
-this.pathX.set(this.worldB.x, this.worldA.y, this.worldA.z);
-this.pathXY.set(this.worldB.x, this.worldB.y, this.worldA.z);
-dx = Math.abs(this.worldB.x - this.worldA.x);
-dy = Math.abs(this.worldB.y - this.worldA.y);
-dz = Math.abs(this.worldB.z - this.worldA.z);
+          this.resolvePoint(first,this.worldA); this.resolvePoint(second,this.worldB);
+          this.pathX.set(this.worldB.x,this.worldA.y,this.worldA.z);
+          this.pathXY.set(this.worldB.x,this.worldB.y,this.worldA.z);
+          dx=Math.abs(this.worldB.x-this.worldA.x); dy=Math.abs(this.worldB.y-this.worldA.y); dz=Math.abs(this.worldB.z-this.worldA.z);
         }
+        return {dx:dx,dy:dy,dz:dz};
+      },
 
-        return {dx: dx, dy: dy, dz: dz, local: Boolean(localMode)};
+      showSnapBadge: function () {
+        if (!this.preview || !this.data.snapLabel || !this.data.snapLabelText) return;
+        if (!this.resolvePoint(this.preview, this.worldC)) return;
+        this.data.snapLabel.object3D.position.copy(this.worldC);
+        this.data.snapLabel.object3D.position.y += 0.035;
+        this.data.snapLabelText.setAttribute('value', this.snapSymbol(this.preview.snapKind) + '  ' + (this.snapEnabled ? this.shortSnapLabel(this.preview.snapKind) : 'SNAP OFF'));
+        this.data.snapLabel.object3D.visible = true;
+      },
+
+      setMainLabel: function (position, value, color) {
+        if (!this.data.label || !this.data.labelText) return;
+        var textValue = String(value || '');
+        var lineCount = Math.max(1, textValue.split('\n').length);
+        var plane = this.data.label.querySelector('a-plane');
+        if (plane) {
+          plane.setAttribute('width', lineCount > 1 ? 1.34 : 1.22);
+          plane.setAttribute('height', lineCount > 1 ? 0.16 + lineCount * 0.115 : 0.22);
+        }
+        this.data.labelText.setAttribute('width', lineCount > 1 ? 1.22 : 1.12);
+        this.data.labelText.setAttribute('wrap-count', lineCount > 1 ? 25 : 30);
+        this.data.label.object3D.position.copy(position);
+        this.data.label.object3D.scale.setScalar(lineCount > 1 ? 0.30 : 0.34);
+        this.data.labelText.setAttribute('value', textValue);
+        this.data.labelText.setAttribute('color', color || '#2563EB');
+        this.data.label.object3D.visible = true;
+      },
+
+      updateAngleArc: function (first, vertex, third) {
+        var v1 = new THREE.Vector3().subVectors(first, vertex);
+        var v2 = new THREE.Vector3().subVectors(third, vertex);
+        var l1 = v1.length(); var l2 = v2.length();
+        if (l1 < 1e-6 || l2 < 1e-6) { this.angleArc.visible=false; return NaN; }
+        v1.normalize(); v2.normalize();
+        var angle = v1.angleTo(v2);
+        this.arcAxis.crossVectors(v1,v2);
+        if (this.arcAxis.lengthSq() < 1e-12) { this.angleArc.visible=false; return THREE.MathUtils.radToDeg(angle); }
+        this.arcAxis.normalize();
+        var radius = Math.max(0.035, Math.min(0.35, Math.min(l1,l2)*0.22));
+        for (var i=0;i<33;i+=1) {
+          this.arcVector.copy(v1).applyAxisAngle(this.arcAxis, angle*(i/32)).multiplyScalar(radius).add(vertex);
+          this.arcPositions[i*3]=this.arcVector.x; this.arcPositions[i*3+1]=this.arcVector.y; this.arcPositions[i*3+2]=this.arcVector.z;
+        }
+        this.angleArc.geometry.attributes.position.needsUpdate=true;
+        this.angleArc.geometry.computeBoundingSphere();
+        this.angleArc.visible=true;
+        return THREE.MathUtils.radToDeg(angle);
       },
 
       updateVisual: function () {
-        if (!this.points[0]) {
-this.clear();
-return;
+        this.hideAllVisuals();
+        if (!this.enabled) return;
+        this.showSnapBadge();
+        var points=this.points;
+        var preview=this.preview;
+
+        if (this.mode === 'distance' || this.mode === 'xyz') {
+          var first=points[0]; var second=points[1] || (points[0] ? preview : null);
+          if (!first || !this.resolvePoint(first,this.worldA)) return;
+          if (this.data.pointA) { this.data.pointA.object3D.position.copy(this.worldA); this.data.pointA.object3D.visible=true; }
+          if (!second || !this.resolvePoint(second,this.worldB)) return;
+          if (this.data.pointB) { this.data.pointB.object3D.position.copy(this.worldB); this.data.pointB.object3D.visible=true; }
+          this.setLine(this.data.line,this.worldA,this.worldB,'#2563EB');
+          var components=this.calculateComponents(first,second);
+          var distance=this.worldA.distanceTo(this.worldB);
+          this.midpoint.copy(this.worldA).add(this.worldB).multiplyScalar(0.5); this.midpoint.y+=Math.max(0.025,Math.min(0.16,distance*0.035));
+          this.setMainLabel(this.midpoint,this.formatMm(distance,true),'#2563EB');
+          if (this.mode === 'xyz') {
+            this.setAxisVisual(this.axisVisuals.x,this.worldA,this.pathX,components.dx,'x');
+            this.setAxisVisual(this.axisVisuals.y,this.pathX,this.pathXY,components.dy,'y');
+            this.setAxisVisual(this.axisVisuals.z,this.pathXY,this.worldB,components.dz,'z');
+          }
+          return;
         }
 
-        this.resolvePoint(this.points[0], this.worldA);
-        if (this.data.pointA) {
-this.data.pointA.object3D.position.copy(this.worldA);
-this.data.pointA.object3D.visible = true;
+        if (this.mode === 'angle') {
+          var p0=points[0]; var p1=points[1] || (points[0]?preview:null); var p2=points[2] || (points[1]?preview:null);
+          if (!p0 || !this.resolvePoint(p0,this.worldA)) return;
+          if (this.data.pointA) {this.data.pointA.object3D.position.copy(this.worldA);this.data.pointA.object3D.visible=true;}
+          if (!p1 || !this.resolvePoint(p1,this.worldB)) return;
+          if (this.data.pointB) {this.data.pointB.object3D.position.copy(this.worldB);this.data.pointB.object3D.visible=true;}
+          this.setLine(this.data.line,this.worldA,this.worldB,'#2563EB');
+          if (!p2 || !this.resolvePoint(p2,this.worldC)) return;
+          if (this.data.pointC) {this.data.pointC.object3D.position.copy(this.worldC);this.data.pointC.object3D.visible=true;}
+          this.setLine(this.data.line2,this.worldB,this.worldC,'#2563EB');
+          var angle=this.updateAngleArc(this.worldA,this.worldB,this.worldC);
+          this.midpoint.copy(this.worldA).sub(this.worldB).normalize().add(this.worldC.clone().sub(this.worldB).normalize()).normalize().multiplyScalar(0.18).add(this.worldB);
+          this.setMainLabel(this.midpoint,'≈ '+angle.toFixed(1).replace('.',',')+'°','#2563EB');
+          return;
         }
 
-        if (!this.points[1]) {
-if (this.data.pointB) this.data.pointB.object3D.visible = false;
-if (this.data.line) this.data.line.object3D.visible = false;
-if (this.data.label) this.data.label.object3D.visible = false;
-this.hideAxisVisual(this.axisVisuals.x);
-this.hideAxisVisual(this.axisVisuals.y);
-this.hideAxisVisual(this.axisVisuals.z);
-return;
+        if (this.mode === 'point') {
+          var point=points[0] || preview;
+          if (!point || !this.resolvePoint(point,this.worldA)) return;
+          if (this.data.pointA) {this.data.pointA.object3D.position.copy(this.worldA);this.data.pointA.object3D.visible=true;}
+          this.coordinate.copy(this.worldA);
+          if (this.data.target) {this.data.target.object3D.updateMatrixWorld(true);this.data.target.object3D.worldToLocal(this.coordinate);}
+          this.midpoint.copy(this.worldA);this.midpoint.y+=0.08;
+          this.setMainLabel(this.midpoint,'X '+this.formatMm(this.coordinate.x,false)+'\nY '+this.formatMm(this.coordinate.y,false)+'\nZ '+this.formatMm(this.coordinate.z,false),'#0F172A');
+          return;
         }
 
-        var components = this.calculateOrthogonalPath();
-        if (this.data.pointA) this.data.pointA.object3D.position.copy(this.worldA);
-        if (this.data.pointB) {
-this.data.pointB.object3D.position.copy(this.worldB);
-this.data.pointB.object3D.visible = true;
+        if (this.mode === 'laser') {
+          var laserPoint=points[0] || preview;
+          if (!laserPoint || !this.resolvePoint(laserPoint,this.worldA) || !this.data.right) return;
+          this.data.right.object3D.getWorldPosition(this.controllerWorld);
+          if (this.data.pointA) {this.data.pointA.object3D.position.copy(this.worldA);this.data.pointA.object3D.visible=true;}
+          this.setLine(this.data.line,this.controllerWorld,this.worldA,'#2563EB');
+          var laserDistance=this.controllerWorld.distanceTo(this.worldA);
+          this.midpoint.copy(this.controllerWorld).add(this.worldA).multiplyScalar(0.5);
+          this.setMainLabel(this.midpoint,this.formatMm(laserDistance,true),'#2563EB');
+          return;
         }
 
-        if (this.data.line) {
-this.setLine(this.data.line, this.worldA, this.worldB, this.data.color);
+        if (this.mode === 'area' && this.result && this.result.type === 'area') {
+          if (!this.resolvePoint(this.result.storedCentroid,this.worldA)) return;
+          if (this.data.pointA) {this.data.pointA.object3D.position.copy(this.worldA);this.data.pointA.object3D.visible=true;}
+          this.midpoint.copy(this.worldA);this.midpoint.y+=0.08;
+          this.setMainLabel(this.midpoint,this.formatArea(this.result.area,this.result.approximate),'#2563EB');
+          return;
         }
 
-        this.setAxisVisual(this.axisVisuals.x, this.worldA, this.pathX, components.dx, 'x');
-        this.setAxisVisual(this.axisVisuals.y, this.pathX, this.pathXY, components.dy, 'y');
-        this.setAxisVisual(this.axisVisuals.z, this.pathXY, this.worldB, components.dz, 'z');
-
-        var distance = this.worldA.distanceTo(this.worldB);
-        this.midpoint.copy(this.worldA).add(this.worldB).multiplyScalar(0.5);
-        this.midpoint.y += Math.max(0.045, Math.min(0.22, distance * 0.045));
-
-        if (this.data.label) {
-this.data.label.object3D.position.copy(this.midpoint);
-var mainScale = MOJA.clamp(distance * 0.07, 0.28, 0.52);
-this.data.label.object3D.scale.setScalar(mainScale);
-this.data.label.object3D.visible = true;
+        if (this.mode === 'min-distance' && this.result && this.result.type === 'min-distance') {
+          if (!this.resolvePoint(this.result.storedA,this.worldA) || !this.resolvePoint(this.result.storedB,this.worldB)) return;
+          if (this.data.pointA) {this.data.pointA.object3D.position.copy(this.worldA);this.data.pointA.object3D.visible=true;}
+          if (this.data.pointB) {this.data.pointB.object3D.position.copy(this.worldB);this.data.pointB.object3D.visible=true;}
+          this.setLine(this.data.line,this.worldA,this.worldB,'#2563EB');
+          this.midpoint.copy(this.worldA).add(this.worldB).multiplyScalar(0.5);this.midpoint.y+=0.05;
+          this.setMainLabel(this.midpoint,this.formatMm(this.result.distance,this.result.approximate),'#2563EB');
         }
-        if (this.data.labelText) {
-var coordinateText = components.local ? 'OSIE MODELU' : 'OSIE ŚWIATA';
-this.data.labelText.setAttribute(
-  'value',
-  'L  ' + MOJA.formatDistance(distance) + '\n' +
-  'ΔX ' + Math.round(components.dx * 1000) + '  •  ' +
-  'ΔY ' + Math.round(components.dy * 1000) + '  •  ' +
-  'ΔZ ' + Math.round(components.dz * 1000) + ' mm  •  ' + coordinateText + '\n' +
-  'SNAP A: ' + (this.points[0].snapLabel || 'PUNKT') + '  •  B: ' + (this.points[1].snapLabel || 'PUNKT')
-);
-        }
+      },
+
+      onUIAction: function (event) {
+        var action=(event.detail||{}).action;
+        if (action === 'measure-distance') this.setMode('distance');
+        else if (action === 'measure-xyz') this.setMode('xyz');
+        else if (action === 'measure-angle') this.setMode('angle');
+        else if (action === 'measure-point') this.setMode('point');
+        else if (action === 'measure-laser') this.setMode('laser');
+        else if (action === 'measure-area') this.setMode('area');
+        else if (action === 'measure-min') this.setMode('min-distance');
+        else if (action === 'measure-snap') this.toggleSnap();
+        else if (action === 'measure-clear') this.clear();
+        else if (action === 'measure-calc') this.computeMinimumDistance();
+        else if (action === 'measure-close') this.setPanelVisible(false);
       },
 
       tick: function () {
-        if (this.points[0]) this.updateVisual();
+        if (this.enabled && (this.points.length || this.preview || this.result)) this.updateVisual();
       },
 
       remove: function () {
-        var self = this;
-        ['x', 'y', 'z'].forEach(function (axis) {
-var visual = self.axisVisuals[axis];
-if (!visual) return;
-if (visual.line.parentNode) visual.line.parentNode.removeChild(visual.line);
-if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
-        });
+        this.el.removeEventListener('viewer-ui-action', this.onUIAction);
+        this.el.removeEventListener('moja-selection-changed', this.onSelectionChanged);
+        var self=this;
+        ['x','y','z'].forEach(function(axis){var visual=self.axisVisuals[axis];if(!visual)return;if(visual.line.parentNode)visual.line.parentNode.removeChild(visual.line);if(visual.label.parentNode)visual.label.parentNode.removeChild(visual.label);});
+        if (this.angleArc) {this.el.object3D.remove(this.angleArc);this.angleArc.geometry.dispose();this.angleArc.material.dispose();}
       }
     });
+
 
     AFRAME.registerComponent('viewer-button', {
       schema: {action: {default: ''}, value: {type: 'number', default: 0}},
@@ -2168,6 +2472,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         if (reveal) this.revealIndex(index);
         this.syncHelpers();
         this.renderPanel();
+        this.el.sceneEl.emit('moja-selection-changed', {}, false);
       },
 
       toggleExpanded: function (index) {
@@ -2234,6 +2539,18 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         this.thumbstickArmed = false;
       },
 
+      getSelectedEntries: function () {
+        var self = this;
+        return Array.from(this.selected).map(function (index) {
+          var node = self.treeNodes[index];
+          return node ? {
+            index: index,
+            node: node,
+            meshes: Array.from(new Set(node.meshes.filter(function (mesh) { return mesh.visible; })))
+          } : null;
+        }).filter(function (entry) { return entry && entry.meshes.length > 0; });
+      },
+
       clearSelection: function (render) {
         this.selected.clear();
         this.helpers.forEach(function (helper) {
@@ -2243,6 +2560,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         });
         this.helpers.clear();
         if (render !== false) this.renderPanel();
+        this.el.sceneEl.emit('moja-selection-changed', {}, false);
       },
 
       setComponentVisibility: function (index, visible) {
@@ -2257,6 +2575,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         this.syncHelpers();
         this.renderPanel();
         this.refreshRaycaster();
+        this.el.sceneEl.emit('moja-selection-changed', {}, false);
       },
 
       showSelected: function () {
@@ -2265,6 +2584,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         this.syncHelpers();
         this.renderPanel();
         this.refreshRaycaster();
+        this.el.sceneEl.emit('moja-selection-changed', {}, false);
       },
 
       isolateSelected: function () {
@@ -2282,6 +2602,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         this.syncHelpers();
         this.renderPanel();
         this.refreshRaycaster();
+        this.el.sceneEl.emit('moja-selection-changed', {}, false);
       },
 
       showAll: function () {
@@ -2289,6 +2610,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         this.syncHelpers();
         this.renderPanel();
         this.refreshRaycaster();
+        this.el.sceneEl.emit('moja-selection-changed', {}, false);
       },
 
       toggleEdges: function () {
@@ -2930,7 +3252,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
       handleY: function () {
         if (!this.ready) return;
         if (this.interactionMode === 'measure') {
-          this.getMeasurement().clear();
+          this.getMeasurement().togglePanel();
           return;
         }
         if (this.interactionMode === 'select') {
@@ -2955,7 +3277,10 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
           return;
         }
         if (this.interactionMode === 'measure') {
-          this.modeText.setAttribute('value', 'POMIAR  •  SNAP AUTO  •  TRIGGER: PUNKT  •  Y: WYCZYŚĆ  •  X: KOMPONENTY');
+          var measurement = this.getMeasurement();
+          var measureName = measurement && measurement.getModeLabel ? measurement.getModeLabel() : 'POMIAR';
+          var snapState = measurement && measurement.snapEnabled === false ? 'SNAP OFF' : 'SNAP ON';
+          this.modeText.setAttribute('value', measureName + '  •  ' + snapState + '  •  CELUJ: PODGLĄD LIVE  •  TRIGGER: ZAPISZ  •  Y: PANEL  •  X: KOMPONENTY');
           this.modeText.setAttribute('color', '#FBBF24');
         } else if (this.interactionMode === 'select') {
           this.modeText.setAttribute('value', 'DRZEWO  •  TRIGGER: WYBIERZ  •  Y: PANEL  •  PRAWY JOYSTICK: PRZEWIJAJ  •  +/−: ROZWIŃ');
@@ -3263,6 +3588,37 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         this.pivot.object3D.position.addScaledVector(this.moveVector, this.data.modelMoveSpeed * dt);
         this.updateInfo();
       },
+      updateMeasurementPreview: function () {
+        var measurement = this.getMeasurement();
+        if (!measurement || !measurement.enabled || !this.right) return;
+        var triggerRay = this.right.components['trigger-ray'];
+        if (!triggerRay) {
+          measurement.clearPreview();
+          return;
+        }
+        var rayComponent = this.right.components.raycaster;
+        var intersections = rayComponent && rayComponent.intersections ? rayComponent.intersections.slice(0, 20) : [];
+        var ray = rayComponent && rayComponent.raycaster && rayComponent.raycaster.ray ? rayComponent.raycaster.ray : null;
+
+        // Nie mierzemy modelu "przez" panel. Jeżeli pierwszy trafiony element to UI,
+        // kursor pomiarowy i badge snapa znikają do chwili zejścia z panelu.
+        var firstInteractive = null;
+        for (var i = 0; i < intersections.length; i += 1) {
+          firstInteractive = MOJA.getInteractiveEl(intersections[i]);
+          if (firstInteractive) break;
+        }
+        if (firstInteractive && firstInteractive.classList && !firstInteractive.classList.contains('measure-target')) {
+          measurement.clearPreview();
+          return;
+        }
+
+        var measureIntersections = intersections.filter(function (candidate) {
+          var candidateEl = MOJA.getInteractiveEl(candidate);
+          return candidateEl && candidateEl.classList && candidateEl.classList.contains('measure-target');
+        });
+        measurement.previewFromIntersection(measureIntersections.length ? measureIntersections[0] : null, ray, measureIntersections);
+      },
+
       updateVertical: function (dt) {
         var direction = (this.verticalUp ? 1 : 0) - (this.verticalDown ? 1 : 0);
         if (direction === 0) return;
@@ -3287,6 +3643,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
           this.updateMRMovement(dt);
         }
         this.updateVertical(dt);
+        if (this.interactionMode === 'measure') this.updateMeasurementPreview();
       },
       remove: function () {
         this.el.removeEventListener('model-normalized', this.onNormalized);
@@ -3301,8 +3658,8 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
 </head>
 <body>
   <div class="topbar">
-    <a class="pill" href="index.html?v=16">← Viewer</a>
-    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v16</div>
+    <a class="pill" href="index.html?v=17">← Viewer</a>
+    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v17</div>
     <button id="enterXR" class="pill enter" type="button">ENTER VR</button>
   </div>
 
@@ -3310,7 +3667,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
 
   <div id="landing" class="landing">
     <div class="card">
-      <div id="landingVersion" class="version">META QUEST 3 • v16</div>
+      <div id="landingVersion" class="version">META QUEST 3 • v17</div>
       <h1 id="landingTitle">CK-207-74-5000_VR — Virtual Reality</h1>
       <p id="landingDescription">Model jest zakotwiczony w skali 1:1. Poruszasz się użytkownikiem, mierzysz i zarządzasz widocznością komponentów.</p>
 
@@ -3334,7 +3691,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
 
       <div id="landingControls" class="controls"></div>
       <div class="actions">
-        <a class="button" href="index.html?v=16">← Wróć</a>
+        <a class="button" href="index.html?v=17">← Wróć</a>
         <button id="landingEnter" class="button primary" type="button">ENTER VR — QUEST 3</button>
       </div>
       <div id="landingNote" class="note">Subtelne krawędzie, oświetlenie modelu 360° i brak ciężkich map cieni.</div>
@@ -3344,14 +3701,14 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
   <a-scene
     id="scene"
     quest-viewer="pivot: #modelPivot; asset: #modelAsset; rig: #rig; camera: #camera; left: #leftHand; right: #rightHand; floor: #floor; grid: #metricGrid; reticle: #placementReticle; info: #modelInfo; infoText: #modelInfoText; modeText: #modeText; teleportMarker: #teleportMarker; scalePanel: #scalePanel; scaleValueText: #scaleValueText; scaleKnob: #scaleKnob; componentPanel: #componentPanel; freeGrabButton: #freeGrabButton; freeGrabButtonText: #freeGrabButtonText"
-    component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; scrollTrack: #componentScrollTrack; scrollThumb: #componentScrollThumb; structureUrl: CK-207-74-5000_VR.structure.json?v=16; rows: 8"
+    component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; scrollTrack: #componentScrollTrack; scrollThumb: #componentScrollThumb; structureUrl: CK-207-74-5000_VR.structure.json?v=17; rows: 8"
     lighting-control="ambient: #ambientLight; front: #lightFront; back: #lightBack; left: #lightLeft; right: #lightRight; top: #lightTop; bottom: #lightBottom; panel: #lightingPanel; valueText: #lightingValueText; detailText: #lightingDetailText; storageKey: moja-ck-207-74-5000_vr-mr-scale-lighting360"
     annotation-control="pivot: #modelPivot; root: #annotationRoot; camera: #camera; right: #rightHand; panel: #annotationPanel; keyboard: #annotationKeyboard; preview: #annotationTextPreview; status: #annotationStatus"
-    measurement-tool="target: #modelPivot; pointA: #measurePointA; pointB: #measurePointB; line: #measureLine; label: #measureLabel; labelText: #measureLabelText; color: #F59E0B"
+    measurement-tool="target: #modelPivot; right: #rightHand; pointA: #measurePointA; pointB: #measurePointB; pointC: #measurePointC; line: #measureLine; line2: #measureLine2; label: #measureLabel; labelText: #measureLabelText; snapLabel: #measureSnapLabel; snapLabelText: #measureSnapLabelText; panel: #measurePanel; status: #measurePanelStatus; color: #2563EB"
     loading-screen="backgroundColor: #0B1220; dotsColor: #60A5FA">
 
     <a-assets timeout="120000">
-      <a-asset-item id="modelSource" src="CK-207-74-5000_VR.glb?v=16"></a-asset-item>
+      <a-asset-item id="modelSource" src="CK-207-74-5000_VR.glb?v=17"></a-asset-item>
     </a-assets>
     <!-- OŚWIETLENIE MODELU 360° — bez map cieni -->
     <a-entity id="ambientLight"
@@ -3425,15 +3782,21 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
       <a-text id="modelInfoText" value="SKALA 100% • 1:1" align="center" anchor="center" baseline="center" width="1.58" color="#F8FAFC" position="0 0 0.006"></a-text>
     </a-entity>
 
-    <a-sphere id="pointerDot" radius="0.017" color="#38BDF8" material="shader: flat" visible="false"></a-sphere>
+    <a-sphere id="pointerDot" radius="0.006" color="#38BDF8" material="shader: flat" visible="false"></a-sphere>
     <a-torus id="teleportMarker" radius="0.14" radius-tubular="0.008" rotation="-90 0 0" color="#34D399" material="shader: flat" visible="false"></a-torus>
 
-    <a-sphere id="measurePointA" radius="0.020" color="#F59E0B" material="shader: flat" visible="false"></a-sphere>
-    <a-sphere id="measurePointB" radius="0.020" color="#F59E0B" material="shader: flat" visible="false"></a-sphere>
-    <a-entity id="measureLine" line="start: 0 0 0; end: 0 0 0; color: #F59E0B; opacity: 1" visible="false"></a-entity>
-    <a-entity id="measureLabel" look-at-camera="camera: #camera; yawOnly: false" scale="0.43 0.43 0.43" visible="false">
-      <a-plane width="1.28" height="0.16" color="#111827" opacity="0.88" material="shader: flat; transparent: true"></a-plane>
-      <a-text id="measureLabelText" value="0,000 m" align="center" anchor="center" baseline="center" width="1.16" color="#FDE68A" position="0 0 0.006"></a-text>
+    <a-sphere id="measurePointA" radius="0.006" color="#FFFFFF" material="shader: flat; depthTest: false" visible="false"></a-sphere>
+    <a-sphere id="measurePointB" radius="0.006" color="#FFFFFF" material="shader: flat; depthTest: false" visible="false"></a-sphere>
+    <a-sphere id="measurePointC" radius="0.006" color="#FFFFFF" material="shader: flat; depthTest: false" visible="false"></a-sphere>
+    <a-entity id="measureLine" line="start: 0 0 0; end: 0 0 0; color: #2563EB; opacity: 1" visible="false"></a-entity>
+    <a-entity id="measureLine2" line="start: 0 0 0; end: 0 0 0; color: #2563EB; opacity: 1" visible="false"></a-entity>
+    <a-entity id="measureLabel" look-at-camera="camera: #camera; yawOnly: false" scale="0.34 0.34 0.34" visible="false">
+      <a-plane width="1.22" height="0.22" color="#F8FAFC" opacity="0.96" material="shader: flat; transparent: true; depthWrite: false"></a-plane>
+      <a-text id="measureLabelText" value="0 mm" align="center" anchor="center" baseline="center" width="1.12" color="#2563EB" position="0 0 0.006"></a-text>
+    </a-entity>
+    <a-entity id="measureSnapLabel" look-at-camera="camera: #camera; yawOnly: false" scale="0.24 0.24 0.24" visible="false">
+      <a-plane width="0.88" height="0.15" color="#FFFFFF" opacity="0.97" material="shader: flat; transparent: true; depthWrite: false"></a-plane>
+      <a-text id="measureSnapLabelText" value="◇ NODE" align="center" anchor="center" baseline="center" width="0.82" color="#F97316" position="0 0 0.006"></a-text>
     </a-entity>
 
     <a-entity id="rig" position="0 0 5">
@@ -3445,6 +3808,24 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
       </a-camera>
 
       <a-entity id="leftHand" meta-touch-controls="hand: left">
+        <a-entity id="measurePanel" position="0.07 0.13 -0.31" rotation="-35 0 0" scale="0.56 0.56 0.56" visible="false">
+          <a-plane width="0.94" height="1.18" color="#0F172A" opacity="0.96" material="shader: flat; transparent: true; depthWrite: false"></a-plane>
+          <a-text value="POMIARY GLB" align="center" width="0.84" color="#BAE6FD" position="0 0.51 0.008"></a-text>
+          <a-text id="measurePanelStatus" value="DYSTANS • SNAP ON" align="center" width="0.82" wrap-count="34" color="#E2E8F0" position="0 0.405 0.008"></a-text>
+
+          <a-plane id="measureBtnDistance" class="measure-ui ui-click" width="0.40" height="0.105" color="#0284C7" position="-0.22 0.25 0.012" material="shader: flat" viewer-button="action: measure-distance"><a-text value="DYSTANS" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane id="measureBtnXYZ" class="measure-ui ui-click" width="0.40" height="0.105" color="#075985" position="0.22 0.25 0.012" material="shader: flat" viewer-button="action: measure-xyz"><a-text value="XYZ" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane id="measureBtnAngle" class="measure-ui ui-click" width="0.40" height="0.105" color="#075985" position="-0.22 0.125 0.012" material="shader: flat" viewer-button="action: measure-angle"><a-text value="KĄT" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane id="measureBtnPoint" class="measure-ui ui-click" width="0.40" height="0.105" color="#075985" position="0.22 0.125 0.012" material="shader: flat" viewer-button="action: measure-point"><a-text value="PUNKT XYZ" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane id="measureBtnLaser" class="measure-ui ui-click" width="0.40" height="0.105" color="#075985" position="-0.22 0.0 0.012" material="shader: flat" viewer-button="action: measure-laser"><a-text value="LASER" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane id="measureBtnArea" class="measure-ui ui-click" width="0.40" height="0.105" color="#075985" position="0.22 0.0 0.012" material="shader: flat" viewer-button="action: measure-area"><a-text value="POWIERZCHNIA" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane id="measureBtnMin" class="measure-ui ui-click" width="0.84" height="0.105" color="#075985" position="0 -0.125 0.012" material="shader: flat" viewer-button="action: measure-min"><a-text value="MIN. DYSTANS PART–PART" align="center" width="0.76" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane id="measureBtnSnap" class="measure-ui ui-click" width="0.40" height="0.105" color="#0F766E" position="-0.22 -0.25 0.012" material="shader: flat" viewer-button="action: measure-snap"><a-text id="measureBtnSnapText" value="SNAP: ON" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane id="measureBtnCompute" class="measure-ui ui-click" width="0.40" height="0.105" color="#334155" position="0.22 -0.25 0.012" material="shader: flat" viewer-button="action: measure-calc"><a-text value="OBLICZ MIN." align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane class="measure-ui ui-click" width="0.40" height="0.105" color="#7C2D12" position="-0.22 -0.375 0.012" material="shader: flat" viewer-button="action: measure-clear"><a-text value="WYCZYŚĆ" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane class="measure-ui ui-click" width="0.40" height="0.105" color="#334155" position="0.22 -0.375 0.012" material="shader: flat" viewer-button="action: measure-close"><a-text value="ZAMKNIJ" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+        </a-entity>
+
         <a-entity id="scalePanel" position="0.07 0.12 -0.29" rotation="-35 0 0" scale="0.54 0.54 0.54" visible="false">
           <a-plane width="0.72" height="0.68" color="#0F172A" opacity="0.94" material="shader: flat; transparent: true"></a-plane>
           <a-text value="SKALA MODELU" align="center" width="0.66" color="#E2E8F0" position="0 0.205 0.006"></a-text>
@@ -3726,11 +4107,11 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
       }
 
       if (mode === 'mr') {
-        document.title = 'CK-207-74-5000_VR — Meta Quest MR v16';
-        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v16';
+        document.title = 'CK-207-74-5000_VR — Meta Quest MR v17';
+        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v17';
         enterXR.textContent = 'ENTER MR';
         enterXR.classList.add('mr');
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v16';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v17';
         landingVersion.classList.add('mr');
         landingTitle.textContent = 'CK-207-74-5000_VR — Mixed Reality';
         landingDescription.textContent = 'Postaw model w pokoju, ustaw dokładną skalę, przesuń go i obróć wokół osi pionowej gestem dwóch gripów.';
@@ -3755,10 +4136,10 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
           'Trigger: wskaźnik punktowy'
         ], legend);
       } else {
-        document.title = 'CK-207-74-5000_VR — Meta Quest VR v16';
-        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v16';
+        document.title = 'CK-207-74-5000_VR — Meta Quest VR v17';
+        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v17';
         enterXR.textContent = 'ENTER VR';
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v16';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v17';
         landingTitle.textContent = 'CK-207-74-5000_VR — Virtual Reality';
         landingDescription.textContent = 'Model pozostaje zakotwiczony w skali 1:1. Chodzisz, obracasz użytkownika, teleportujesz się, mierzysz i izolujesz komponenty.';
         landingEnter.textContent = 'ENTER VR — QUEST 3';
