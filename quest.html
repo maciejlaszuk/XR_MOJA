@@ -6,7 +6,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — Meta Quest Viewer v20</title>
+  <title>CK-207-74-5000_VR — Meta Quest Viewer v21</title>
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
@@ -594,7 +594,8 @@
         // FULL dodaje środki okręgów i rzut prostopadły.
         this.snapMode = 'basic';
         this.snapEnabled = true;
-        this.snapAngleRad = 0.0065;
+        this.snapAngleRad = 0.0038;
+        this.snapPullLimit = 0.02;
         this.filters = {vertex: true, midpoint: true, center: false, edge: true, perpendicular: false, surface: true};
         this.points = [];
         this.preview = null;
@@ -623,7 +624,7 @@
         this.arcPositions = new Float32Array(33 * 3);
         this.axisVisuals = {};
         this.snapEngine = window.MOJA_SNAP
-          ? window.MOJA_SNAP.createEngine(THREE, {maxAngleRad: 0.0065, featureAngleDeg: 18})
+          ? window.MOJA_SNAP.createEngine(THREE, {maxAngleRad: 0.0038, featureAngleDeg: 18})
           : null;
         this.measureEngine = window.MOJA_MEASURE
           ? window.MOJA_MEASURE.createEngine(THREE, {surfaceSmoothAngleDeg: 14, minDistanceMaxTrianglesPerSet: 2800})
@@ -783,8 +784,7 @@
 
       getSnapModeLabel: function () {
         if (this.snapMode === 'off') return 'OFF';
-        if (this.snapMode === 'full') return 'FULL';
-        return 'BASIC';
+        return 'AUTO';
       },
 
       applySnapMode: function (mode) {
@@ -885,7 +885,7 @@
           button.setAttribute('color', mode === this.mode ? '#0284C7' : '#075985');
         }, this);
         var snapButton = document.getElementById('measureBtnSnap');
-        if (snapButton) snapButton.setAttribute('color', this.snapMode === 'off' ? '#9A3412' : (this.snapMode === 'full' ? '#6D28D9' : '#0F766E'));
+        if (snapButton) snapButton.setAttribute('color', this.snapMode === 'off' ? '#9A3412' : '#0F766E');
         var snapButtonText = document.getElementById('measureBtnSnapText');
         if (snapButtonText) snapButtonText.setAttribute('value', 'SNAP: ' + this.getSnapModeLabel());
         var computeButton = document.getElementById('measureBtnCompute');
@@ -1113,6 +1113,20 @@
             })
           : null;
         if ((!snap || !snap.point) && (!intersection || !intersection.point)) return null;
+
+        if (snap && snap.point && intersection && intersection.point) {
+          var pull = snap.point.distanceTo(intersection.point);
+          var limit = this.snapPullLimit;
+          if (targetObject) {
+            try {
+              var box = new THREE.Box3().setFromObject(targetObject);
+              if (!box.isEmpty()) {
+                limit = Math.min(0.05, Math.max(0.008, box.getSize(new THREE.Vector3()).length() * 0.0012));
+              }
+            } catch (error) {}
+          }
+          if (pull > limit) snap = null;
+        }
 
         var worldPoint = snap && snap.point ? snap.point.clone() : intersection.point.clone();
         var sourceObject = snap && snap.object ? snap.object : (intersection && intersection.object);
@@ -4057,7 +4071,7 @@
 <body>
   <div class="topbar">
     <a class="pill" href="index.html?v=20">← Viewer</a>
-    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v20</div>
+    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v21</div>
     <button id="enterXR" class="pill enter" type="button">ENTER VR</button>
   </div>
 
@@ -4065,7 +4079,7 @@
 
   <div id="landing" class="landing">
     <div class="card">
-      <div id="landingVersion" class="version">META QUEST 3 • v20</div>
+      <div id="landingVersion" class="version">META QUEST 3 • v21</div>
       <h1 id="landingTitle">CK-207-74-5000_VR — Virtual Reality</h1>
       <p id="landingDescription">Model jest zakotwiczony w skali 1:1. Poruszasz się użytkownikiem, stawiasz trwałe wymiary i zarządzasz widocznością komponentów.</p>
 
@@ -4212,7 +4226,7 @@
         <a-entity id="measurePanel" position="0.07 0.13 -0.31" rotation="-35 0 0" scale="0.56 0.56 0.56" visible="false">
           <a-plane width="0.94" height="1.18" color="#0F172A" opacity="0.96" material="shader: flat; transparent: true; depthWrite: false"></a-plane>
           <a-text value="POMIARY GLB" align="center" width="0.84" color="#BAE6FD" position="0 0.51 0.008"></a-text>
-          <a-text id="measurePanelStatus" value="DYSTANS • SNAP BASIC" align="center" width="0.82" wrap-count="34" color="#E2E8F0" position="0 0.405 0.008"></a-text>
+          <a-text id="measurePanelStatus" value="DYSTANS • SNAP AUTO" align="center" width="0.82" wrap-count="34" color="#E2E8F0" position="0 0.405 0.008"></a-text>
 
           <a-plane id="measureBtnDistance" class="measure-ui ui-click" width="0.40" height="0.105" color="#0284C7" position="-0.22 0.25 0.012" material="shader: flat" viewer-button="action: measure-distance"><a-text value="DYSTANS" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane id="measureBtnXYZ" class="measure-ui ui-click" width="0.40" height="0.105" color="#075985" position="0.22 0.25 0.012" material="shader: flat" viewer-button="action: measure-xyz"><a-text value="XYZ" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
@@ -4220,7 +4234,7 @@
           <a-plane id="measureBtnPoint" class="measure-ui ui-click" width="0.40" height="0.105" color="#075985" position="0.22 0.125 0.012" material="shader: flat" viewer-button="action: measure-point"><a-text value="PUNKT XYZ" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane id="measureBtnArea" class="measure-ui ui-click" width="0.84" height="0.105" color="#075985" position="0 0.0 0.012" material="shader: flat" viewer-button="action: measure-area"><a-text value="POWIERZCHNIA" align="center" width="0.76" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane id="measureBtnMin" class="measure-ui ui-click" width="0.84" height="0.105" color="#075985" position="0 -0.125 0.012" material="shader: flat" viewer-button="action: measure-min"><a-text value="MIN. DYSTANS PART–PART" align="center" width="0.76" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
-          <a-plane id="measureBtnSnap" class="measure-ui ui-click" width="0.40" height="0.105" color="#0F766E" position="-0.22 -0.25 0.012" material="shader: flat" viewer-button="action: measure-snap"><a-text id="measureBtnSnapText" value="SNAP: BASIC" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane id="measureBtnSnap" class="measure-ui ui-click" width="0.40" height="0.105" color="#0F766E" position="-0.22 -0.25 0.012" material="shader: flat" viewer-button="action: measure-snap"><a-text id="measureBtnSnapText" value="SNAP: AUTO" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane id="measureBtnCompute" class="measure-ui ui-click" width="0.40" height="0.105" color="#334155" position="0.22 -0.25 0.012" material="shader: flat" viewer-button="action: measure-calc"><a-text value="OBLICZ MIN." align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane class="measure-ui ui-click" width="0.40" height="0.105" color="#7C2D12" position="-0.22 -0.375 0.012" material="shader: flat" viewer-button="action: measure-clear"><a-text value="WYCZYŚĆ" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane class="measure-ui ui-click" width="0.40" height="0.105" color="#334155" position="0.22 -0.375 0.012" material="shader: flat" viewer-button="action: measure-close"><a-text value="ZAMKNIJ" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
@@ -4507,11 +4521,11 @@
       }
 
       if (mode === 'mr') {
-        document.title = 'CK-207-74-5000_VR — Meta Quest MR v20';
-        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v20';
+        document.title = 'CK-207-74-5000_VR — Meta Quest MR v21';
+        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v21';
         enterXR.textContent = 'ENTER MR';
         enterXR.classList.add('mr');
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v20';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v21';
         landingVersion.classList.add('mr');
         landingTitle.textContent = 'CK-207-74-5000_VR — Mixed Reality';
         landingDescription.textContent = 'Postaw model w pokoju, ustaw dokładną skalę, przesuń go i obróć wokół osi pionowej gestem dwóch gripów.';
@@ -4536,10 +4550,10 @@
           'Trigger: przytrzymaj — widoczny celownik • puść — akcja'
         ], legend);
       } else {
-        document.title = 'CK-207-74-5000_VR — Meta Quest VR v20';
-        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v20';
+        document.title = 'CK-207-74-5000_VR — Meta Quest VR v21';
+        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v21';
         enterXR.textContent = 'ENTER VR';
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v20';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v21';
         landingTitle.textContent = 'CK-207-74-5000_VR — Virtual Reality';
         landingDescription.textContent = 'Model pozostaje zakotwiczony w skali 1:1. Chodzisz, obracasz użytkownika, teleportujesz się, mierzysz i izolujesz komponenty.';
         landingEnter.textContent = 'ENTER VR — QUEST 3';
