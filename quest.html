@@ -6,7 +6,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — Meta Quest Viewer v18</title>
+  <title>CK-207-74-5000_VR — Meta Quest Viewer v19</title>
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
@@ -25,8 +25,8 @@
     })();
   </script>
   <script src="https://aframe.io/releases/1.8.0/aframe.min.js"></script>
-  <script src="moja-snap.js?v=18"></script>
-  <script src="moja-measure.js?v=18"></script>
+  <script src="moja-snap.js?v=19"></script>
+  <script src="moja-measure.js?v=19"></script>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
@@ -400,45 +400,106 @@
         objects: {default: '.ray-target'},
         marker: {type: 'selector'},
         color: {type: 'color', default: '#38BDF8'},
-        far: {type: 'number', default: 250}
+        far: {type: 'number', default: 80},
+        alwaysVisible: {default: true},
+        idleOpacity: {type: 'number', default: 0.34},
+        activeOpacity: {type: 'number', default: 0.96}
       },
+
       init: function () {
         this.active = false;
         this.currentIntersection = null;
         this.currentIntersections = [];
+        this.currentColor = this.data.color;
+        this._lineVisible = null;
+        this._lineOpacity = null;
+        this.rayOrigin = new THREE.Vector3();
+
         this.onTriggerDown = this.setActive.bind(this, true);
         this.onTriggerUp = this.handleTriggerUp.bind(this);
         this.configure = this.configure.bind(this);
+
         this.el.addEventListener('triggerdown', this.onTriggerDown);
         this.el.addEventListener('triggerup', this.onTriggerUp);
         this.el.addEventListener('controllerconnected', this.configure);
+
+        // laser-controls dostarcza poprawny target-ray kontrolera Meta Quest.
+        // Drugi timeout zabezpiecza konfigurację po inicjalizacji kontrolera.
         window.setTimeout(this.configure, 0);
+        window.setTimeout(this.configure, 120);
       },
+
       configure: function () {
         this.el.setAttribute('raycaster', {
           objects: this.data.objects,
           far: this.data.far,
           showLine: false,
-          lineColor: this.data.color,
-          lineOpacity: 0.95,
+          lineColor: this.currentColor,
+          lineOpacity: this.data.idleOpacity,
           interval: 0
         });
         this.refresh();
-        if (this.data.marker) this.data.marker.object3D.visible = false;
+        this.updateVisualState(true);
       },
+
       refresh: function () {
         var raycaster = this.el.components.raycaster;
         if (raycaster && raycaster.refreshObjects) raycaster.refreshObjects();
       },
+
       setActive: function (active) {
-        this.active = active;
-        this.el.setAttribute('raycaster', 'showLine', Boolean(active));
-        if (!active && this.data.marker) this.data.marker.object3D.visible = false;
+        this.active = Boolean(active);
+        this.updateVisualState(true);
       },
+
       setColor: function (color) {
-        this.el.setAttribute('raycaster', 'lineColor', color);
-        if (this.data.marker) this.data.marker.setAttribute('color', color);
+        this.currentColor = color || this.data.color;
+        this.el.setAttribute('raycaster', 'lineColor', this.currentColor);
+
+        if (this.data.marker) {
+          this.data.marker.querySelectorAll('.pointer-color').forEach(function (part) {
+            part.setAttribute('color', this.currentColor);
+          }, this);
+        }
       },
+
+      forceRayOverlay: function () {
+        var component = this.el.components.raycaster;
+        var line = component && component.line ? component.line : this.el.getObject3D('line');
+        if (!line || !line.traverse) return;
+        line.renderOrder = 94;
+        line.traverse(function (object) {
+          object.renderOrder = 94;
+          var materials = object.material
+            ? (Array.isArray(object.material) ? object.material : [object.material])
+            : [];
+          materials.forEach(function (material) {
+            material.depthTest = false;
+            material.depthWrite = false;
+            material.transparent = true;
+            material.needsUpdate = true;
+          });
+        });
+      },
+
+      updateVisualState: function (force) {
+        var hasHit = Boolean(this.currentIntersection && this.currentIntersection.point);
+        var visible = hasHit && (this.data.alwaysVisible || this.active);
+        var opacity = this.active ? this.data.activeOpacity : this.data.idleOpacity;
+
+        if (force || visible !== this._lineVisible) {
+          this.el.setAttribute('raycaster', 'showLine', visible);
+          this._lineVisible = visible;
+        }
+        if (force || Math.abs(opacity - (this._lineOpacity || 0)) > 0.001) {
+          this.el.setAttribute('raycaster', 'lineOpacity', opacity);
+          this._lineOpacity = opacity;
+        }
+
+        if (!visible && this.data.marker) this.data.marker.object3D.visible = false;
+        this.forceRayOverlay();
+      },
+
       handleTriggerUp: function () {
         var rayComponent = this.el.components.raycaster;
         var intersections = rayComponent && rayComponent.intersections
@@ -447,27 +508,57 @@
         var ray = rayComponent && rayComponent.raycaster && rayComponent.raycaster.ray
           ? rayComponent.raycaster.ray.clone()
           : null;
+
         this.el.emit('moja-ray-select', {
           intersection: this.currentIntersection,
           intersections: intersections,
           ray: ray,
           targetEl: MOJA.getInteractiveEl(this.currentIntersection)
         }, false);
+
         this.setActive(false);
       },
+
       tick: function () {
         var raycaster = this.el.components.raycaster;
         var intersections = raycaster && raycaster.intersections;
-        this.currentIntersections = intersections && intersections.length ? intersections.slice(0, 32) : [];
-        this.currentIntersection = this.currentIntersections.length ? this.currentIntersections[0] : null;
-        if (!this.active || !this.data.marker) return;
-        if (!this.currentIntersection) {
+
+        this.currentIntersections = intersections && intersections.length
+          ? intersections.slice(0, 32)
+          : [];
+        this.currentIntersection = this.currentIntersections.length
+          ? this.currentIntersections[0]
+          : null;
+
+        this.updateVisualState(false);
+
+        if (!this.data.marker) return;
+        if (!this.currentIntersection || !this.currentIntersection.point ||
+            !(this.data.alwaysVisible || this.active)) {
           this.data.marker.object3D.visible = false;
           return;
         }
+
         this.data.marker.object3D.position.copy(this.currentIntersection.point);
+
+        var distance = Number(this.currentIntersection.distance);
+        if (!Number.isFinite(distance)) {
+          var ray = raycaster && raycaster.raycaster && raycaster.raycaster.ray;
+          if (ray && ray.origin) {
+            this.rayOrigin.copy(ray.origin);
+            distance = this.rayOrigin.distanceTo(this.currentIntersection.point);
+          } else {
+            distance = 1;
+          }
+        }
+
+        // Stała czytelność kątowa reticle na małym i dużym modelu.
+        var scale = MOJA.clamp(0.78 + distance * 0.022, 0.78, 2.25);
+        if (this.active) scale *= 1.12;
+        this.data.marker.object3D.scale.setScalar(scale);
         this.data.marker.object3D.visible = true;
       },
+
       remove: function () {
         this.el.removeEventListener('triggerdown', this.onTriggerDown);
         this.el.removeEventListener('triggerup', this.onTriggerUp);
@@ -478,6 +569,7 @@
     AFRAME.registerComponent('measurement-tool', {
       schema: {
         target: {type: 'selector'},
+        camera: {type: 'selector'},
         right: {type: 'selector'},
         pointA: {type: 'selector'},
         pointB: {type: 'selector'},
@@ -497,8 +589,13 @@
         this.enabled = false;
         this.panelVisible = false;
         this.mode = 'distance';
+
+        // SNAP BASIC jest stabilny w VR/MR. OFF daje punkt powierzchni,
+        // FULL dodaje środki okręgów i rzut prostopadły.
+        this.snapMode = 'basic';
         this.snapEnabled = true;
-        this.filters = {vertex: true, midpoint: true, center: true, edge: true, perpendicular: true, surface: true};
+        this.snapAngleRad = 0.0065;
+        this.filters = {vertex: true, midpoint: true, center: false, edge: true, perpendicular: false, surface: true};
         this.points = [];
         this.preview = null;
         this.previewIntersection = null;
@@ -517,12 +614,15 @@
         this.localPathXY = new THREE.Vector3();
         this.targetScale = new THREE.Vector3(1, 1, 1);
         this.coordinate = new THREE.Vector3();
+        this.cameraWorld = new THREE.Vector3();
+        this.overlayDirection = new THREE.Vector3();
+        this.overlayPosition = new THREE.Vector3();
         this.arcAxis = new THREE.Vector3();
         this.arcVector = new THREE.Vector3();
         this.arcPositions = new Float32Array(33 * 3);
         this.axisVisuals = {};
         this.snapEngine = window.MOJA_SNAP
-          ? window.MOJA_SNAP.createEngine(THREE, {maxAngleRad: 0.018, featureAngleDeg: 18})
+          ? window.MOJA_SNAP.createEngine(THREE, {maxAngleRad: 0.0065, featureAngleDeg: 18})
           : null;
         this.measureEngine = window.MOJA_MEASURE
           ? window.MOJA_MEASURE.createEngine(THREE, {surfaceSmoothAngleDeg: 14, minDistanceMaxTrianglesPerSet: 2800})
@@ -534,6 +634,8 @@
         this.createAxisVisuals();
         this.createAngleArc();
         this.styleMainLabel();
+        this.prepareOverlayMaterials();
+        window.setTimeout(this.prepareOverlayMaterials.bind(this), 120);
         this.setPanelVisible(false);
         this.clear();
       },
@@ -590,8 +692,8 @@
           plane.setAttribute('width', 1.22);
           plane.setAttribute('height', 0.22);
           plane.setAttribute('color', '#F8FAFC');
-          plane.setAttribute('opacity', 0.96);
-          plane.setAttribute('material', 'shader: flat; transparent: true; depthWrite: false');
+          plane.setAttribute('opacity', 0.98);
+          plane.setAttribute('material', 'shader: flat; transparent: true; depthTest: false; depthWrite: false');
         }
         if (this.data.labelText) {
           this.data.labelText.setAttribute('width', 1.12);
@@ -599,10 +701,105 @@
         }
       },
 
+      forceOverlayElement: function (element, renderOrder) {
+        if (!element || !element.object3D) return;
+        var order = Number(renderOrder) || 80;
+        element.object3D.renderOrder = order;
+        element.object3D.traverse(function (object) {
+          object.renderOrder = order;
+          var materials = object.material
+            ? (Array.isArray(object.material) ? object.material : [object.material])
+            : [];
+          materials.forEach(function (material) {
+            material.depthTest = false;
+            material.depthWrite = false;
+            material.transparent = true;
+            material.needsUpdate = true;
+          });
+        });
+      },
+
+      prepareOverlayMaterials: function () {
+        var self = this;
+        [this.data.pointA, this.data.pointB, this.data.pointC, this.data.line, this.data.line2,
+         this.data.label, this.data.snapLabel].forEach(function (element) {
+          self.forceOverlayElement(element, element === self.data.label || element === self.data.snapLabel ? 92 : 86);
+        });
+        ['x', 'y', 'z'].forEach(function (axis) {
+          var visual = self.axisVisuals[axis];
+          if (!visual) return;
+          self.forceOverlayElement(visual.line, 87);
+          self.forceOverlayElement(visual.label, 91);
+        });
+        if (this.angleArc) {
+          this.angleArc.renderOrder = 88;
+          this.angleArc.material.depthTest = false;
+          this.angleArc.material.depthWrite = false;
+          this.angleArc.material.transparent = true;
+          this.angleArc.material.needsUpdate = true;
+        }
+      },
+
+      getCameraWorldPosition: function (output) {
+        var camera = this.data.camera || document.getElementById('camera');
+        if (!camera || !camera.object3D) return null;
+        camera.object3D.getWorldPosition(output);
+        return output;
+      },
+
+      overlayScaleAt: function (position, factor, minimum, maximum) {
+        if (!position || !this.getCameraWorldPosition(this.cameraWorld)) return minimum;
+        return MOJA.clamp(this.cameraWorld.distanceTo(position) * factor, minimum, maximum);
+      },
+
+      placeOverlayInFront: function (source, output, verticalOffset) {
+        output.copy(source);
+        if (this.getCameraWorldPosition(this.cameraWorld)) {
+          this.overlayDirection.copy(this.cameraWorld).sub(source);
+          var distance = this.overlayDirection.length();
+          if (distance > 1e-6) {
+            this.overlayDirection.multiplyScalar(1 / distance);
+            output.addScaledVector(this.overlayDirection, MOJA.clamp(distance * 0.010, 0.028, 0.14));
+          }
+        }
+        output.y += Number(verticalOffset) || 0;
+        return output;
+      },
+
+      showMarker: function (element, position) {
+        if (!element || !position) return;
+        element.object3D.position.copy(position);
+        element.object3D.scale.setScalar(this.overlayScaleAt(position, 0.085, 0.78, 2.35));
+        element.object3D.visible = true;
+        this.forceOverlayElement(element, 89);
+      },
+
       getModeLabel: function () {
         return ({
           distance: 'DYSTANS', xyz: 'XYZ', angle: 'KĄT', point: 'PUNKT XYZ', area: 'POWIERZCHNIA', 'min-distance': 'MIN. PART–PART'
         })[this.mode] || 'POMIAR';
+      },
+
+      getSnapModeLabel: function () {
+        if (this.snapMode === 'off') return 'OFF';
+        if (this.snapMode === 'full') return 'FULL';
+        return 'BASIC';
+      },
+
+      applySnapMode: function (mode) {
+        this.snapMode = mode === 'off' || mode === 'full' ? mode : 'basic';
+        this.snapEnabled = this.snapMode !== 'off';
+
+        if (this.snapMode === 'full') {
+          this.snapAngleRad = 0.010;
+          this.filters = {vertex:true, midpoint:true, center:true, edge:true, perpendicular:true, surface:true};
+        } else if (this.snapMode === 'off') {
+          this.snapAngleRad = 0.0045;
+          this.filters = {vertex:false, midpoint:false, center:false, edge:false, perpendicular:false, surface:true};
+        } else {
+          this.snapAngleRad = 0.0065;
+          this.filters = {vertex:true, midpoint:true, center:false, edge:true, perpendicular:false, surface:true};
+        }
       },
 
       shortSnapLabel: function (kind) {
@@ -666,7 +863,7 @@
 
       updatePanel: function () {
         if (this.data.status) {
-          var line1 = this.getModeLabel() + '  •  SNAP ' + (this.snapEnabled ? 'ON' : 'OFF');
+          var line1 = this.getModeLabel() + '  •  SNAP ' + this.getSnapModeLabel();
           var line2 = '';
           if (this.mode === 'distance' || this.mode === 'xyz') line2 = this.points.length === 0 ? 'TRIGGER: A' : (this.points.length === 1 ? 'CELUJ: B — PODGLĄD LIVE • TRIGGER: ZAPISZ' : 'GOTOWE');
           else if (this.mode === 'angle') line2 = ['TRIGGER: A', 'TRIGGER: WIERZCHOŁEK', 'CELUJ: B — PODGLĄD LIVE • TRIGGER: ZAPISZ', 'GOTOWE'][Math.min(this.points.length, 3)];
@@ -687,9 +884,9 @@
           button.setAttribute('color', mode === this.mode ? '#0284C7' : '#075985');
         }, this);
         var snapButton = document.getElementById('measureBtnSnap');
-        if (snapButton) snapButton.setAttribute('color', this.snapEnabled ? '#0F766E' : '#9A3412');
+        if (snapButton) snapButton.setAttribute('color', this.snapMode === 'off' ? '#9A3412' : (this.snapMode === 'full' ? '#6D28D9' : '#0F766E'));
         var snapButtonText = document.getElementById('measureBtnSnapText');
-        if (snapButtonText) snapButtonText.setAttribute('value', this.snapEnabled ? 'SNAP: ON' : 'SNAP: OFF');
+        if (snapButtonText) snapButtonText.setAttribute('value', 'SNAP: ' + this.getSnapModeLabel());
         var computeButton = document.getElementById('measureBtnCompute');
         if (computeButton) computeButton.setAttribute('color', this.mode === 'min-distance' ? '#166534' : '#334155');
 
@@ -705,7 +902,8 @@
       },
 
       toggleSnap: function () {
-        this.snapEnabled = !this.snapEnabled;
+        var next = this.snapMode === 'basic' ? 'off' : (this.snapMode === 'off' ? 'full' : 'basic');
+        this.applySnapMode(next);
         this.clearPreview();
         this.updatePanel();
       },
@@ -740,7 +938,7 @@
               enabled: this.snapEnabled,
               filters: this.filters,
               basePoint: this.getBasePoint(),
-              maxAngleRad: 0.018,
+              maxAngleRad: this.snapAngleRad,
               searchRoot: targetObject
             })
           : null;
@@ -899,8 +1097,9 @@
 
       setLine: function (element, start, end, color) {
         if (!element) return;
-        element.setAttribute('line', {start:start, end:end, color:color || this.data.color, opacity:0.96});
+        element.setAttribute('line', {start:start, end:end, color:color || this.data.color, opacity:0.98});
         element.object3D.visible = true;
+        this.forceOverlayElement(element, 86);
       },
 
       setAxisVisual: function (visual, start, end, value, axis) {
@@ -910,10 +1109,11 @@
         this.midpoint.copy(start).add(end).multiplyScalar(0.5);
         var offset = Math.max(0.012, Math.min(0.06, length * 0.025));
         if (axis === 'y') this.midpoint.x += offset; else this.midpoint.y += offset;
-        visual.label.object3D.position.copy(this.midpoint);
-        visual.label.object3D.scale.setScalar(MOJA.clamp(length * 0.055, 0.18, 0.34));
+        this.placeOverlayInFront(this.midpoint, visual.label.object3D.position, 0.010);
+        visual.label.object3D.scale.setScalar(this.overlayScaleAt(this.midpoint, 0.032, 0.16, 0.42));
         visual.text.setAttribute('value', axis.toUpperCase() + '  ' + this.formatMm(value, false));
         visual.label.object3D.visible = true;
+        this.forceOverlayElement(visual.label, 91);
       },
 
       calculateComponents: function (first, second) {
@@ -943,10 +1143,11 @@
       showSnapBadge: function () {
         if (!this.preview || !this.data.snapLabel || !this.data.snapLabelText) return;
         if (!this.resolvePoint(this.preview, this.worldC)) return;
-        this.data.snapLabel.object3D.position.copy(this.worldC);
-        this.data.snapLabel.object3D.position.y += 0.035;
-        this.data.snapLabelText.setAttribute('value', this.snapSymbol(this.preview.snapKind) + '  ' + (this.snapEnabled ? this.shortSnapLabel(this.preview.snapKind) : 'SNAP OFF'));
+        this.placeOverlayInFront(this.worldC, this.data.snapLabel.object3D.position, 0.020);
+        this.data.snapLabel.object3D.scale.setScalar(this.overlayScaleAt(this.worldC, 0.026, 0.12, 0.30));
+        this.data.snapLabelText.setAttribute('value', this.snapSymbol(this.preview.snapKind) + '  ' + (this.snapEnabled ? this.shortSnapLabel(this.preview.snapKind) : 'FREE'));
         this.data.snapLabel.object3D.visible = true;
+        this.forceOverlayElement(this.data.snapLabel, 93);
       },
 
       setMainLabel: function (position, value, color) {
@@ -960,11 +1161,14 @@
         }
         this.data.labelText.setAttribute('width', lineCount > 1 ? 1.22 : 1.12);
         this.data.labelText.setAttribute('wrap-count', lineCount > 1 ? 25 : 30);
-        this.data.label.object3D.position.copy(position);
-        this.data.label.object3D.scale.setScalar(lineCount > 1 ? 0.30 : 0.34);
+        this.placeOverlayInFront(position, this.data.label.object3D.position, 0.012);
+        this.data.label.object3D.scale.setScalar(
+          this.overlayScaleAt(position, lineCount > 1 ? 0.036 : 0.040, lineCount > 1 ? 0.18 : 0.19, lineCount > 1 ? 0.50 : 0.56)
+        );
         this.data.labelText.setAttribute('value', textValue);
         this.data.labelText.setAttribute('color', color || '#2563EB');
         this.data.label.object3D.visible = true;
+        this.forceOverlayElement(this.data.label, 94);
       },
 
       updateAngleArc: function (first, vertex, third) {
@@ -998,9 +1202,9 @@
         if (this.mode === 'distance' || this.mode === 'xyz') {
           var first=points[0]; var second=points[1] || (points[0] ? preview : null);
           if (!first || !this.resolvePoint(first,this.worldA)) return;
-          if (this.data.pointA) { this.data.pointA.object3D.position.copy(this.worldA); this.data.pointA.object3D.visible=true; }
+          this.showMarker(this.data.pointA, this.worldA);
           if (!second || !this.resolvePoint(second,this.worldB)) return;
-          if (this.data.pointB) { this.data.pointB.object3D.position.copy(this.worldB); this.data.pointB.object3D.visible=true; }
+          this.showMarker(this.data.pointB, this.worldB);
           this.setLine(this.data.line,this.worldA,this.worldB,'#2563EB');
           var components=this.calculateComponents(first,second);
           var distance=this.worldA.distanceTo(this.worldB);
@@ -1017,12 +1221,12 @@
         if (this.mode === 'angle') {
           var p0=points[0]; var p1=points[1] || (points[0]?preview:null); var p2=points[2] || (points[1]?preview:null);
           if (!p0 || !this.resolvePoint(p0,this.worldA)) return;
-          if (this.data.pointA) {this.data.pointA.object3D.position.copy(this.worldA);this.data.pointA.object3D.visible=true;}
+          this.showMarker(this.data.pointA, this.worldA);
           if (!p1 || !this.resolvePoint(p1,this.worldB)) return;
-          if (this.data.pointB) {this.data.pointB.object3D.position.copy(this.worldB);this.data.pointB.object3D.visible=true;}
+          this.showMarker(this.data.pointB, this.worldB);
           this.setLine(this.data.line,this.worldA,this.worldB,'#2563EB');
           if (!p2 || !this.resolvePoint(p2,this.worldC)) return;
-          if (this.data.pointC) {this.data.pointC.object3D.position.copy(this.worldC);this.data.pointC.object3D.visible=true;}
+          this.showMarker(this.data.pointC, this.worldC);
           this.setLine(this.data.line2,this.worldB,this.worldC,'#2563EB');
           var angle=this.updateAngleArc(this.worldA,this.worldB,this.worldC);
           this.midpoint.copy(this.worldA).sub(this.worldB).normalize().add(this.worldC.clone().sub(this.worldB).normalize()).normalize().multiplyScalar(0.18).add(this.worldB);
@@ -1033,7 +1237,7 @@
         if (this.mode === 'point') {
           var point=points[0] || preview;
           if (!point || !this.resolvePoint(point,this.worldA)) return;
-          if (this.data.pointA) {this.data.pointA.object3D.position.copy(this.worldA);this.data.pointA.object3D.visible=true;}
+          this.showMarker(this.data.pointA, this.worldA);
           this.coordinate.copy(this.worldA);
           if (this.data.target) {this.data.target.object3D.updateMatrixWorld(true);this.data.target.object3D.worldToLocal(this.coordinate);}
           this.midpoint.copy(this.worldA);this.midpoint.y+=0.08;
@@ -1043,7 +1247,7 @@
 
         if (this.mode === 'area' && this.result && this.result.type === 'area') {
           if (!this.resolvePoint(this.result.storedCentroid,this.worldA)) return;
-          if (this.data.pointA) {this.data.pointA.object3D.position.copy(this.worldA);this.data.pointA.object3D.visible=true;}
+          this.showMarker(this.data.pointA, this.worldA);
           this.midpoint.copy(this.worldA);this.midpoint.y+=0.08;
           this.setMainLabel(this.midpoint,this.formatArea(this.result.area,this.result.approximate),'#2563EB');
           return;
@@ -1051,8 +1255,8 @@
 
         if (this.mode === 'min-distance' && this.result && this.result.type === 'min-distance') {
           if (!this.resolvePoint(this.result.storedA,this.worldA) || !this.resolvePoint(this.result.storedB,this.worldB)) return;
-          if (this.data.pointA) {this.data.pointA.object3D.position.copy(this.worldA);this.data.pointA.object3D.visible=true;}
-          if (this.data.pointB) {this.data.pointB.object3D.position.copy(this.worldB);this.data.pointB.object3D.visible=true;}
+          this.showMarker(this.data.pointA, this.worldA);
+          this.showMarker(this.data.pointB, this.worldB);
           this.setLine(this.data.line,this.worldA,this.worldB,'#2563EB');
           this.midpoint.copy(this.worldA).add(this.worldB).multiplyScalar(0.5);this.midpoint.y+=0.05;
           this.setMainLabel(this.midpoint,this.formatMm(this.result.distance,this.result.approximate),'#2563EB');
@@ -3266,14 +3470,14 @@
         if (this.interactionMode === 'measure') {
           var measurement = this.getMeasurement();
           var measureName = measurement && measurement.getModeLabel ? measurement.getModeLabel() : 'POMIAR';
-          var snapState = measurement && measurement.snapEnabled === false ? 'SNAP OFF' : 'SNAP ON';
-          this.modeText.setAttribute('value', measureName + '  •  ' + snapState + '  •  PRZYTRZYMAJ TRIGGER: CELUJ  •  PUŚĆ: ZAPISZ  •  Y: PANEL');
+          var snapState = measurement && measurement.getSnapModeLabel ? 'SNAP ' + measurement.getSnapModeLabel() : 'SNAP BASIC';
+          this.modeText.setAttribute('value', measureName + '  •  ' + snapState + '  •  CELOWNIK AKTYWNY  •  TRIGGER: ZAPISZ  •  Y: PANEL');
           this.modeText.setAttribute('color', '#FBBF24');
         } else if (this.interactionMode === 'select') {
-          this.modeText.setAttribute('value', 'DRZEWO  •  PRZYTRZYMAJ TRIGGER: CELUJ  •  PUŚĆ: WYBIERZ  •  Y: PANEL  •  PRAWY JOYSTICK: PRZEWIJAJ');
+          this.modeText.setAttribute('value', 'DRZEWO  •  CELOWNIK AKTYWNY  •  TRIGGER: WYBIERZ  •  Y: PANEL  •  PRAWY JOYSTICK: PRZEWIJAJ');
           this.modeText.setAttribute('color', '#C4B5FD');
         } else if (this.interactionMode === 'annotate') {
-          this.modeText.setAttribute('value', 'ADNOTACJE 3D  •  WIDOCZNY CELOWNIK: TRZYMAJ TRIGGER  •  TEKST: PUŚĆ W PUNKCIE  •  Y: PANEL');
+          this.modeText.setAttribute('value', 'ADNOTACJE 3D  •  CELOWNIK AKTYWNY  •  RYSUJ: TRZYMAJ TRIGGER  •  Y: PANEL');
           this.modeText.setAttribute('color', '#F9A8D4');
         } else if (this.modeType === 'mr') {
           this.modeText.setAttribute(
@@ -3284,7 +3488,7 @@
           );
           this.modeText.setAttribute('color', '#D1FAE5');
         } else {
-          this.modeText.setAttribute('value', 'NAWIGACJA  •  L: RUCH  •  R: OBRÓT  •  B: GÓRA  •  A: DÓŁ  •  PRZYTRZYMAJ TRIGGER: CELUJ  •  PUŚĆ: TELEPORT');
+          this.modeText.setAttribute('value', 'NAWIGACJA  •  L: RUCH  •  R: OBRÓT  •  B: GÓRA  •  A: DÓŁ  •  CELOWNIK: TELEPORT  •  TRIGGER: JUMP');
           this.modeText.setAttribute('color', '#E0F2FE');
         }
       },
@@ -3343,26 +3547,10 @@
 
         if (this.interactionMode === 'annotate') return;
 
-        if (this.modeType === 'vr') {
-          var teleportIntersection = this.findTeleportIntersection(allIntersections);
-          if (teleportIntersection) this.teleportTo(teleportIntersection.point);
+        // Prosty jump: najbliższe trafienie poprawnego target-raya.
+        if (this.modeType === 'vr' && this.isValidTeleport(intersection)) {
+          this.teleportTo(intersection.point);
         }
-      },
-      findTeleportIntersection: function (intersections) {
-        var list = Array.isArray(intersections) ? intersections : [];
-
-        for (var index = 0; index < list.length; index += 1) {
-          var candidate = list[index];
-          var targetEl = MOJA.getInteractiveEl(candidate);
-
-          // Panel lub pierwsza trafiona powierzchnia modelu blokuje teleport "na wylot".
-          if (targetEl && targetEl.classList && targetEl.classList.contains('ui-click')) return null;
-          if (targetEl && targetEl.classList && targetEl.classList.contains('teleportable')) {
-            return this.isValidTeleport(candidate) ? candidate : null;
-          }
-        }
-
-        return null;
       },
       isValidTeleport: function (intersection) {
         if (!intersection || !intersection.point) return false;
@@ -3385,22 +3573,20 @@
         }
 
         var triggerRay = this.right.components['trigger-ray'];
-        if (!triggerRay || !triggerRay.active) {
+        if (!triggerRay || !triggerRay.currentIntersection) {
           this.teleportMarker.object3D.visible = false;
           return;
         }
 
-        var intersections = triggerRay.currentIntersections && triggerRay.currentIntersections.length
-          ? triggerRay.currentIntersections
-          : (triggerRay.currentIntersection ? [triggerRay.currentIntersection] : []);
-        var intersection = this.findTeleportIntersection(intersections);
-
-        if (!intersection) {
+        var intersection = triggerRay.currentIntersection;
+        if (!this.isValidTeleport(intersection)) {
           this.teleportMarker.object3D.visible = false;
-          triggerRay.setColor('#FB7185');
+          if (triggerRay.active) triggerRay.setColor('#FB7185');
+          else this.updateRayColor();
           return;
         }
 
+        // Cel teleportu widać jeszcze przed wciśnięciem Triggera.
         triggerRay.setColor('#38BDF8');
         this.teleportMarker.object3D.position.copy(intersection.point);
         this.teleportMarker.object3D.position.y += 0.018;
@@ -3682,8 +3868,8 @@
 </head>
 <body>
   <div class="topbar">
-    <a class="pill" href="index.html?v=18">← Viewer</a>
-    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v18</div>
+    <a class="pill" href="index.html?v=19">← Viewer</a>
+    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v19</div>
     <button id="enterXR" class="pill enter" type="button">ENTER VR</button>
   </div>
 
@@ -3691,7 +3877,7 @@
 
   <div id="landing" class="landing">
     <div class="card">
-      <div id="landingVersion" class="version">META QUEST 3 • v18</div>
+      <div id="landingVersion" class="version">META QUEST 3 • v19</div>
       <h1 id="landingTitle">CK-207-74-5000_VR — Virtual Reality</h1>
       <p id="landingDescription">Model jest zakotwiczony w skali 1:1. Poruszasz się użytkownikiem, mierzysz i zarządzasz widocznością komponentów.</p>
 
@@ -3715,7 +3901,7 @@
 
       <div id="landingControls" class="controls"></div>
       <div class="actions">
-        <a class="button" href="index.html?v=18">← Wróć</a>
+        <a class="button" href="index.html?v=19">← Wróć</a>
         <button id="landingEnter" class="button primary" type="button">ENTER VR — QUEST 3</button>
       </div>
       <div id="landingNote" class="note">Subtelne krawędzie, oświetlenie modelu 360° i brak ciężkich map cieni.</div>
@@ -3725,14 +3911,14 @@
   <a-scene
     id="scene"
     quest-viewer="pivot: #modelPivot; asset: #modelAsset; rig: #rig; camera: #camera; left: #leftHand; right: #rightHand; floor: #floor; grid: #metricGrid; reticle: #placementReticle; info: #modelInfo; infoText: #modelInfoText; modeText: #modeText; teleportMarker: #teleportMarker; scalePanel: #scalePanel; scaleValueText: #scaleValueText; scaleKnob: #scaleKnob; componentPanel: #componentPanel; freeGrabButton: #freeGrabButton; freeGrabButtonText: #freeGrabButtonText"
-    component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; scrollTrack: #componentScrollTrack; scrollThumb: #componentScrollThumb; structureUrl: CK-207-74-5000_VR.structure.json?v=18; rows: 8"
+    component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; scrollTrack: #componentScrollTrack; scrollThumb: #componentScrollThumb; structureUrl: CK-207-74-5000_VR.structure.json?v=19; rows: 8"
     lighting-control="ambient: #ambientLight; front: #lightFront; back: #lightBack; left: #lightLeft; right: #lightRight; top: #lightTop; bottom: #lightBottom; panel: #lightingPanel; valueText: #lightingValueText; detailText: #lightingDetailText; storageKey: moja-ck-207-74-5000_vr-mr-scale-lighting360"
     annotation-control="pivot: #modelPivot; root: #annotationRoot; camera: #camera; right: #rightHand; panel: #annotationPanel; keyboard: #annotationKeyboard; preview: #annotationTextPreview; status: #annotationStatus"
-    measurement-tool="target: #modelPivot; right: #rightHand; pointA: #measurePointA; pointB: #measurePointB; pointC: #measurePointC; line: #measureLine; line2: #measureLine2; label: #measureLabel; labelText: #measureLabelText; snapLabel: #measureSnapLabel; snapLabelText: #measureSnapLabelText; panel: #measurePanel; status: #measurePanelStatus; color: #2563EB"
+    measurement-tool="target: #modelPivot; camera: #camera; right: #rightHand; pointA: #measurePointA; pointB: #measurePointB; pointC: #measurePointC; line: #measureLine; line2: #measureLine2; label: #measureLabel; labelText: #measureLabelText; snapLabel: #measureSnapLabel; snapLabelText: #measureSnapLabelText; panel: #measurePanel; status: #measurePanelStatus; color: #2563EB"
     loading-screen="backgroundColor: #0B1220; dotsColor: #60A5FA">
 
     <a-assets timeout="120000">
-      <a-asset-item id="modelSource" src="CK-207-74-5000_VR.glb?v=18"></a-asset-item>
+      <a-asset-item id="modelSource" src="CK-207-74-5000_VR.glb?v=19"></a-asset-item>
     </a-assets>
     <!-- OŚWIETLENIE MODELU 360° — bez map cieni -->
     <a-entity id="ambientLight"
@@ -3806,12 +3992,15 @@
       <a-text id="modelInfoText" value="SKALA 100% • 1:1" align="center" anchor="center" baseline="center" width="1.58" color="#F8FAFC" position="0 0 0.006"></a-text>
     </a-entity>
 
-    <a-sphere id="pointerDot" radius="0.017" color="#38BDF8" material="shader: flat; depthTest: false; depthWrite: false" visible="false"></a-sphere>
-    <a-torus id="teleportMarker" radius="0.14" radius-tubular="0.008" rotation="-90 0 0" color="#34D399" material="shader: flat" visible="false"></a-torus>
+    <a-entity id="pointerDot" look-at-camera="camera: #camera; yawOnly: false" visible="false">
+      <a-ring class="pointer-color" radius-inner="0.009" radius-outer="0.014" color="#38BDF8" material="shader: flat; depthTest: false; depthWrite: false; transparent: true; opacity: 0.96"></a-ring>
+      <a-circle class="pointer-color" radius="0.0032" color="#38BDF8" position="0 0 0.001" material="shader: flat; depthTest: false; depthWrite: false"></a-circle>
+    </a-entity>
+    <a-torus id="teleportMarker" radius="0.14" radius-tubular="0.008" rotation="-90 0 0" color="#34D399" material="shader: flat; depthTest: false; depthWrite: false; transparent: true; opacity: 0.96" visible="false"></a-torus>
 
-    <a-sphere id="measurePointA" radius="0.006" color="#FFFFFF" material="shader: flat; depthTest: false" visible="false"></a-sphere>
-    <a-sphere id="measurePointB" radius="0.006" color="#FFFFFF" material="shader: flat; depthTest: false" visible="false"></a-sphere>
-    <a-sphere id="measurePointC" radius="0.006" color="#FFFFFF" material="shader: flat; depthTest: false" visible="false"></a-sphere>
+    <a-sphere id="measurePointA" radius="0.005" color="#FFFFFF" material="shader: flat; depthTest: false; depthWrite: false" visible="false"></a-sphere>
+    <a-sphere id="measurePointB" radius="0.005" color="#2563EB" material="shader: flat; depthTest: false; depthWrite: false" visible="false"></a-sphere>
+    <a-sphere id="measurePointC" radius="0.005" color="#F97316" material="shader: flat; depthTest: false; depthWrite: false" visible="false"></a-sphere>
     <a-entity id="measureLine" line="start: 0 0 0; end: 0 0 0; color: #2563EB; opacity: 1" visible="false"></a-entity>
     <a-entity id="measureLine2" line="start: 0 0 0; end: 0 0 0; color: #2563EB; opacity: 1" visible="false"></a-entity>
     <a-entity id="measureLabel" look-at-camera="camera: #camera; yawOnly: false" scale="0.34 0.34 0.34" visible="false">
@@ -3835,7 +4024,7 @@
         <a-entity id="measurePanel" position="0.07 0.13 -0.31" rotation="-35 0 0" scale="0.56 0.56 0.56" visible="false">
           <a-plane width="0.94" height="1.18" color="#0F172A" opacity="0.96" material="shader: flat; transparent: true; depthWrite: false"></a-plane>
           <a-text value="POMIARY GLB" align="center" width="0.84" color="#BAE6FD" position="0 0.51 0.008"></a-text>
-          <a-text id="measurePanelStatus" value="DYSTANS • SNAP ON" align="center" width="0.82" wrap-count="34" color="#E2E8F0" position="0 0.405 0.008"></a-text>
+          <a-text id="measurePanelStatus" value="DYSTANS • SNAP BASIC" align="center" width="0.82" wrap-count="34" color="#E2E8F0" position="0 0.405 0.008"></a-text>
 
           <a-plane id="measureBtnDistance" class="measure-ui ui-click" width="0.40" height="0.105" color="#0284C7" position="-0.22 0.25 0.012" material="shader: flat" viewer-button="action: measure-distance"><a-text value="DYSTANS" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane id="measureBtnXYZ" class="measure-ui ui-click" width="0.40" height="0.105" color="#075985" position="0.22 0.25 0.012" material="shader: flat" viewer-button="action: measure-xyz"><a-text value="XYZ" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
@@ -3843,7 +4032,7 @@
           <a-plane id="measureBtnPoint" class="measure-ui ui-click" width="0.40" height="0.105" color="#075985" position="0.22 0.125 0.012" material="shader: flat" viewer-button="action: measure-point"><a-text value="PUNKT XYZ" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane id="measureBtnArea" class="measure-ui ui-click" width="0.84" height="0.105" color="#075985" position="0 0.0 0.012" material="shader: flat" viewer-button="action: measure-area"><a-text value="POWIERZCHNIA" align="center" width="0.76" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane id="measureBtnMin" class="measure-ui ui-click" width="0.84" height="0.105" color="#075985" position="0 -0.125 0.012" material="shader: flat" viewer-button="action: measure-min"><a-text value="MIN. DYSTANS PART–PART" align="center" width="0.76" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
-          <a-plane id="measureBtnSnap" class="measure-ui ui-click" width="0.40" height="0.105" color="#0F766E" position="-0.22 -0.25 0.012" material="shader: flat" viewer-button="action: measure-snap"><a-text id="measureBtnSnapText" value="SNAP: ON" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane id="measureBtnSnap" class="measure-ui ui-click" width="0.40" height="0.105" color="#0F766E" position="-0.22 -0.25 0.012" material="shader: flat" viewer-button="action: measure-snap"><a-text id="measureBtnSnapText" value="SNAP: BASIC" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane id="measureBtnCompute" class="measure-ui ui-click" width="0.40" height="0.105" color="#334155" position="0.22 -0.25 0.012" material="shader: flat" viewer-button="action: measure-calc"><a-text value="OBLICZ MIN." align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane class="measure-ui ui-click" width="0.40" height="0.105" color="#7C2D12" position="-0.22 -0.375 0.012" material="shader: flat" viewer-button="action: measure-clear"><a-text value="WYCZYŚĆ" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane class="measure-ui ui-click" width="0.40" height="0.105" color="#334155" position="0.22 -0.375 0.012" material="shader: flat" viewer-button="action: measure-close"><a-text value="ZAMKNIJ" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
@@ -4094,9 +4283,9 @@
 
       <a-entity
         id="rightHand"
-        meta-touch-controls="hand: right"
-        raycaster="objects: .ray-target; far: 250; showLine: false; lineColor: #38BDF8; lineOpacity: 0.95"
-        trigger-ray="objects: .ray-target; marker: #pointerDot; color: #38BDF8; far: 250">
+        laser-controls="hand: right"
+        raycaster="objects: .ray-target; far: 80; showLine: false; lineColor: #38BDF8; lineOpacity: 0.34"
+        trigger-ray="objects: .ray-target; marker: #pointerDot; color: #38BDF8; far: 80; alwaysVisible: true; idleOpacity: 0.34; activeOpacity: 0.96">
       </a-entity>
     </a-entity>
   </a-scene>
@@ -4130,11 +4319,11 @@
       }
 
       if (mode === 'mr') {
-        document.title = 'CK-207-74-5000_VR — Meta Quest MR v18';
-        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v18';
+        document.title = 'CK-207-74-5000_VR — Meta Quest MR v19';
+        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v19';
         enterXR.textContent = 'ENTER MR';
         enterXR.classList.add('mr');
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v18';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v19';
         landingVersion.classList.add('mr');
         landingTitle.textContent = 'CK-207-74-5000_VR — Mixed Reality';
         landingDescription.textContent = 'Postaw model w pokoju, ustaw dokładną skalę, przesuń go i obróć wokół osi pionowej gestem dwóch gripów.';
@@ -4159,10 +4348,10 @@
           'Trigger: przytrzymaj — widoczny celownik • puść — akcja'
         ], legend);
       } else {
-        document.title = 'CK-207-74-5000_VR — Meta Quest VR v18';
-        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v18';
+        document.title = 'CK-207-74-5000_VR — Meta Quest VR v19';
+        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v19';
         enterXR.textContent = 'ENTER VR';
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v18';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v19';
         landingTitle.textContent = 'CK-207-74-5000_VR — Virtual Reality';
         landingDescription.textContent = 'Model pozostaje zakotwiczony w skali 1:1. Chodzisz, obracasz użytkownika, teleportujesz się, mierzysz i izolujesz komponenty.';
         landingEnter.textContent = 'ENTER VR — QUEST 3';
