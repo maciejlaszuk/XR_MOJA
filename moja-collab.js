@@ -1,5 +1,5 @@
 /*
-  MOJA XR v14 — współpraca VR/MR przez Supabase Realtime.
+  MOJA XR v15 — współpraca VR/MR przez Supabase Realtime.
 
   Funkcje:
   - Presence: lista osób w pokoju.
@@ -27,7 +27,7 @@
   var CLIENT_ID = createClientId();
   var COLOR = colorFor(CLIENT_ID);
   var POSE_HZ = clamp(Number(COLLAB.poseHz) || 10, 2, 15);
-  var TOPIC = 'moja-xr-v14-' + compact(MODEL).slice(0, 32) + '-' + compact(ROOM).slice(0, 64);
+  var TOPIC = 'moja-xr-v15-' + compact(MODEL).slice(0, 32) + '-' + compact(ROOM).slice(0, 64);
 
   var scene = null;
   var channel = null;
@@ -183,6 +183,7 @@
       listenBroadcast('pose', onRemotePose);
       listenBroadcast('action', onRemoteAction);
       listenBroadcast('selection', onRemoteSelection);
+      listenBroadcast('selection-clear', onRemoteSelectionClear);
       listenBroadcast('scale', onRemoteScale);
       listenBroadcast('measurement-point', onRemoteMeasurementPoint);
       listenBroadcast('measurement-clear', onRemoteMeasurementClear);
@@ -306,6 +307,59 @@
     return { p: vec3Array(position), q: quatArray(quaternion) };
   }
 
+  function resolveActiveRay(left, right) {
+    var presentationRay = left && left.components && left.components['presentation-ray'];
+    if (presentationRay && presentationRay.active) {
+      return {
+        hand: 'left',
+        element: left,
+        component: presentationRay,
+        color: '#FF3B30'
+      };
+    }
+
+    var triggerRay = right && right.components && right.components['trigger-ray'];
+    if (triggerRay && triggerRay.active) {
+      var raycaster = right.components && right.components.raycaster;
+      var raycasterData = raycaster && raycaster.data;
+      return {
+        hand: 'right',
+        element: right,
+        component: triggerRay,
+        color: String((raycasterData && raycasterData.lineColor) || '#38BDF8')
+      };
+    }
+
+    return null;
+  }
+
+  function activeRayPayload(left, right) {
+    var activeRay = resolveActiveRay(left, right);
+    if (!activeRay || !activeRay.element || !activeRay.element.object3D) {
+      return { active: false, hand: '', start: null, end: null, color: '' };
+    }
+
+    var start = new THREE.Vector3();
+    var end = new THREE.Vector3();
+    var quaternion = new THREE.Quaternion();
+    activeRay.element.object3D.getWorldPosition(start);
+
+    if (activeRay.component.currentIntersection && activeRay.component.currentIntersection.point) {
+      end.copy(activeRay.component.currentIntersection.point);
+    } else {
+      activeRay.element.object3D.getWorldQuaternion(quaternion);
+      end.copy(start).add(new THREE.Vector3(0, 0, -3).applyQuaternion(quaternion));
+    }
+
+    return {
+      active: true,
+      hand: activeRay.hand,
+      start: vec3Array(start),
+      end: vec3Array(end),
+      color: activeRay.color
+    };
+  }
+
   function sendLocalPose() {
     if (!isImmersive()) return;
     var camera = document.getElementById('camera');
@@ -316,18 +370,7 @@
     var rightPose = worldPose(right);
     if (!headPose || !rightPose) return;
 
-    var rayEnd = null;
-    var triggerRay = right && right.components && right.components['trigger-ray'];
-    if (triggerRay && triggerRay.currentIntersection && triggerRay.currentIntersection.point) {
-      rayEnd = vec3Array(triggerRay.currentIntersection.point);
-    } else {
-      var end = new THREE.Vector3();
-      var q = new THREE.Quaternion();
-      right.object3D.getWorldPosition(end);
-      right.object3D.getWorldQuaternion(q);
-      end.add(new THREE.Vector3(0, 0, -3).applyQuaternion(q));
-      rayEnd = vec3Array(end);
-    }
+    var ray = activeRayPayload(left, right);
 
     send('pose', {
       id: CLIENT_ID,
@@ -337,7 +380,11 @@
       head: headPose,
       left: leftPose,
       right: rightPose,
-      rayEnd: rayEnd
+      rayActive: ray.active,
+      rayHand: ray.hand,
+      rayStart: ray.start,
+      rayEnd: ray.end,
+      rayColor: ray.color
     });
   }
 
@@ -354,13 +401,15 @@
     avatar.label.object3D.position.copy(headPosition).add(new THREE.Vector3(0, 0.22, 0));
     avatar.label.setAttribute('value', sanitizeName(payload.name || 'Użytkownik'));
 
-    if (payload.right && payload.rayEnd) {
+    var fallbackPose = payload.rayHand === 'left' ? payload.left : payload.right;
+    var rayStart = payload.rayStart || (fallbackPose && fallbackPose.p);
+    if (payload.rayActive && rayStart && payload.rayEnd) {
       avatar.laser.object3D.visible = true;
       avatar.laser.setAttribute('line', {
-        start: arrayVec3(payload.right.p),
+        start: arrayVec3(rayStart),
         end: arrayVec3(payload.rayEnd),
-        color: payload.color || avatar.color,
-        opacity: 0.92
+        color: payload.rayColor || payload.color || avatar.color,
+        opacity: 0.96
       });
     } else {
       avatar.laser.object3D.visible = false;
@@ -490,6 +539,8 @@
     if (selection.__mojaCollabPatched) return;
     selection.__mojaCollabPatched = true;
     var originalToggle = selection.toggleIndex.bind(selection);
+    var originalClear = selection.clearSelection.bind(selection);
+
     selection.toggleIndex = function (index, reveal) {
       var result = originalToggle(index, reveal);
       if (!suppress) {
@@ -499,6 +550,13 @@
           reveal: Boolean(reveal)
         });
       }
+      return result;
+    };
+
+    selection.clearSelection = function (render) {
+      var hadSelection = Boolean(selection.selected && selection.selected.size);
+      var result = originalClear(render);
+      if (hadSelection && !suppress) send('selection-clear', {});
       return result;
     };
   }
@@ -618,6 +676,12 @@
       var isSelected = selection.selected.has(index);
       if (Boolean(payload.selected) !== isSelected) selection.toggleIndex(index, Boolean(payload.reveal));
     });
+  }
+
+  function onRemoteSelectionClear() {
+    var selection = scene && scene.components && scene.components['component-selection'];
+    if (!selection || !selection.built) return;
+    withSuppress(function () { selection.clearSelection(); });
   }
 
   function onRemoteScale(payload) {
