@@ -1,7 +1,7 @@
 (function (global) {
   'use strict';
 
-  var VERSION = '16';
+  var VERSION = '17';
 
   function createEngine(THREE, userOptions) {
     if (!THREE) throw new Error('MOJA SNAP: brak biblioteki THREE.');
@@ -325,25 +325,42 @@
       });
       if (!ray) return null;
 
+      var filters = Object.assign({
+        vertex: true,
+        center: true,
+        midpoint: true,
+        edge: true,
+        perpendicular: true,
+        surface: true
+      }, callOptions.filters || {});
+      var snappingEnabled = callOptions.enabled !== false;
+      var basePoint = finiteVector(callOptions.basePoint) ? callOptions.basePoint : null;
       var hasSurfaceHit = hits.length > 0;
       var referenceDistance = hasSurfaceHit ? Number(hits[0].distance) : Number(callOptions.referenceDistance);
       if (!Number.isFinite(referenceDistance) && hasSurfaceHit) referenceDistance = ray.origin.distanceTo(hits[0].point);
       if (!Number.isFinite(referenceDistance)) referenceDistance = 10;
       referenceDistance = Math.max(referenceDistance, 0.05);
 
-      var best = hasSurfaceHit ? {
-        point: hits[0].point.clone(),
-        object: hits[0].object,
-        kind: 'surface',
-        label: 'PUNKT POWIERZCHNI',
-        snapped: false,
-        score: 999,
-        angle: 0,
-        sourceIntersection: hits[0]
-      } : null;
+      function surfaceResult() {
+        if (!hasSurfaceHit) return null;
+        return {
+          point: hits[0].point.clone(),
+          object: hits[0].object,
+          kind: 'surface',
+          label: snappingEnabled ? 'PUNKT POWIERZCHNI' : 'SNAP WYŁĄCZONY / PUNKT DOWOLNY',
+          snapped: false,
+          angle: 0,
+          sourceIntersection: hits[0]
+        };
+      }
+
+      if (!snappingEnabled) return surfaceResult();
+
+      var best = hasSurfaceHit && filters.surface ? Object.assign(surfaceResult(), {score: 999}) : null;
 
       var penalties = {
         vertex: 0.00,
+        perpendicular: 0.018,
         center: 0.035,
         midpoint: 0.070,
         edge: 0.110,
@@ -352,7 +369,18 @@
         meshEdge: 0.190
       };
 
+      function filterAllows(kind) {
+        if (kind === 'vertex') return filters.vertex !== false;
+        if (kind === 'center') return filters.center !== false;
+        if (kind === 'midpoint') return filters.midpoint !== false;
+        if (kind === 'edge') return filters.edge !== false;
+        if (kind === 'perpendicular') return filters.perpendicular !== false;
+        if (kind === 'surface') return filters.surface !== false;
+        return true;
+      }
+
       function consider(point, object, kind, label, sourceIntersection, penalty, acceptanceMultiplier) {
+        if (!filterAllows(kind)) return;
         var metric = rayMetric(ray, point);
         if (!metric) return;
         var limit = maxAngle * (acceptanceMultiplier || 1);
@@ -374,6 +402,19 @@
             sourceIntersection: sourceIntersection || null
           };
         }
+      }
+
+      function considerPerpendicular(a, b, object, sourceIntersection, penalty) {
+        if (!basePoint || filters.perpendicular === false) return;
+        temp.d.subVectors(b, a);
+        var lengthSquared = temp.d.lengthSq();
+        if (lengthSquared < 1e-18) return;
+        var parameter = temp.e.subVectors(basePoint, a).dot(temp.d) / lengthSquared;
+        if (parameter < -1e-5 || parameter > 1.00001) return;
+        parameter = Math.max(0, Math.min(1, parameter));
+        temp.f.copy(a).addScaledVector(temp.d, parameter);
+        if (temp.f.distanceToSquared(a) < lengthSquared * 1e-8 || temp.f.distanceToSquared(b) < lengthSquared * 1e-8) return;
+        consider(temp.f, object, 'perpendicular', 'PROSTOPADLE ⟂', sourceIntersection, penalty, 1.18);
       }
 
       var distinctObjects = [];
@@ -414,6 +455,7 @@
           consider(temp.pointOnSegment, object, 'edge', 'KRAWĘDŹ', hit, penalties.meshEdge, 1.0);
           temp.midpoint.copy(a).add(b).multiplyScalar(0.5);
           consider(temp.midpoint, object, 'midpoint', 'ŚRODEK KRAWĘDZI', hit, penalties.meshMidpoint, 1.0);
+          considerPerpendicular(a, b, object, hit, penalties.perpendicular + 0.10);
         });
       });
 
@@ -442,6 +484,7 @@
           consider(temp.midpoint, object, 'midpoint', 'ŚRODEK KRAWĘDZI', hit, penalties.midpoint, 1.0);
           consider(temp.a, object, 'vertex', 'WIERZCHOŁEK / NODE', hit, penalties.vertex, 1.0);
           consider(temp.b, object, 'vertex', 'WIERZCHOŁEK / NODE', hit, penalties.vertex, 1.0);
+          considerPerpendicular(temp.a, temp.b, object, hit, penalties.perpendicular);
         }
       });
 
@@ -494,6 +537,14 @@
 
       if (!best) return null;
       delete best.score;
+      if (best.sourceIntersection && best.sourceIntersection.face && best.sourceIntersection.object) {
+        try {
+          best.normal = best.sourceIntersection.face.normal.clone();
+          best.normal.transformDirection(best.sourceIntersection.object.matrixWorld).normalize();
+        } catch (error) {
+          best.normal = null;
+        }
+      }
       return best;
     }
 
