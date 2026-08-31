@@ -6,12 +6,12 @@
   <meta name="theme-color" content="#0f172a">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — MOJA XR v14</title>
+  <title>CK-207-74-5000_VR — MOJA XR v15</title>
 
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
-  <script src="moja-config.js?v=14"></script>
+  <script src="moja-config.js?v=15"></script>
   <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.3.1/dist/model-viewer.min.js"></script>
 
   <script type="importmap">
@@ -63,7 +63,7 @@
     .pill.status.error { color: #fca5a5; }
 
     .panel {
-      position: fixed; z-index: 40; top: 66px; bottom: 92px; width: min(360px, calc(100vw - 24px));
+      position: fixed; z-index: 40; top: 66px; bottom: 154px; width: min(360px, calc(100vw - 24px));
       display: flex; flex-direction: column; overflow: hidden;
       border: 1px solid rgba(255,255,255,.12); border-radius: 20px;
       background: var(--panel); color: var(--text); box-shadow: 0 24px 70px rgba(15,23,42,.33);
@@ -129,6 +129,38 @@
     .tool.cyan { background: #0369a1; }
     .tool.violet { background: #6d28d9; }
 
+    .interaction-bar {
+      position: fixed; z-index: 52; left: 50%; bottom: 82px; transform: translateX(-50%);
+      width: min(620px, calc(100vw - 24px)); display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px;
+      padding: 7px; border: 1px solid rgba(255,255,255,.14); border-radius: 16px;
+      background: rgba(15,23,42,.92); box-shadow: 0 16px 42px rgba(15,23,42,.30); backdrop-filter: blur(16px);
+    }
+    .mode-tool {
+      min-height: 42px; border: 1px solid rgba(255,255,255,.10); border-radius: 11px;
+      background: #334155; color: #fff; cursor: pointer; font-size: 11px; font-weight: 900;
+    }
+    .mode-tool.active { background: #0369a1; border-color: #7dd3fc; box-shadow: inset 0 0 0 1px rgba(255,255,255,.16); }
+    .mode-tool.select-active { background: #6d28d9; border-color: #c4b5fd; }
+    .mode-tool.measure-active { background: #b45309; border-color: #fde68a; }
+    .mode-tool.clear { background: #475569; }
+
+    .measure-hud {
+      position: fixed; z-index: 48; top: 66px; left: 50%; transform: translateX(-50%);
+      width: min(470px, calc(100vw - 24px)); padding: 11px 13px;
+      border: 1px solid rgba(245,158,11,.55); border-radius: 16px;
+      background: rgba(15,23,42,.94); color: #fff; box-shadow: 0 18px 48px rgba(15,23,42,.28); backdrop-filter: blur(14px);
+    }
+    .measure-hud[hidden] { display: none; }
+    .measure-hud-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .measure-hud-head strong { color: #fde68a; font-size: 11px; letter-spacing: .06em; }
+    .measure-hud-head button { min-height: 28px; padding: 0 9px; border: 0; border-radius: 8px; background: #7c2d12; color: #fff; font-size: 10px; font-weight: 900; cursor: pointer; }
+    .measure-prompt { margin-top: 5px; color: #cbd5e1; font-size: 10px; }
+    .measure-grid { margin-top: 8px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .measure-cell { padding: 7px 6px; border: 1px solid rgba(148,163,184,.22); border-radius: 9px; background: rgba(30,41,59,.72); text-align: center; }
+    .measure-cell span { display: block; color: #94a3b8; font-size: 9px; font-weight: 900; }
+    .measure-cell strong { display: block; margin-top: 3px; color: #fff; font-size: 11px; }
+    #viewport[data-mode="select"] canvas, #viewport[data-mode="measure"] canvas { cursor: crosshair; }
+
     .explode-wrap { grid-column: span 2; display: grid; grid-template-columns: 62px 1fr 42px; align-items: center; gap: 8px; padding: 0 11px; border-radius: 12px; background: #1e293b; }
     .explode-wrap label { font-size: 10px; font-weight: 900; }
     .explode-wrap output { font-size: 10px; color: #fde68a; text-align: right; }
@@ -167,9 +199,15 @@
       .topbar { top: max(8px, env(safe-area-inset-top)); left: 8px; right: 8px; }
       .pill { min-height: 38px; padding: 0 11px; }
       .pill small, .pill.status span { display: none; }
-      .panel { top: 56px; left: 8px !important; right: 8px !important; bottom: 80px; width: auto; display: none; }
+      .panel { top: 56px; left: 8px !important; right: 8px !important; bottom: 132px; width: auto; display: none; }
       .panel.open { display: flex !important; }
       .toolbar { bottom: max(8px, env(safe-area-inset-bottom)); width: calc(100vw - 16px); grid-template-columns: repeat(6,1fr); gap: 5px; padding: 6px; }
+      .interaction-bar { bottom: calc(max(8px, env(safe-area-inset-bottom)) + 58px); width: calc(100vw - 16px); gap: 5px; padding: 5px; }
+      .mode-tool { min-height: 40px; font-size: 10px; }
+      .measure-hud { top: 54px; width: calc(100vw - 16px); padding: 9px 10px; }
+      .measure-grid { gap: 4px; }
+      .measure-cell { padding: 6px 3px; }
+      .measure-cell strong { font-size: 10px; }
       .tool { min-height: 48px; }
       .tool span { display: none; }
       .explode-wrap { display: none; }
@@ -185,7 +223,7 @@
 
   <div class="topbar">
     <button id="treeToggle" class="pill mobile-toggle" type="button">☰ Drzewo</button>
-    <div class="pill"><strong>CK-207-74-5000_VR</strong><small>MOJA XR v14</small></div>
+    <div class="pill"><strong>CK-207-74-5000_VR</strong><small>MOJA XR v15</small></div>
     <button id="propsToggle" class="pill mobile-toggle" type="button">iProperties</button>
     <div id="loadStatus" class="pill status"><span>Ładowanie modelu…</span></div>
   </div>
@@ -193,7 +231,7 @@
   <aside id="treePanel" class="panel">
     <div class="panel-head">
       <h2>Struktura IAM / Part Number</h2>
-      <p>Kliknij wiersz albo element modelu. Ctrl pozwala zaznaczyć kilka pozycji.</p>
+      <p>Wybierz tryb ZAZNACZ. Kliknij wiersz albo element modelu; Ctrl pozwala zaznaczyć kilka pozycji.</p>
       <input id="treeSearch" class="search" type="search" placeholder="Szukaj Part Number / Description…">
       <div class="mobile-explode">
         <div class="mobile-explode-head"><span>Rozsuń model</span><output id="explodeValueMobile">0%</output></div>
@@ -221,6 +259,27 @@
     </div>
   </aside>
 
+  <div id="measureHud" class="measure-hud" hidden>
+    <div class="measure-hud-head">
+      <strong>POMIAR 2-PUNKTOWY</strong>
+      <button id="measureClear" type="button">WYCZYŚĆ POMIAR</button>
+    </div>
+    <div id="measurePrompt" class="measure-prompt">Kliknij punkt A na modelu.</div>
+    <div class="measure-grid">
+      <div class="measure-cell"><span>L</span><strong id="measureL">—</strong></div>
+      <div class="measure-cell"><span>ΔX</span><strong id="measureX">—</strong></div>
+      <div class="measure-cell"><span>ΔY</span><strong id="measureY">—</strong></div>
+      <div class="measure-cell"><span>ΔZ</span><strong id="measureZ">—</strong></div>
+    </div>
+  </div>
+
+  <nav class="interaction-bar" aria-label="Tryb interakcji z modelem">
+    <button id="orbitMode" class="mode-tool active" type="button">OBRÓT</button>
+    <button id="selectMode" class="mode-tool" type="button">ZAZNACZ</button>
+    <button id="measureMode" class="mode-tool" type="button">POMIAR</button>
+    <button id="clearInteraction" class="mode-tool clear" type="button">WYCZYŚĆ</button>
+  </nav>
+
   <nav class="toolbar" aria-label="Narzędzia widoku">
     <button id="fitView" class="tool" type="button"><strong>Dopasuj</strong><span>cały model</span></button>
     <button id="showAllBottom" class="tool" type="button"><strong>Włącz</strong><span>wszystko</span></button>
@@ -230,15 +289,15 @@
       <output id="explodeValue">0%</output>
     </div>
     <button id="arButton" class="tool cyan" type="button"><strong>AR</strong><span>telefon</span></button>
-    <a id="mrButton" class="tool green" href="quest.html?mode=mr&v=14" style="text-decoration:none;color:#fff"><strong>MR</strong><span>Quest 3</span></a>
-    <a id="vrButton" class="tool blue" href="quest.html?mode=vr&v=14" style="text-decoration:none;color:#fff"><strong>VR</strong><span>Quest 3</span></a>
+    <a id="mrButton" class="tool green" href="quest.html?mode=mr&v=15" style="text-decoration:none;color:#fff"><strong>MR</strong><span>Quest 3</span></a>
+    <a id="vrButton" class="tool blue" href="quest.html?mode=vr&v=15" style="text-decoration:none;color:#fff"><strong>VR</strong><span>Quest 3</span></a>
     <button id="roomButton" class="tool violet" type="button"><strong>Pokój VR</strong><span>współpraca</span></button>
   </nav>
 
   <model-viewer
     id="arViewer"
-    src="CK-207-74-5000_VR.glb?v=14"
-    ios-src="CK-207-74-5000_VR.usdz?v=14"
+    src="CK-207-74-5000_VR.glb?v=15"
+    ios-src="CK-207-74-5000_VR.usdz?v=15"
     ar
     ar-modes="webxr scene-viewer quick-look"
     ar-placement="floor"
@@ -285,7 +344,7 @@
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
     const MODEL = 'CK-207-74-5000_VR';
-    const VERSION = '14';
+    const VERSION = '15';
     const viewport = document.getElementById('viewport');
     const loadStatus = document.getElementById('loadStatus');
     const treePanel = document.getElementById('treePanel');
@@ -297,6 +356,16 @@
     const explodeValue = document.getElementById('explodeValue');
     const explodeRangeMobile = document.getElementById('explodeRangeMobile');
     const explodeValueMobile = document.getElementById('explodeValueMobile');
+    const orbitModeButton = document.getElementById('orbitMode');
+    const selectModeButton = document.getElementById('selectMode');
+    const measureModeButton = document.getElementById('measureMode');
+    const clearInteractionButton = document.getElementById('clearInteraction');
+    const measureHud = document.getElementById('measureHud');
+    const measurePrompt = document.getElementById('measurePrompt');
+    const measureL = document.getElementById('measureL');
+    const measureX = document.getElementById('measureX');
+    const measureY = document.getElementById('measureY');
+    const measureZ = document.getElementById('measureZ');
 
     const state = {
       modelRoot: null,
@@ -311,7 +380,9 @@
       helpers: new Map(),
       explodable: [],
       explodeFactor: 0,
-      query: ''
+      query: '',
+      interactionMode: 'orbit',
+      measurement: { points: [null, null] }
     };
 
     const scene = new THREE.Scene();
@@ -341,6 +412,42 @@
     grid.material.transparent = true;
     grid.material.opacity = 0.28;
     scene.add(grid);
+
+    const measurementGroup = new THREE.Group();
+    measurementGroup.name = '__MOJA_MEASUREMENT__';
+    scene.add(measurementGroup);
+
+    const markerGeometry = new THREE.SphereGeometry(0.02, 20, 14);
+    const markerA = new THREE.Mesh(markerGeometry, new THREE.MeshBasicMaterial({ color: 0xf59e0b, depthTest: false, toneMapped: false }));
+    const markerB = new THREE.Mesh(markerGeometry, new THREE.MeshBasicMaterial({ color: 0xfde047, depthTest: false, toneMapped: false }));
+    markerA.renderOrder = 120; markerB.renderOrder = 120;
+    measurementGroup.add(markerA, markerB);
+
+    function createMeasureLine(color) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute([0,0,0, 0,0,0], 3));
+      const material = new THREE.LineBasicMaterial({ color, depthTest: false, transparent: true, opacity: 0.96, toneMapped: false });
+      const line = new THREE.Line(geometry, material);
+      line.frustumCulled = false; line.renderOrder = 119; measurementGroup.add(line);
+      return line;
+    }
+
+    const measureDirect = createMeasureLine(0xf59e0b);
+    const measureAxisX = createMeasureLine(0xef4444);
+    const measureAxisY = createMeasureLine(0x22c55e);
+    const measureAxisZ = createMeasureLine(0x3b82f6);
+    markerA.visible = markerB.visible = false;
+    measureDirect.visible = measureAxisX.visible = measureAxisY.visible = measureAxisZ.visible = false;
+
+    const measureWorldA = new THREE.Vector3();
+    const measureWorldB = new THREE.Vector3();
+    const measureLocalA = new THREE.Vector3();
+    const measureLocalB = new THREE.Vector3();
+    const measurePathXLocal = new THREE.Vector3();
+    const measurePathXYLocal = new THREE.Vector3();
+    const measurePathXWorld = new THREE.Vector3();
+    const measurePathXYWorld = new THREE.Vector3();
+    const measureRootScale = new THREE.Vector3(1, 1, 1);
 
     function resize() {
       const rect = viewport.getBoundingClientRect();
@@ -587,9 +694,15 @@
 
     function selectNode(index, additive) {
       if (!Number.isInteger(index) || !state.treeNodes[index]) return;
-      if (!additive) state.selected.clear();
-      if (additive && state.selected.has(index)) state.selected.delete(index);
-      else state.selected.add(index);
+      const wasOnlySelected = state.selected.size === 1 && state.selected.has(index);
+      if (!additive) {
+        state.selected.clear();
+        if (!wasOnlySelected) state.selected.add(index);
+      } else if (state.selected.has(index)) {
+        state.selected.delete(index);
+      } else {
+        state.selected.add(index);
+      }
       syncHelpers();
       renderTree();
       renderProperties();
@@ -597,6 +710,13 @@
         if (window.innerWidth <= 760) treePanel.classList.remove('open');
         propsPanel.classList.add('open');
       }
+    }
+
+    function clearSelection() {
+      state.selected.clear();
+      syncHelpers();
+      renderTree();
+      renderProperties();
     }
 
     function syncHelpers() {
@@ -744,23 +864,137 @@
       syncHelpers();
     }
 
-    const raycaster = new THREE.Raycaster();
-    const pointer = new THREE.Vector2();
-    let pointerDown = null;
-    renderer.domElement.addEventListener('pointerdown', event => {
-      pointerDown = { x: event.clientX, y: event.clientY };
-    });
-    renderer.domElement.addEventListener('pointerup', event => {
-      if (!state.modelRoot || event.button !== 0 || !pointerDown) return;
-      const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
-      pointerDown = null;
-      if (moved > 6) return;
+    function setModeButtonState() {
+      orbitModeButton.className = 'mode-tool' + (state.interactionMode === 'orbit' ? ' active' : '');
+      selectModeButton.className = 'mode-tool' + (state.interactionMode === 'select' ? ' active select-active' : '');
+      measureModeButton.className = 'mode-tool' + (state.interactionMode === 'measure' ? ' active measure-active' : '');
+      viewport.dataset.mode = state.interactionMode;
+      measureHud.hidden = state.interactionMode !== 'measure';
+    }
+
+    function setInteractionMode(mode) {
+      if (!['orbit', 'select', 'measure'].includes(mode)) return;
+      const previous = state.interactionMode;
+      state.interactionMode = mode;
+      if (previous === 'select' && mode !== 'select') clearSelection();
+      setModeButtonState();
+    }
+
+    function formatMm(valueMetres) {
+      if (!Number.isFinite(valueMetres)) return '—';
+      return Math.round(valueMetres * 1000).toLocaleString('pl-PL') + ' mm';
+    }
+
+    function formatLength(valueMetres) {
+      if (!Number.isFinite(valueMetres)) return '—';
+      return valueMetres.toLocaleString('pl-PL', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' m';
+    }
+
+    function setMeasureLine(line, start, end, visible = true) {
+      line.visible = Boolean(visible);
+      if (!visible) return;
+      const array = line.geometry.attributes.position.array;
+      array[0] = start.x; array[1] = start.y; array[2] = start.z;
+      array[3] = end.x; array[4] = end.y; array[5] = end.z;
+      line.geometry.attributes.position.needsUpdate = true;
+      line.geometry.computeBoundingSphere();
+    }
+
+    function createMeasuredPoint(hit) {
+      if (!hit?.object || !hit?.point) return null;
+      hit.object.updateMatrixWorld(true);
+      return { object: hit.object, local: hit.object.worldToLocal(hit.point.clone()) };
+    }
+
+    function resolveMeasuredPoint(stored, output) {
+      if (!stored?.object || !stored?.local) return null;
+      stored.object.updateMatrixWorld(true);
+      output.copy(stored.local);
+      stored.object.localToWorld(output);
+      return output;
+    }
+
+    function resetMeasureReadout() {
+      measureL.textContent = measureX.textContent = measureY.textContent = measureZ.textContent = '—';
+      measurePrompt.textContent = state.measurement.points[0] ? 'Punkt A gotowy. Kliknij punkt B.' : 'Kliknij punkt A na modelu.';
+    }
+
+    function clearMeasurement() {
+      state.measurement.points = [null, null];
+      markerA.visible = markerB.visible = false;
+      measureDirect.visible = measureAxisX.visible = measureAxisY.visible = measureAxisZ.visible = false;
+      resetMeasureReadout();
+    }
+
+    function addMeasurementPoint(hit) {
+      const stored = createMeasuredPoint(hit);
+      if (!stored) return;
+      if (state.measurement.points[0] && state.measurement.points[1]) clearMeasurement();
+      if (!state.measurement.points[0]) state.measurement.points[0] = stored;
+      else state.measurement.points[1] = stored;
+      updateMeasurement();
+    }
+
+    function updateMeasurement() {
+      const pointA = state.measurement.points[0];
+      const pointB = state.measurement.points[1];
+      if (!pointA || !state.modelRoot || !resolveMeasuredPoint(pointA, measureWorldA)) {
+        markerA.visible = markerB.visible = false;
+        measureDirect.visible = measureAxisX.visible = measureAxisY.visible = measureAxisZ.visible = false;
+        resetMeasureReadout();
+        return;
+      }
+
+      markerA.position.copy(measureWorldA); markerA.visible = true;
+      if (!pointB || !resolveMeasuredPoint(pointB, measureWorldB)) {
+        markerB.visible = false;
+        measureDirect.visible = measureAxisX.visible = measureAxisY.visible = measureAxisZ.visible = false;
+        resetMeasureReadout();
+        return;
+      }
+
+      markerB.position.copy(measureWorldB); markerB.visible = true;
+      state.modelRoot.updateMatrixWorld(true);
+      measureLocalA.copy(measureWorldA); state.modelRoot.worldToLocal(measureLocalA);
+      measureLocalB.copy(measureWorldB); state.modelRoot.worldToLocal(measureLocalB);
+      measurePathXLocal.set(measureLocalB.x, measureLocalA.y, measureLocalA.z);
+      measurePathXYLocal.set(measureLocalB.x, measureLocalB.y, measureLocalA.z);
+      measurePathXWorld.copy(measurePathXLocal); state.modelRoot.localToWorld(measurePathXWorld);
+      measurePathXYWorld.copy(measurePathXYLocal); state.modelRoot.localToWorld(measurePathXYWorld);
+      state.modelRoot.getWorldScale(measureRootScale);
+
+      const dx = Math.abs(measureLocalB.x - measureLocalA.x) * Math.abs(measureRootScale.x);
+      const dy = Math.abs(measureLocalB.y - measureLocalA.y) * Math.abs(measureRootScale.y);
+      const dz = Math.abs(measureLocalB.z - measureLocalA.z) * Math.abs(measureRootScale.z);
+      const length = measureWorldA.distanceTo(measureWorldB);
+
+      setMeasureLine(measureDirect, measureWorldA, measureWorldB);
+      setMeasureLine(measureAxisX, measureWorldA, measurePathXWorld, dx > 0.000001);
+      setMeasureLine(measureAxisY, measurePathXWorld, measurePathXYWorld, dy > 0.000001);
+      setMeasureLine(measureAxisZ, measurePathXYWorld, measureWorldB, dz > 0.000001);
+
+      measureL.textContent = formatLength(length);
+      measureX.textContent = formatMm(dx);
+      measureY.textContent = formatMm(dy);
+      measureZ.textContent = formatMm(dz);
+      measurePrompt.textContent = 'Wynik w układzie modelu viewera. Trzeci punkt rozpoczyna nowy pomiar.';
+    }
+
+    function clearInteraction() {
+      clearSelection();
+      clearMeasurement();
+    }
+
+    function findPointerHit(event) {
       const rect = renderer.domElement.getBoundingClientRect();
       pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
-      const hit = raycaster.intersectObjects(state.meshes.filter(mesh => mesh.visible), false)[0];
-      if (!hit) return;
+      return raycaster.intersectObjects(state.meshes.filter(mesh => mesh.visible), false)[0] || null;
+    }
+
+    function selectHit(hit, additive) {
+      if (!hit) { clearSelection(); return; }
       let current = hit.object;
       let index = -1;
       while (current) {
@@ -768,8 +1002,40 @@
         if (Number.isInteger(mapped)) { index = mapped; break; }
         current = current.parent;
       }
-      if (index >= 0) selectNode(index, event.ctrlKey || event.metaKey);
+      if (index >= 0) selectNode(index, additive);
+      else clearSelection();
+    }
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    let pointerDown = null;
+    renderer.domElement.addEventListener('pointerdown', event => {
+      pointerDown = { x: event.clientX, y: event.clientY };
     });
+    renderer.domElement.addEventListener('pointercancel', () => { pointerDown = null; });
+    renderer.domElement.addEventListener('pointerup', event => {
+      if (!state.modelRoot || event.button !== 0 || !pointerDown) return;
+      const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
+      pointerDown = null;
+      if (moved > 8 || state.interactionMode === 'orbit') return;
+      const hit = findPointerHit(event);
+      if (state.interactionMode === 'select') selectHit(hit, event.ctrlKey || event.metaKey);
+      else if (state.interactionMode === 'measure' && hit) addMeasurementPoint(hit);
+    });
+
+    orbitModeButton.addEventListener('click', () => setInteractionMode('orbit'));
+    selectModeButton.addEventListener('click', () => setInteractionMode('select'));
+    measureModeButton.addEventListener('click', () => setInteractionMode('measure'));
+    clearInteractionButton.addEventListener('click', clearInteraction);
+    document.getElementById('measureClear').addEventListener('click', clearMeasurement);
+    window.addEventListener('keydown', event => {
+      if (event.key === 'Escape') clearInteraction();
+      else if (event.key === '1') setInteractionMode('orbit');
+      else if (event.key === '2') setInteractionMode('select');
+      else if (event.key === '3') setInteractionMode('measure');
+    });
+    setModeButtonState();
+    resetMeasureReadout();
 
     searchInput.addEventListener('input', () => { state.query = searchInput.value; renderTree(); });
     document.getElementById('expandAll').addEventListener('click', () => { state.treeNodes.forEach(node => { if (node.children.length) node.expanded = true; }); renderTree(); });
@@ -808,6 +1074,7 @@
       requestAnimationFrame(animate);
       controls.update();
       state.helpers.forEach(helper => helper.updateMatrixWorld(true));
+      if (state.measurement.points[0]) updateMeasurement();
       renderer.render(scene, camera);
     }
     animate();
@@ -838,6 +1105,9 @@
       if (structure?.root) buildStructureNode(structure.root, -1, state.modelRoot, state.modelRoot, 0, true);
       else buildFallbackTree(state.modelRoot);
       finalizeTree();
+      const modelDiagonal = new THREE.Box3().setFromObject(state.modelRoot).getSize(new THREE.Vector3()).length();
+      const markerScale = THREE.MathUtils.clamp(modelDiagonal * 0.55, 0.45, 2.8);
+      markerA.scale.setScalar(markerScale); markerB.scale.setScalar(markerScale);
       fitView();
       setStatus((structure?.root ? 'Drzewo IAM' : 'Nazwy GLB') + ' • ' + state.meshes.length + ' brył', 'ok');
     }).catch(error => {
@@ -865,17 +1135,17 @@
     function safeRoom(value) { return String(value || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0,64); }
     function safeName(value) { return String(value || '').trim().slice(0,32) || 'Użytkownik'; }
 
-    userName.value = localStorage.getItem('moja-ck-207-74-5000_vr-v14-user-name') || 'Maciek';
-    guestName.value = localStorage.getItem('moja-ck-207-74-5000_vr-v14-guest-name') || 'Klient';
-    roomCode.value = localStorage.getItem('moja-ck-207-74-5000_vr-v14-room') || randomRoom();
+    userName.value = localStorage.getItem('moja-ck-207-74-5000_vr-v15-user-name') || 'Maciek';
+    guestName.value = localStorage.getItem('moja-ck-207-74-5000_vr-v15-guest-name') || 'Klient';
+    roomCode.value = localStorage.getItem('moja-ck-207-74-5000_vr-v15-room') || randomRoom();
 
     function saveRoomInputs() {
       userName.value = safeName(userName.value);
       guestName.value = safeName(guestName.value);
       roomCode.value = safeRoom(roomCode.value) || randomRoom();
-      localStorage.setItem('moja-ck-207-74-5000_vr-v14-user-name', userName.value);
-      localStorage.setItem('moja-ck-207-74-5000_vr-v14-guest-name', guestName.value);
-      localStorage.setItem('moja-ck-207-74-5000_vr-v14-room', roomCode.value);
+      localStorage.setItem('moja-ck-207-74-5000_vr-v15-user-name', userName.value);
+      localStorage.setItem('moja-ck-207-74-5000_vr-v15-guest-name', guestName.value);
+      localStorage.setItem('moja-ck-207-74-5000_vr-v15-room', roomCode.value);
     }
 
     function questUrl(mode, role) {
