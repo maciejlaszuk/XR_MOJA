@@ -6,7 +6,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — Meta Quest Viewer v21</title>
+  <title>CK-207-74-5000_VR — Meta Quest Viewer v22</title>
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
@@ -691,15 +691,16 @@
         if (!this.data.label) return;
         var plane = this.data.label.querySelector('a-plane');
         if (plane) {
-          plane.setAttribute('width', 1.42);
-          plane.setAttribute('height', 0.26);
+          plane.setAttribute('width', 1.48);
+          plane.setAttribute('height', 0.42);
           plane.setAttribute('color', '#0F172A');
           plane.setAttribute('opacity', 0.92);
           plane.setAttribute('material', 'shader: flat; transparent: true; depthTest: false; depthWrite: false');
         }
         if (this.data.labelText) {
-          this.data.labelText.setAttribute('width', 1.26);
+          this.data.labelText.setAttribute('width', 1.34);
           this.data.labelText.setAttribute('color', '#F8FAFC');
+          this.data.labelText.setAttribute('position', '0 0.125 0.006');
         }
       },
 
@@ -935,18 +936,25 @@
         var pointC = this.createElement('a-sphere', {radius: '0.0038', color: '#F97316', material: 'shader: flat; depthTest: false; depthWrite: false', visible: 'false'}, root);
         var line = this.createElement('a-entity', {line: 'start: 0 0 0; end: 0 0 0; color: #38BDF8; opacity: 1', visible: 'false'}, root);
         var line2 = this.createElement('a-entity', {line: 'start: 0 0 0; end: 0 0 0; color: #38BDF8; opacity: 1', visible: 'false'}, root);
-        var label = this.createElement('a-entity', {'look-at-camera': 'camera: #camera; yawOnly: false', scale: '0.44 0.44 0.44', visible: 'false'}, root);
-        this.createElement('a-plane', {width: '1.42', height: '0.26', color: '#0F172A', opacity: '0.92', material: 'shader: flat; transparent: true; depthTest: false; depthWrite: false'}, label);
-        var labelText = this.createElement('a-text', {value: '0 mm', align: 'center', anchor: 'center', baseline: 'center', width: '1.26', color: '#F8FAFC', position: '0 0 0.006'}, label);
-        [root, pointA, pointB, pointC, line, line2, label].forEach(this.forceOverlayElement.bind(this));
-        return {root: root, pointA: pointA, pointB: pointB, pointC: pointC, line: line, line2: line2, label: label, labelText: labelText};
+        var axisX = this.createElement('a-entity', {line: 'start: 0 0 0; end: 0 0 0; color: #EF4444; opacity: 1', visible: 'false'}, root);
+        var axisY = this.createElement('a-entity', {line: 'start: 0 0 0; end: 0 0 0; color: #22C55E; opacity: 1', visible: 'false'}, root);
+        var axisZ = this.createElement('a-entity', {line: 'start: 0 0 0; end: 0 0 0; color: #3B82F6; opacity: 1', visible: 'false'}, root);
+        var label = this.createElement('a-entity', {'look-at-camera': 'camera: #camera; yawOnly: false', scale: '0.50 0.50 0.50', visible: 'false'}, root);
+        this.createElement('a-plane', {width: '1.48', height: '0.42', color: '#0F172A', opacity: '0.92', material: 'shader: flat; transparent: true; depthTest: false; depthWrite: false'}, label);
+        var labelText = this.createElement('a-text', {value: '0 mm', align: 'center', anchor: 'center', baseline: 'center', width: '1.34', color: '#F8FAFC', position: '0 0.125 0.006'}, label);
+        var labelX = this.createElement('a-text', {value: '', align: 'center', anchor: 'center', baseline: 'center', width: '1.34', color: '#EF4444', position: '0 0.035 0.006', visible: 'false'}, label);
+        var labelY = this.createElement('a-text', {value: '', align: 'center', anchor: 'center', baseline: 'center', width: '1.34', color: '#22C55E', position: '0 -0.055 0.006', visible: 'false'}, label);
+        var labelZ = this.createElement('a-text', {value: '', align: 'center', anchor: 'center', baseline: 'center', width: '1.34', color: '#3B82F6', position: '0 -0.145 0.006', visible: 'false'}, label);
+        [root, pointA, pointB, pointC, line, line2, axisX, axisY, axisZ, label].forEach(this.forceOverlayElement.bind(this));
+        return {root: root, pointA: pointA, pointB: pointB, pointC: pointC, line: line, line2: line2, axisX: axisX, axisY: axisY, axisZ: axisZ, label: label, labelText: labelText, labelX: labelX, labelY: labelY, labelZ: labelZ};
       },
 
       hideSavedVisual: function (visual) {
         if (!visual) return;
-        ['pointA', 'pointB', 'pointC', 'line', 'line2', 'label'].forEach(function (name) {
+        ['pointA', 'pointB', 'pointC', 'line', 'line2', 'axisX', 'axisY', 'axisZ', 'label'].forEach(function (name) {
           if (visual[name] && visual[name].object3D) visual[name].object3D.visible = false;
         });
+        ['labelX','labelY','labelZ'].forEach(function(name){ if (visual[name]) visual[name].setAttribute('visible', false); });
       },
 
       setSavedMarker: function (element, position) {
@@ -966,21 +974,59 @@
 
       setSavedLabel: function (visual, position, value, color) {
         if (!visual || !visual.label || !visual.labelText) return;
+        ['labelX','labelY','labelZ'].forEach(function(name){ if (visual[name]) visual[name].setAttribute('visible', false); });
         var textValue = String(value || '');
         var lineCount = Math.max(1, textValue.split('\n').length);
         var plane = visual.label.querySelector('a-plane');
         if (plane) {
           plane.setAttribute('width', lineCount > 1 ? 1.50 : 1.42);
-          plane.setAttribute('height', lineCount > 1 ? 0.20 + lineCount * 0.125 : 0.26);
+          plane.setAttribute('height', lineCount > 1 ? 0.42 : 0.26);
         }
         visual.labelText.setAttribute('width', lineCount > 1 ? 1.34 : 1.26);
         visual.labelText.setAttribute('wrap-count', lineCount > 1 ? 24 : 28);
-        this.placeOverlayInFront(position, visual.label.object3D.position, lineCount > 1 ? 0.024 : 0.016);
-        visual.label.object3D.scale.setScalar(this.overlayScaleAt(position, lineCount > 1 ? 0.044 : 0.048, 0.26, 0.70));
+        visual.labelText.setAttribute('position', lineCount > 1 ? '0 0.125 0.006' : '0 0 0.006');
+        this.placeOverlayInFront(position, visual.label.object3D.position, lineCount > 1 ? 0.028 : 0.018);
+        visual.label.object3D.scale.setScalar(this.overlayScaleAt(position, lineCount > 1 ? 0.058 : 0.052, 0.34, 0.90));
         visual.labelText.setAttribute('value', textValue);
         visual.labelText.setAttribute('color', color || '#F8FAFC');
         visual.label.object3D.visible = true;
         this.forceOverlayElement(visual.label, 94);
+      },
+      setXYZLabel: function (labelRoot, mainText, xText, yText, zText, position) {
+        if (!labelRoot || !this.data.labelText) return;
+        var plane = labelRoot.querySelector('a-plane');
+        var main = labelRoot.querySelector('#measureLabelText') || this.data.labelText;
+        var lx = labelRoot.querySelector('#measureLabelX');
+        var ly = labelRoot.querySelector('#measureLabelY');
+        var lz = labelRoot.querySelector('#measureLabelZ');
+        if (plane) {
+          plane.setAttribute('width', 1.50);
+          plane.setAttribute('height', 0.42);
+        }
+        if (main) { main.setAttribute('value', mainText); main.setAttribute('color', '#F8FAFC'); main.setAttribute('position', '0 0.125 0.006'); }
+        if (lx) { lx.setAttribute('value', xText); lx.setAttribute('visible', true); }
+        if (ly) { ly.setAttribute('value', yText); ly.setAttribute('visible', true); }
+        if (lz) { lz.setAttribute('value', zText); lz.setAttribute('visible', true); }
+        this.placeOverlayInFront(position, labelRoot.object3D.position, 0.028);
+        labelRoot.object3D.scale.setScalar(this.overlayScaleAt(position, 0.058, 0.34, 0.90));
+        labelRoot.object3D.visible = true;
+        this.forceOverlayElement(labelRoot, 94);
+      },
+
+      setAxisLineOnly: function (visual, start, end) {
+        var length = start.distanceTo(end);
+        if (length < 0.00005) { this.hideAxisVisual(visual); return; }
+        this.setLine(visual.line, start, end, visual.color);
+        if (visual.label && visual.label.object3D) visual.label.object3D.visible = false;
+      },
+
+      setSavedAxisLine: function (element, start, end, color) {
+        if (!element) return;
+        var length = start.distanceTo(end);
+        if (length < 0.00005) { if (element.object3D) element.object3D.visible = false; return; }
+        element.setAttribute('line', {start: start, end: end, color: color, opacity: 0.98});
+        element.object3D.visible = true;
+        this.forceOverlayElement(element, 87);
       },
 
       storeMeasurementRecord: function (record) {
@@ -1039,10 +1085,14 @@
           var distance = this.worldA.distanceTo(this.worldB);
           this.midpoint.copy(this.worldA).add(this.worldB).multiplyScalar(0.5);
           this.midpoint.y += Math.max(0.030, Math.min(0.18, distance * 0.040));
-          var label = record.type === 'xyz'
-            ? 'L  ' + this.formatMm(distance, true) + '\nX  ' + this.formatMm(components.dx, false) + '\nY  ' + this.formatMm(components.dy, false) + '\nZ  ' + this.formatMm(components.dz, false)
-            : this.formatMm(distance, true);
-          this.setSavedLabel(visual, this.midpoint, label, '#F8FAFC');
+          if (record.type === 'xyz') {
+            this.setSavedAxisLine(visual.axisX, this.worldA, this.pathX, '#EF4444');
+            this.setSavedAxisLine(visual.axisY, this.pathX, this.pathXY, '#22C55E');
+            this.setSavedAxisLine(visual.axisZ, this.pathXY, this.worldB, '#3B82F6');
+            this.setXYZLabel(visual.label, 'L  ' + this.formatMm(distance, true), 'X  ' + this.formatMm(components.dx, false), 'Y  ' + this.formatMm(components.dy, false), 'Z  ' + this.formatMm(components.dz, false), this.midpoint);
+          } else {
+            this.setSavedLabel(visual, this.midpoint, this.formatMm(distance, true), '#F8FAFC');
+          }
           return;
         }
         if (record.type === 'angle') {
@@ -1340,21 +1390,26 @@
 
       setMainLabel: function (position, value, color) {
         if (!this.data.label || !this.data.labelText) return;
+        var xText = this.data.label.querySelector('#measureLabelX');
+        var yText = this.data.label.querySelector('#measureLabelY');
+        var zText = this.data.label.querySelector('#measureLabelZ');
+        if (xText) xText.setAttribute('visible', false);
+        if (yText) yText.setAttribute('visible', false);
+        if (zText) zText.setAttribute('visible', false);
         var textValue = String(value || '');
         var lineCount = Math.max(1, textValue.split('\n').length);
         var plane = this.data.label.querySelector('a-plane');
         if (plane) {
-          plane.setAttribute('width', lineCount > 1 ? 1.34 : 1.22);
-          plane.setAttribute('height', lineCount > 1 ? 0.16 + lineCount * 0.115 : 0.22);
+          plane.setAttribute('width', lineCount > 1 ? 1.48 : 1.42);
+          plane.setAttribute('height', lineCount > 1 ? 0.42 : 0.26);
         }
-        this.data.labelText.setAttribute('width', lineCount > 1 ? 1.22 : 1.12);
-        this.data.labelText.setAttribute('wrap-count', lineCount > 1 ? 25 : 30);
-        this.placeOverlayInFront(position, this.data.label.object3D.position, 0.012);
-        this.data.label.object3D.scale.setScalar(
-          this.overlayScaleAt(position, lineCount > 1 ? 0.036 : 0.040, lineCount > 1 ? 0.18 : 0.19, lineCount > 1 ? 0.50 : 0.56)
-        );
+        this.data.labelText.setAttribute('width', lineCount > 1 ? 1.34 : 1.26);
+        this.data.labelText.setAttribute('wrap-count', lineCount > 1 ? 24 : 28);
+        this.data.labelText.setAttribute('position', lineCount > 1 ? '0 0.125 0.006' : '0 0 0.006');
+        this.placeOverlayInFront(position, this.data.label.object3D.position, lineCount > 1 ? 0.028 : 0.018);
+        this.data.label.object3D.scale.setScalar(this.overlayScaleAt(position, lineCount > 1 ? 0.058 : 0.052, 0.34, 0.90));
         this.data.labelText.setAttribute('value', textValue);
-        this.data.labelText.setAttribute('color', color || '#2563EB');
+        this.data.labelText.setAttribute('color', color || '#F8FAFC');
         this.data.label.object3D.visible = true;
         this.forceOverlayElement(this.data.label, 94);
       },
@@ -1397,11 +1452,13 @@
           var components=this.calculateComponents(first,second);
           var distance=this.worldA.distanceTo(this.worldB);
           this.midpoint.copy(this.worldA).add(this.worldB).multiplyScalar(0.5); this.midpoint.y+=Math.max(0.025,Math.min(0.16,distance*0.035));
-          this.setMainLabel(this.midpoint,this.formatMm(distance,true),'#2563EB');
           if (this.mode === 'xyz') {
-            this.setAxisVisual(this.axisVisuals.x,this.worldA,this.pathX,components.dx,'x');
-            this.setAxisVisual(this.axisVisuals.y,this.pathX,this.pathXY,components.dy,'y');
-            this.setAxisVisual(this.axisVisuals.z,this.pathXY,this.worldB,components.dz,'z');
+            this.setAxisLineOnly(this.axisVisuals.x,this.worldA,this.pathX);
+            this.setAxisLineOnly(this.axisVisuals.y,this.pathX,this.pathXY);
+            this.setAxisLineOnly(this.axisVisuals.z,this.pathXY,this.worldB);
+            this.setXYZLabel(this.data.label, 'L  ' + this.formatMm(distance,true), 'X  ' + this.formatMm(components.dx,false), 'Y  ' + this.formatMm(components.dy,false), 'Z  ' + this.formatMm(components.dz,false), this.midpoint);
+          } else {
+            this.setMainLabel(this.midpoint,this.formatMm(distance,true),'#F8FAFC');
           }
           return;
         }
@@ -4071,7 +4128,7 @@
 <body>
   <div class="topbar">
     <a class="pill" href="index.html?v=20">← Viewer</a>
-    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v21</div>
+    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v22</div>
     <button id="enterXR" class="pill enter" type="button">ENTER VR</button>
   </div>
 
@@ -4079,7 +4136,7 @@
 
   <div id="landing" class="landing">
     <div class="card">
-      <div id="landingVersion" class="version">META QUEST 3 • v21</div>
+      <div id="landingVersion" class="version">META QUEST 3 • v22</div>
       <h1 id="landingTitle">CK-207-74-5000_VR — Virtual Reality</h1>
       <p id="landingDescription">Model jest zakotwiczony w skali 1:1. Poruszasz się użytkownikiem, stawiasz trwałe wymiary i zarządzasz widocznością komponentów.</p>
 
@@ -4206,8 +4263,11 @@
     <a-entity id="measureLine" line="start: 0 0 0; end: 0 0 0; color: #2563EB; opacity: 1" visible="false"></a-entity>
     <a-entity id="measureLine2" line="start: 0 0 0; end: 0 0 0; color: #2563EB; opacity: 1" visible="false"></a-entity>
     <a-entity id="measureLabel" look-at-camera="camera: #camera; yawOnly: false" scale="0.42 0.42 0.42" visible="false">
-      <a-plane width="1.22" height="0.22" color="#F8FAFC" opacity="0.96" material="shader: flat; transparent: true; depthWrite: false"></a-plane>
-      <a-text id="measureLabelText" value="0 mm" align="center" anchor="center" baseline="center" width="1.26" color="#F8FAFC" position="0 0 0.006"></a-text>
+      <a-plane width="1.48" height="0.42" color="#0F172A" opacity="0.92" material="shader: flat; transparent: true; depthTest: false; depthWrite: false"></a-plane>
+      <a-text id="measureLabelText" value="0 mm" align="center" anchor="center" baseline="center" width="1.34" color="#F8FAFC" position="0 0.125 0.006"></a-text>
+      <a-text id="measureLabelX" value="" align="center" anchor="center" baseline="center" width="1.34" color="#EF4444" position="0 0.035 0.006" visible="false"></a-text>
+      <a-text id="measureLabelY" value="" align="center" anchor="center" baseline="center" width="1.34" color="#22C55E" position="0 -0.055 0.006" visible="false"></a-text>
+      <a-text id="measureLabelZ" value="" align="center" anchor="center" baseline="center" width="1.34" color="#3B82F6" position="0 -0.145 0.006" visible="false"></a-text>
     </a-entity>
     <a-entity id="measureSnapLabel" look-at-camera="camera: #camera; yawOnly: false" scale="0.28 0.28 0.28" visible="false">
       <a-plane width="0.88" height="0.15" color="#FFFFFF" opacity="0.97" material="shader: flat; transparent: true; depthWrite: false"></a-plane>
@@ -4234,7 +4294,7 @@
           <a-plane id="measureBtnPoint" class="measure-ui ui-click" width="0.40" height="0.105" color="#075985" position="0.22 0.125 0.012" material="shader: flat" viewer-button="action: measure-point"><a-text value="PUNKT XYZ" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane id="measureBtnArea" class="measure-ui ui-click" width="0.84" height="0.105" color="#075985" position="0 0.0 0.012" material="shader: flat" viewer-button="action: measure-area"><a-text value="POWIERZCHNIA" align="center" width="0.76" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane id="measureBtnMin" class="measure-ui ui-click" width="0.84" height="0.105" color="#075985" position="0 -0.125 0.012" material="shader: flat" viewer-button="action: measure-min"><a-text value="MIN. DYSTANS PART–PART" align="center" width="0.76" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
-          <a-plane id="measureBtnSnap" class="measure-ui ui-click" width="0.40" height="0.105" color="#0F766E" position="-0.22 -0.25 0.012" material="shader: flat" viewer-button="action: measure-snap"><a-text id="measureBtnSnapText" value="SNAP: AUTO" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane id="measureBtnSnap" class="measure-ui ui-click" width="0.40" height="0.105" color="#0F766E" position="-0.22 -0.25 0.012" material="shader: flat" viewer-button="action: measure-snap" visible="false"><a-text id="measureBtnSnapText" value="SNAP: AUTO" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane id="measureBtnCompute" class="measure-ui ui-click" width="0.40" height="0.105" color="#334155" position="0.22 -0.25 0.012" material="shader: flat" viewer-button="action: measure-calc"><a-text value="OBLICZ MIN." align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane class="measure-ui ui-click" width="0.40" height="0.105" color="#7C2D12" position="-0.22 -0.375 0.012" material="shader: flat" viewer-button="action: measure-clear"><a-text value="WYCZYŚĆ" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane class="measure-ui ui-click" width="0.40" height="0.105" color="#334155" position="0.22 -0.375 0.012" material="shader: flat" viewer-button="action: measure-close"><a-text value="ZAMKNIJ" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
@@ -4521,11 +4581,11 @@
       }
 
       if (mode === 'mr') {
-        document.title = 'CK-207-74-5000_VR — Meta Quest MR v21';
-        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v21';
+        document.title = 'CK-207-74-5000_VR — Meta Quest MR v22';
+        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v22';
         enterXR.textContent = 'ENTER MR';
         enterXR.classList.add('mr');
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v21';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v22';
         landingVersion.classList.add('mr');
         landingTitle.textContent = 'CK-207-74-5000_VR — Mixed Reality';
         landingDescription.textContent = 'Postaw model w pokoju, ustaw dokładną skalę, przesuń go i obróć wokół osi pionowej gestem dwóch gripów.';
@@ -4550,10 +4610,10 @@
           'Trigger: przytrzymaj — widoczny celownik • puść — akcja'
         ], legend);
       } else {
-        document.title = 'CK-207-74-5000_VR — Meta Quest VR v21';
-        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v21';
+        document.title = 'CK-207-74-5000_VR — Meta Quest VR v22';
+        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v22';
         enterXR.textContent = 'ENTER VR';
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v21';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v22';
         landingTitle.textContent = 'CK-207-74-5000_VR — Virtual Reality';
         landingDescription.textContent = 'Model pozostaje zakotwiczony w skali 1:1. Chodzisz, obracasz użytkownika, teleportujesz się, mierzysz i izolujesz komponenty.';
         landingEnter.textContent = 'ENTER VR — QUEST 3';
