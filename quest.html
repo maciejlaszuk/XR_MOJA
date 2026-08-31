@@ -6,7 +6,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — Meta Quest Viewer v17</title>
+  <title>CK-207-74-5000_VR — Meta Quest Viewer v18</title>
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
@@ -25,8 +25,8 @@
     })();
   </script>
   <script src="https://aframe.io/releases/1.8.0/aframe.min.js"></script>
-  <script src="moja-snap.js?v=17"></script>
-  <script src="moja-measure.js?v=17"></script>
+  <script src="moja-snap.js?v=18"></script>
+  <script src="moja-measure.js?v=18"></script>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
@@ -400,11 +400,12 @@
         objects: {default: '.ray-target'},
         marker: {type: 'selector'},
         color: {type: 'color', default: '#38BDF8'},
-        far: {type: 'number', default: 50}
+        far: {type: 'number', default: 250}
       },
       init: function () {
         this.active = false;
         this.currentIntersection = null;
+        this.currentIntersections = [];
         this.onTriggerDown = this.setActive.bind(this, true);
         this.onTriggerUp = this.handleTriggerUp.bind(this);
         this.configure = this.configure.bind(this);
@@ -431,7 +432,7 @@
       },
       setActive: function (active) {
         this.active = active;
-        this.el.setAttribute('raycaster', 'showLine', false);
+        this.el.setAttribute('raycaster', 'showLine', Boolean(active));
         if (!active && this.data.marker) this.data.marker.object3D.visible = false;
       },
       setColor: function (color) {
@@ -457,7 +458,8 @@
       tick: function () {
         var raycaster = this.el.components.raycaster;
         var intersections = raycaster && raycaster.intersections;
-        this.currentIntersection = intersections && intersections.length ? intersections[0] : null;
+        this.currentIntersections = intersections && intersections.length ? intersections.slice(0, 32) : [];
+        this.currentIntersection = this.currentIntersections.length ? this.currentIntersections[0] : null;
         if (!this.active || !this.data.marker) return;
         if (!this.currentIntersection) {
           this.data.marker.object3D.visible = false;
@@ -514,7 +516,6 @@
         this.localPathX = new THREE.Vector3();
         this.localPathXY = new THREE.Vector3();
         this.targetScale = new THREE.Vector3(1, 1, 1);
-        this.controllerWorld = new THREE.Vector3();
         this.coordinate = new THREE.Vector3();
         this.arcAxis = new THREE.Vector3();
         this.arcVector = new THREE.Vector3();
@@ -600,7 +601,7 @@
 
       getModeLabel: function () {
         return ({
-          distance: 'DYSTANS', xyz: 'XYZ', angle: 'KĄT', point: 'PUNKT XYZ', laser: 'LASER', area: 'POWIERZCHNIA', 'min-distance': 'MIN. PART–PART'
+          distance: 'DYSTANS', xyz: 'XYZ', angle: 'KĄT', point: 'PUNKT XYZ', area: 'POWIERZCHNIA', 'min-distance': 'MIN. PART–PART'
         })[this.mode] || 'POMIAR';
       },
 
@@ -670,7 +671,6 @@
           if (this.mode === 'distance' || this.mode === 'xyz') line2 = this.points.length === 0 ? 'TRIGGER: A' : (this.points.length === 1 ? 'CELUJ: B — PODGLĄD LIVE • TRIGGER: ZAPISZ' : 'GOTOWE');
           else if (this.mode === 'angle') line2 = ['TRIGGER: A', 'TRIGGER: WIERZCHOŁEK', 'CELUJ: B — PODGLĄD LIVE • TRIGGER: ZAPISZ', 'GOTOWE'][Math.min(this.points.length, 3)];
           else if (this.mode === 'point') line2 = 'TRIGGER: WSPÓŁRZĘDNE PUNKTU';
-          else if (this.mode === 'laser') line2 = 'CELUJ: PODGLĄD LIVE • TRIGGER: PRZYPNIJ';
           else if (this.mode === 'area') line2 = 'TRIGGER: POWIERZCHNIA SIATKI';
           else if (this.mode === 'min-distance') line2 = this.busy ? 'OBLICZANIE…' : 'ZAZNACZ 2 CZĘŚCI → OBLICZ';
           this.data.status.setAttribute('value', line1 + '\n' + line2);
@@ -678,7 +678,7 @@
 
         var modeButtons = {
           distance: 'measureBtnDistance', xyz: 'measureBtnXYZ', angle: 'measureBtnAngle',
-          point: 'measureBtnPoint', laser: 'measureBtnLaser', area: 'measureBtnArea',
+          point: 'measureBtnPoint', area: 'measureBtnArea',
           'min-distance': 'measureBtnMin'
         };
         Object.keys(modeButtons).forEach(function (mode) {
@@ -698,7 +698,7 @@
       },
 
       setMode: function (mode) {
-        if (['distance','xyz','angle','point','laser','area','min-distance'].indexOf(mode) < 0) return;
+        if (['distance','xyz','angle','point','area','min-distance'].indexOf(mode) < 0) return;
         this.mode = mode;
         this.clear();
         this.updatePanel();
@@ -810,7 +810,7 @@
         } else if (this.mode === 'angle') {
           if (this.points.length >= 3) this.points = [];
           this.points.push(point);
-        } else if (this.mode === 'point' || this.mode === 'laser') {
+        } else if (this.mode === 'point') {
           this.points = [point];
         } else if (this.mode === 'area') {
           var surface = this.measureEngine && this.measureEngine.surfacePatchFromIntersection(point.sourceIntersection, {smoothAngleDeg:14});
@@ -1041,18 +1041,6 @@
           return;
         }
 
-        if (this.mode === 'laser') {
-          var laserPoint=points[0] || preview;
-          if (!laserPoint || !this.resolvePoint(laserPoint,this.worldA) || !this.data.right) return;
-          this.data.right.object3D.getWorldPosition(this.controllerWorld);
-          if (this.data.pointA) {this.data.pointA.object3D.position.copy(this.worldA);this.data.pointA.object3D.visible=true;}
-          this.setLine(this.data.line,this.controllerWorld,this.worldA,'#2563EB');
-          var laserDistance=this.controllerWorld.distanceTo(this.worldA);
-          this.midpoint.copy(this.controllerWorld).add(this.worldA).multiplyScalar(0.5);
-          this.setMainLabel(this.midpoint,this.formatMm(laserDistance,true),'#2563EB');
-          return;
-        }
-
         if (this.mode === 'area' && this.result && this.result.type === 'area') {
           if (!this.resolvePoint(this.result.storedCentroid,this.worldA)) return;
           if (this.data.pointA) {this.data.pointA.object3D.position.copy(this.worldA);this.data.pointA.object3D.visible=true;}
@@ -1077,7 +1065,6 @@
         else if (action === 'measure-xyz') this.setMode('xyz');
         else if (action === 'measure-angle') this.setMode('angle');
         else if (action === 'measure-point') this.setMode('point');
-        else if (action === 'measure-laser') this.setMode('laser');
         else if (action === 'measure-area') this.setMode('area');
         else if (action === 'measure-min') this.setMode('min-distance');
         else if (action === 'measure-snap') this.toggleSnap();
@@ -3280,13 +3267,13 @@
           var measurement = this.getMeasurement();
           var measureName = measurement && measurement.getModeLabel ? measurement.getModeLabel() : 'POMIAR';
           var snapState = measurement && measurement.snapEnabled === false ? 'SNAP OFF' : 'SNAP ON';
-          this.modeText.setAttribute('value', measureName + '  •  ' + snapState + '  •  CELUJ: PODGLĄD LIVE  •  TRIGGER: ZAPISZ  •  Y: PANEL  •  X: KOMPONENTY');
+          this.modeText.setAttribute('value', measureName + '  •  ' + snapState + '  •  PRZYTRZYMAJ TRIGGER: CELUJ  •  PUŚĆ: ZAPISZ  •  Y: PANEL');
           this.modeText.setAttribute('color', '#FBBF24');
         } else if (this.interactionMode === 'select') {
-          this.modeText.setAttribute('value', 'DRZEWO  •  TRIGGER: WYBIERZ  •  Y: PANEL  •  PRAWY JOYSTICK: PRZEWIJAJ  •  +/−: ROZWIŃ');
+          this.modeText.setAttribute('value', 'DRZEWO  •  PRZYTRZYMAJ TRIGGER: CELUJ  •  PUŚĆ: WYBIERZ  •  Y: PANEL  •  PRAWY JOYSTICK: PRZEWIJAJ');
           this.modeText.setAttribute('color', '#C4B5FD');
         } else if (this.interactionMode === 'annotate') {
-          this.modeText.setAttribute('value', 'ADNOTACJE 3D  •  RYSUJ: TRZYMAJ TRIGGER  •  TEKST: PUŚĆ TRIGGER W PUNKCIE WSKAŹNIKA  •  Y: PANEL');
+          this.modeText.setAttribute('value', 'ADNOTACJE 3D  •  WIDOCZNY CELOWNIK: TRZYMAJ TRIGGER  •  TEKST: PUŚĆ W PUNKCIE  •  Y: PANEL');
           this.modeText.setAttribute('color', '#F9A8D4');
         } else if (this.modeType === 'mr') {
           this.modeText.setAttribute(
@@ -3297,7 +3284,7 @@
           );
           this.modeText.setAttribute('color', '#D1FAE5');
         } else {
-          this.modeText.setAttribute('value', 'NAWIGACJA  •  L: RUCH  •  R: OBRÓT  •  B: GÓRA  •  A: DÓŁ  •  TRIGGER: TELEPORT');
+          this.modeText.setAttribute('value', 'NAWIGACJA  •  L: RUCH  •  R: OBRÓT  •  B: GÓRA  •  A: DÓŁ  •  PRZYTRZYMAJ TRIGGER: CELUJ  •  PUŚĆ: TELEPORT');
           this.modeText.setAttribute('color', '#E0F2FE');
         }
       },
@@ -3312,45 +3299,75 @@
       },
       onRaySelect: function (event) {
         if (!this.ready) return;
-        var intersection = event.detail && event.detail.intersection;
+
+        var detail = event.detail || {};
+        var allIntersections = Array.isArray(detail.intersections)
+          ? detail.intersections
+          : (detail.intersection ? [detail.intersection] : []);
+        var intersection = detail.intersection || (allIntersections.length ? allIntersections[0] : null);
+
         if (!intersection) {
-          if (this.interactionMode === 'measure' && event.detail && event.detail.ray) {
-            this.getMeasurement().addIntersection(null, event.detail.ray, []);
+          if (this.interactionMode === 'measure' && detail.ray) {
+            this.getMeasurement().addIntersection(null, detail.ray, []);
           }
           return;
         }
+
+        // Przycisk panelu ma pierwszeństwo, ale tylko gdy jest pierwszym trafieniem promienia.
         var targetEl = MOJA.getInteractiveEl(intersection);
         if (targetEl && targetEl.classList && targetEl.classList.contains('ui-click')) {
           targetEl.emit('click', {intersection: intersection}, false);
           return;
         }
+
         if (this.modeType === 'mr' && !this.placed) return;
+
         if (this.interactionMode === 'measure') {
-          var allIntersections = event.detail && Array.isArray(event.detail.intersections)
-            ? event.detail.intersections
-            : [intersection];
           var measureIntersections = allIntersections.filter(function (candidate) {
             var candidateEl = MOJA.getInteractiveEl(candidate);
             return candidateEl && candidateEl.classList && candidateEl.classList.contains('measure-target');
           });
           this.getMeasurement().addIntersection(
             measureIntersections.length ? measureIntersections[0] : null,
-            event.detail && event.detail.ray,
+            detail.ray,
             measureIntersections
           );
           return;
         }
+
         if (this.interactionMode === 'select') {
           var selection = this.getSelection();
           if (selection) selection.selectIntersection(intersection);
           return;
         }
+
         if (this.interactionMode === 'annotate') return;
-        if (this.modeType === 'vr' && this.isValidTeleport(intersection)) this.teleportTo(intersection.point);
+
+        if (this.modeType === 'vr') {
+          var teleportIntersection = this.findTeleportIntersection(allIntersections);
+          if (teleportIntersection) this.teleportTo(teleportIntersection.point);
+        }
+      },
+      findTeleportIntersection: function (intersections) {
+        var list = Array.isArray(intersections) ? intersections : [];
+
+        for (var index = 0; index < list.length; index += 1) {
+          var candidate = list[index];
+          var targetEl = MOJA.getInteractiveEl(candidate);
+
+          // Panel lub pierwsza trafiona powierzchnia modelu blokuje teleport "na wylot".
+          if (targetEl && targetEl.classList && targetEl.classList.contains('ui-click')) return null;
+          if (targetEl && targetEl.classList && targetEl.classList.contains('teleportable')) {
+            return this.isValidTeleport(candidate) ? candidate : null;
+          }
+        }
+
+        return null;
       },
       isValidTeleport: function (intersection) {
+        if (!intersection || !intersection.point) return false;
         var targetEl = MOJA.getInteractiveEl(intersection);
-        if (!targetEl || !targetEl.classList.contains('teleportable')) return false;
+        if (!targetEl || !targetEl.classList || !targetEl.classList.contains('teleportable')) return false;
         return MOJA.intersectionNormalY(intersection) >= 0.48;
       },
       teleportTo: function (point) {
@@ -3366,17 +3383,24 @@
           if (this.teleportMarker) this.teleportMarker.object3D.visible = false;
           return;
         }
+
         var triggerRay = this.right.components['trigger-ray'];
-        if (!triggerRay || !triggerRay.active || !triggerRay.currentIntersection) {
+        if (!triggerRay || !triggerRay.active) {
           this.teleportMarker.object3D.visible = false;
           return;
         }
-        var intersection = triggerRay.currentIntersection;
-        if (!this.isValidTeleport(intersection)) {
+
+        var intersections = triggerRay.currentIntersections && triggerRay.currentIntersections.length
+          ? triggerRay.currentIntersections
+          : (triggerRay.currentIntersection ? [triggerRay.currentIntersection] : []);
+        var intersection = this.findTeleportIntersection(intersections);
+
+        if (!intersection) {
           this.teleportMarker.object3D.visible = false;
           triggerRay.setColor('#FB7185');
           return;
         }
+
         triggerRay.setColor('#38BDF8');
         this.teleportMarker.object3D.position.copy(intersection.point);
         this.teleportMarker.object3D.position.y += 0.018;
@@ -3658,8 +3682,8 @@
 </head>
 <body>
   <div class="topbar">
-    <a class="pill" href="index.html?v=17">← Viewer</a>
-    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v17</div>
+    <a class="pill" href="index.html?v=18">← Viewer</a>
+    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v18</div>
     <button id="enterXR" class="pill enter" type="button">ENTER VR</button>
   </div>
 
@@ -3667,7 +3691,7 @@
 
   <div id="landing" class="landing">
     <div class="card">
-      <div id="landingVersion" class="version">META QUEST 3 • v17</div>
+      <div id="landingVersion" class="version">META QUEST 3 • v18</div>
       <h1 id="landingTitle">CK-207-74-5000_VR — Virtual Reality</h1>
       <p id="landingDescription">Model jest zakotwiczony w skali 1:1. Poruszasz się użytkownikiem, mierzysz i zarządzasz widocznością komponentów.</p>
 
@@ -3691,7 +3715,7 @@
 
       <div id="landingControls" class="controls"></div>
       <div class="actions">
-        <a class="button" href="index.html?v=17">← Wróć</a>
+        <a class="button" href="index.html?v=18">← Wróć</a>
         <button id="landingEnter" class="button primary" type="button">ENTER VR — QUEST 3</button>
       </div>
       <div id="landingNote" class="note">Subtelne krawędzie, oświetlenie modelu 360° i brak ciężkich map cieni.</div>
@@ -3701,14 +3725,14 @@
   <a-scene
     id="scene"
     quest-viewer="pivot: #modelPivot; asset: #modelAsset; rig: #rig; camera: #camera; left: #leftHand; right: #rightHand; floor: #floor; grid: #metricGrid; reticle: #placementReticle; info: #modelInfo; infoText: #modelInfoText; modeText: #modeText; teleportMarker: #teleportMarker; scalePanel: #scalePanel; scaleValueText: #scaleValueText; scaleKnob: #scaleKnob; componentPanel: #componentPanel; freeGrabButton: #freeGrabButton; freeGrabButtonText: #freeGrabButtonText"
-    component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; scrollTrack: #componentScrollTrack; scrollThumb: #componentScrollThumb; structureUrl: CK-207-74-5000_VR.structure.json?v=17; rows: 8"
+    component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; scrollTrack: #componentScrollTrack; scrollThumb: #componentScrollThumb; structureUrl: CK-207-74-5000_VR.structure.json?v=18; rows: 8"
     lighting-control="ambient: #ambientLight; front: #lightFront; back: #lightBack; left: #lightLeft; right: #lightRight; top: #lightTop; bottom: #lightBottom; panel: #lightingPanel; valueText: #lightingValueText; detailText: #lightingDetailText; storageKey: moja-ck-207-74-5000_vr-mr-scale-lighting360"
     annotation-control="pivot: #modelPivot; root: #annotationRoot; camera: #camera; right: #rightHand; panel: #annotationPanel; keyboard: #annotationKeyboard; preview: #annotationTextPreview; status: #annotationStatus"
     measurement-tool="target: #modelPivot; right: #rightHand; pointA: #measurePointA; pointB: #measurePointB; pointC: #measurePointC; line: #measureLine; line2: #measureLine2; label: #measureLabel; labelText: #measureLabelText; snapLabel: #measureSnapLabel; snapLabelText: #measureSnapLabelText; panel: #measurePanel; status: #measurePanelStatus; color: #2563EB"
     loading-screen="backgroundColor: #0B1220; dotsColor: #60A5FA">
 
     <a-assets timeout="120000">
-      <a-asset-item id="modelSource" src="CK-207-74-5000_VR.glb?v=17"></a-asset-item>
+      <a-asset-item id="modelSource" src="CK-207-74-5000_VR.glb?v=18"></a-asset-item>
     </a-assets>
     <!-- OŚWIETLENIE MODELU 360° — bez map cieni -->
     <a-entity id="ambientLight"
@@ -3751,8 +3775,8 @@
       class="ray-target teleportable measure-target"
       position="0 -0.012 0"
       rotation="-90 0 0"
-      width="120"
-      height="120"
+      width="500"
+      height="500"
       color="#E1E7ED">
     </a-plane>
     <a-entity id="metricGrid" metric-grid="size: 20; divisions: 20; opacity: 0.15"></a-entity>
@@ -3782,7 +3806,7 @@
       <a-text id="modelInfoText" value="SKALA 100% • 1:1" align="center" anchor="center" baseline="center" width="1.58" color="#F8FAFC" position="0 0 0.006"></a-text>
     </a-entity>
 
-    <a-sphere id="pointerDot" radius="0.006" color="#38BDF8" material="shader: flat" visible="false"></a-sphere>
+    <a-sphere id="pointerDot" radius="0.017" color="#38BDF8" material="shader: flat; depthTest: false; depthWrite: false" visible="false"></a-sphere>
     <a-torus id="teleportMarker" radius="0.14" radius-tubular="0.008" rotation="-90 0 0" color="#34D399" material="shader: flat" visible="false"></a-torus>
 
     <a-sphere id="measurePointA" radius="0.006" color="#FFFFFF" material="shader: flat; depthTest: false" visible="false"></a-sphere>
@@ -3817,8 +3841,7 @@
           <a-plane id="measureBtnXYZ" class="measure-ui ui-click" width="0.40" height="0.105" color="#075985" position="0.22 0.25 0.012" material="shader: flat" viewer-button="action: measure-xyz"><a-text value="XYZ" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane id="measureBtnAngle" class="measure-ui ui-click" width="0.40" height="0.105" color="#075985" position="-0.22 0.125 0.012" material="shader: flat" viewer-button="action: measure-angle"><a-text value="KĄT" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane id="measureBtnPoint" class="measure-ui ui-click" width="0.40" height="0.105" color="#075985" position="0.22 0.125 0.012" material="shader: flat" viewer-button="action: measure-point"><a-text value="PUNKT XYZ" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
-          <a-plane id="measureBtnLaser" class="measure-ui ui-click" width="0.40" height="0.105" color="#075985" position="-0.22 0.0 0.012" material="shader: flat" viewer-button="action: measure-laser"><a-text value="LASER" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
-          <a-plane id="measureBtnArea" class="measure-ui ui-click" width="0.40" height="0.105" color="#075985" position="0.22 0.0 0.012" material="shader: flat" viewer-button="action: measure-area"><a-text value="POWIERZCHNIA" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane id="measureBtnArea" class="measure-ui ui-click" width="0.84" height="0.105" color="#075985" position="0 0.0 0.012" material="shader: flat" viewer-button="action: measure-area"><a-text value="POWIERZCHNIA" align="center" width="0.76" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane id="measureBtnMin" class="measure-ui ui-click" width="0.84" height="0.105" color="#075985" position="0 -0.125 0.012" material="shader: flat" viewer-button="action: measure-min"><a-text value="MIN. DYSTANS PART–PART" align="center" width="0.76" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane id="measureBtnSnap" class="measure-ui ui-click" width="0.40" height="0.105" color="#0F766E" position="-0.22 -0.25 0.012" material="shader: flat" viewer-button="action: measure-snap"><a-text id="measureBtnSnapText" value="SNAP: ON" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane id="measureBtnCompute" class="measure-ui ui-click" width="0.40" height="0.105" color="#334155" position="0.22 -0.25 0.012" material="shader: flat" viewer-button="action: measure-calc"><a-text value="OBLICZ MIN." align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
@@ -4072,8 +4095,8 @@
       <a-entity
         id="rightHand"
         meta-touch-controls="hand: right"
-        raycaster="objects: .ray-target; far: 50; showLine: false; lineColor: #38BDF8; lineOpacity: 0.95"
-        trigger-ray="objects: .ray-target; marker: #pointerDot; color: #38BDF8; far: 50">
+        raycaster="objects: .ray-target; far: 250; showLine: false; lineColor: #38BDF8; lineOpacity: 0.95"
+        trigger-ray="objects: .ray-target; marker: #pointerDot; color: #38BDF8; far: 250">
       </a-entity>
     </a-entity>
   </a-scene>
@@ -4107,11 +4130,11 @@
       }
 
       if (mode === 'mr') {
-        document.title = 'CK-207-74-5000_VR — Meta Quest MR v17';
-        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v17';
+        document.title = 'CK-207-74-5000_VR — Meta Quest MR v18';
+        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v18';
         enterXR.textContent = 'ENTER MR';
         enterXR.classList.add('mr');
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v17';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v18';
         landingVersion.classList.add('mr');
         landingTitle.textContent = 'CK-207-74-5000_VR — Mixed Reality';
         landingDescription.textContent = 'Postaw model w pokoju, ustaw dokładną skalę, przesuń go i obróć wokół osi pionowej gestem dwóch gripów.';
@@ -4133,13 +4156,13 @@
           'B: góra  •  A: dół',
           'X: tryb',
           'Y: panel',
-          'Trigger: wskaźnik punktowy'
+          'Trigger: przytrzymaj — widoczny celownik • puść — akcja'
         ], legend);
       } else {
-        document.title = 'CK-207-74-5000_VR — Meta Quest VR v17';
-        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v17';
+        document.title = 'CK-207-74-5000_VR — Meta Quest VR v18';
+        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v18';
         enterXR.textContent = 'ENTER VR';
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v17';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v18';
         landingTitle.textContent = 'CK-207-74-5000_VR — Virtual Reality';
         landingDescription.textContent = 'Model pozostaje zakotwiczony w skali 1:1. Chodzisz, obracasz użytkownika, teleportujesz się, mierzysz i izolujesz komponenty.';
         landingEnter.textContent = 'ENTER VR — QUEST 3';
@@ -4148,7 +4171,7 @@
           'L joystick: chodzenie',
           'R joystick: obrót użytkownika',
           'B: góra  •  A: dół',
-          'Trigger: teleport / punkt  •  SNAP AUTO w pomiarze',
+          'Trigger: przytrzymaj — widoczny celownik • puść — teleport / punkt',
           'X: nawigacja → pomiar → komponenty → adnotacje',
           'Y: wyczyść / panel'
         ], landingControls);
@@ -4156,7 +4179,7 @@
           'L: chodzenie',
           'R: obrót użytkownika',
           'B: góra  •  A: dół',
-          'Trigger: teleport',
+          'Trigger: celownik / teleport',
           'X: tryb',
           'Y: panel'
         ], legend);
