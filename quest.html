@@ -6,7 +6,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — Meta Quest Viewer v19</title>
+  <title>CK-207-74-5000_VR — Meta Quest Viewer v20</title>
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
@@ -25,8 +25,8 @@
     })();
   </script>
   <script src="https://aframe.io/releases/1.8.0/aframe.min.js"></script>
-  <script src="moja-snap.js?v=19"></script>
-  <script src="moja-measure.js?v=19"></script>
+  <script src="moja-snap.js?v=20"></script>
+  <script src="moja-measure.js?v=20"></script>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
@@ -601,6 +601,7 @@
         this.previewIntersection = null;
         this.result = null;
         this.busy = false;
+        this.savedMeasurements = [];
         this.computeToken = 0;
         this.worldA = new THREE.Vector3();
         this.worldB = new THREE.Vector3();
@@ -689,15 +690,15 @@
         if (!this.data.label) return;
         var plane = this.data.label.querySelector('a-plane');
         if (plane) {
-          plane.setAttribute('width', 1.22);
-          plane.setAttribute('height', 0.22);
-          plane.setAttribute('color', '#F8FAFC');
-          plane.setAttribute('opacity', 0.98);
+          plane.setAttribute('width', 1.42);
+          plane.setAttribute('height', 0.26);
+          plane.setAttribute('color', '#0F172A');
+          plane.setAttribute('opacity', 0.92);
           plane.setAttribute('material', 'shader: flat; transparent: true; depthTest: false; depthWrite: false');
         }
         if (this.data.labelText) {
-          this.data.labelText.setAttribute('width', 1.12);
-          this.data.labelText.setAttribute('color', '#2563EB');
+          this.data.labelText.setAttribute('width', 1.26);
+          this.data.labelText.setAttribute('color', '#F8FAFC');
         }
       },
 
@@ -908,6 +909,175 @@
         this.updatePanel();
       },
 
+      cloneStoredPoint: function (stored) {
+        if (!stored) return null;
+        return {
+          space: stored.space,
+          value: stored.value && stored.value.clone ? stored.value.clone() : stored.value,
+          snapKind: stored.snapKind || 'surface',
+          snapLabel: stored.snapLabel || '',
+          object: stored.object || null
+        };
+      },
+
+      hasSavedMeasurements: function () {
+        return this.savedMeasurements.length > 0;
+      },
+
+      hasWorkInProgress: function () {
+        return this.points.length > 0 || Boolean(this.preview || this.result);
+      },
+
+      createSavedVisual: function () {
+        var root = this.createElement('a-entity', {visible: 'true'});
+        var pointA = this.createElement('a-sphere', {radius: '0.0038', color: '#F8FAFC', material: 'shader: flat; depthTest: false; depthWrite: false', visible: 'false'}, root);
+        var pointB = this.createElement('a-sphere', {radius: '0.0038', color: '#38BDF8', material: 'shader: flat; depthTest: false; depthWrite: false', visible: 'false'}, root);
+        var pointC = this.createElement('a-sphere', {radius: '0.0038', color: '#F97316', material: 'shader: flat; depthTest: false; depthWrite: false', visible: 'false'}, root);
+        var line = this.createElement('a-entity', {line: 'start: 0 0 0; end: 0 0 0; color: #38BDF8; opacity: 1', visible: 'false'}, root);
+        var line2 = this.createElement('a-entity', {line: 'start: 0 0 0; end: 0 0 0; color: #38BDF8; opacity: 1', visible: 'false'}, root);
+        var label = this.createElement('a-entity', {'look-at-camera': 'camera: #camera; yawOnly: false', scale: '0.44 0.44 0.44', visible: 'false'}, root);
+        this.createElement('a-plane', {width: '1.42', height: '0.26', color: '#0F172A', opacity: '0.92', material: 'shader: flat; transparent: true; depthTest: false; depthWrite: false'}, label);
+        var labelText = this.createElement('a-text', {value: '0 mm', align: 'center', anchor: 'center', baseline: 'center', width: '1.26', color: '#F8FAFC', position: '0 0 0.006'}, label);
+        [root, pointA, pointB, pointC, line, line2, label].forEach(this.forceOverlayElement.bind(this));
+        return {root: root, pointA: pointA, pointB: pointB, pointC: pointC, line: line, line2: line2, label: label, labelText: labelText};
+      },
+
+      hideSavedVisual: function (visual) {
+        if (!visual) return;
+        ['pointA', 'pointB', 'pointC', 'line', 'line2', 'label'].forEach(function (name) {
+          if (visual[name] && visual[name].object3D) visual[name].object3D.visible = false;
+        });
+      },
+
+      setSavedMarker: function (element, position) {
+        if (!element || !position) return;
+        element.object3D.position.copy(position);
+        element.object3D.scale.setScalar(this.overlayScaleAt(position, 0.070, 0.90, 1.85));
+        element.object3D.visible = true;
+        this.forceOverlayElement(element, 89);
+      },
+
+      setSavedLine: function (element, start, end, color) {
+        if (!element) return;
+        element.setAttribute('line', {start: start, end: end, color: color || '#38BDF8', opacity: 0.98});
+        element.object3D.visible = true;
+        this.forceOverlayElement(element, 86);
+      },
+
+      setSavedLabel: function (visual, position, value, color) {
+        if (!visual || !visual.label || !visual.labelText) return;
+        var textValue = String(value || '');
+        var lineCount = Math.max(1, textValue.split('\n').length);
+        var plane = visual.label.querySelector('a-plane');
+        if (plane) {
+          plane.setAttribute('width', lineCount > 1 ? 1.50 : 1.42);
+          plane.setAttribute('height', lineCount > 1 ? 0.20 + lineCount * 0.125 : 0.26);
+        }
+        visual.labelText.setAttribute('width', lineCount > 1 ? 1.34 : 1.26);
+        visual.labelText.setAttribute('wrap-count', lineCount > 1 ? 24 : 28);
+        this.placeOverlayInFront(position, visual.label.object3D.position, lineCount > 1 ? 0.024 : 0.016);
+        visual.label.object3D.scale.setScalar(this.overlayScaleAt(position, lineCount > 1 ? 0.044 : 0.048, 0.26, 0.70));
+        visual.labelText.setAttribute('value', textValue);
+        visual.labelText.setAttribute('color', color || '#F8FAFC');
+        visual.label.object3D.visible = true;
+        this.forceOverlayElement(visual.label, 94);
+      },
+
+      storeMeasurementRecord: function (record) {
+        if (!record) return;
+        record.visual = this.createSavedVisual();
+        this.savedMeasurements.push(record);
+      },
+
+      clearStoredMeasurements: function () {
+        this.savedMeasurements.forEach(function (record) {
+          if (record.visual && record.visual.root && record.visual.root.parentNode) record.visual.root.parentNode.removeChild(record.visual.root);
+        });
+        this.savedMeasurements = [];
+        this.updatePanel();
+      },
+
+      commitCompletedMeasurement: function () {
+        if (this.mode === 'distance' || this.mode === 'xyz') {
+          if (this.points.length < 2) return;
+          this.storeMeasurementRecord({type: this.mode, first: this.cloneStoredPoint(this.points[0]), second: this.cloneStoredPoint(this.points[1])});
+          this.points = [];
+          this.preview = null;
+          this.previewIntersection = null;
+        } else if (this.mode === 'angle') {
+          if (this.points.length < 3) return;
+          this.storeMeasurementRecord({type: 'angle', first: this.cloneStoredPoint(this.points[0]), vertex: this.cloneStoredPoint(this.points[1]), third: this.cloneStoredPoint(this.points[2])});
+          this.points = [];
+          this.preview = null;
+          this.previewIntersection = null;
+        } else if (this.mode === 'point') {
+          if (!this.points.length) return;
+          this.storeMeasurementRecord({type: 'point', point: this.cloneStoredPoint(this.points[0])});
+          this.points = [];
+          this.preview = null;
+          this.previewIntersection = null;
+        } else if (this.mode === 'area' && this.result && this.result.type === 'area') {
+          this.storeMeasurementRecord({type: 'area', storedCentroid: this.cloneStoredPoint(this.result.storedCentroid), area: this.result.area, approximate: this.result.approximate});
+          this.result = null;
+          this.preview = null;
+          this.previewIntersection = null;
+        }
+        this.hideAllVisuals();
+        this.updatePanel();
+      },
+
+      renderSavedMeasurement: function (record) {
+        if (!record || !record.visual) return;
+        var visual = record.visual;
+        this.hideSavedVisual(visual);
+        if (record.type === 'distance' || record.type === 'xyz') {
+          if (!this.resolvePoint(record.first, this.worldA) || !this.resolvePoint(record.second, this.worldB)) return;
+          this.setSavedMarker(visual.pointA, this.worldA);
+          this.setSavedMarker(visual.pointB, this.worldB);
+          this.setSavedLine(visual.line, this.worldA, this.worldB, '#38BDF8');
+          var components = this.calculateComponents(record.first, record.second);
+          var distance = this.worldA.distanceTo(this.worldB);
+          this.midpoint.copy(this.worldA).add(this.worldB).multiplyScalar(0.5);
+          this.midpoint.y += Math.max(0.030, Math.min(0.18, distance * 0.040));
+          var label = record.type === 'xyz'
+            ? 'L  ' + this.formatMm(distance, true) + '\nX  ' + this.formatMm(components.dx, false) + '\nY  ' + this.formatMm(components.dy, false) + '\nZ  ' + this.formatMm(components.dz, false)
+            : this.formatMm(distance, true);
+          this.setSavedLabel(visual, this.midpoint, label, '#F8FAFC');
+          return;
+        }
+        if (record.type === 'angle') {
+          if (!this.resolvePoint(record.first, this.worldA) || !this.resolvePoint(record.vertex, this.worldB) || !this.resolvePoint(record.third, this.worldC)) return;
+          this.setSavedMarker(visual.pointA, this.worldA);
+          this.setSavedMarker(visual.pointB, this.worldB);
+          this.setSavedMarker(visual.pointC, this.worldC);
+          this.setSavedLine(visual.line, this.worldA, this.worldB, '#38BDF8');
+          this.setSavedLine(visual.line2, this.worldB, this.worldC, '#38BDF8');
+          var angle = THREE.MathUtils.radToDeg(new THREE.Vector3().subVectors(this.worldA, this.worldB).angleTo(new THREE.Vector3().subVectors(this.worldC, this.worldB)));
+          this.midpoint.copy(this.worldA).sub(this.worldB).normalize().add(this.worldC.clone().sub(this.worldB).normalize()).normalize().multiplyScalar(0.20).add(this.worldB);
+          this.setSavedLabel(visual, this.midpoint, '≈ ' + angle.toFixed(1).replace('.', ',') + '°', '#F8FAFC');
+          return;
+        }
+        if (record.type === 'point') {
+          if (!this.resolvePoint(record.point, this.worldA)) return;
+          this.setSavedMarker(visual.pointA, this.worldA);
+          this.coordinate.copy(this.worldA);
+          if (this.data.target) { this.data.target.object3D.updateMatrixWorld(true); this.data.target.object3D.worldToLocal(this.coordinate); }
+          this.midpoint.copy(this.worldA); this.midpoint.y += 0.08;
+          this.setSavedLabel(visual, this.midpoint, 'X  ' + this.formatMm(this.coordinate.x, false) + '\nY  ' + this.formatMm(this.coordinate.y, false) + '\nZ  ' + this.formatMm(this.coordinate.z, false), '#F8FAFC');
+          return;
+        }
+        if (record.type === 'area') {
+          if (!this.resolvePoint(record.storedCentroid, this.worldA)) return;
+          this.setSavedMarker(visual.pointA, this.worldA);
+          this.midpoint.copy(this.worldA); this.midpoint.y += 0.08;
+          this.setSavedLabel(visual, this.midpoint, this.formatArea(record.area, record.approximate), '#F8FAFC');
+        }
+      },
+
+      refreshStoredMeasurements: function () {
+        for (var i = 0; i < this.savedMeasurements.length; i += 1) this.renderSavedMeasurement(this.savedMeasurements[i]);
+      },
+
       onSelectionChanged: function () {
         if (this.mode !== 'min-distance') return;
         this.computeToken += 1;
@@ -1005,11 +1175,14 @@
         if (this.mode === 'distance' || this.mode === 'xyz') {
           if (this.points.length >= 2) this.points = [];
           this.points.push(point);
+          if (this.points.length === 2) this.commitCompletedMeasurement();
         } else if (this.mode === 'angle') {
           if (this.points.length >= 3) this.points = [];
           this.points.push(point);
+          if (this.points.length === 3) this.commitCompletedMeasurement();
         } else if (this.mode === 'point') {
           this.points = [point];
+          this.commitCompletedMeasurement();
         } else if (this.mode === 'area') {
           var surface = this.measureEngine && this.measureEngine.surfacePatchFromIntersection(point.sourceIntersection, {smoothAngleDeg:14});
           if (!surface) return false;
@@ -1017,6 +1190,7 @@
             type:'area', area:surface.area, approximate:surface.approximate, triangleCount:surface.triangleCount,
             storedCentroid:this.createWorldStoredPoint(surface.centroid, surface.object, 'surface', 'ŚRODEK POWIERZCHNI')
           };
+          this.commitCompletedMeasurement();
         }
         this.updatePanel();
         this.updateVisual();
@@ -1272,16 +1446,18 @@
         else if (action === 'measure-area') this.setMode('area');
         else if (action === 'measure-min') this.setMode('min-distance');
         else if (action === 'measure-snap') this.toggleSnap();
-        else if (action === 'measure-clear') this.clear();
+        else if (action === 'measure-clear') { this.clearStoredMeasurements(); this.clear(); }
         else if (action === 'measure-calc') this.computeMinimumDistance();
         else if (action === 'measure-close') this.setPanelVisible(false);
       },
 
       tick: function () {
+        if (this.savedMeasurements.length) this.refreshStoredMeasurements();
         if (this.enabled && (this.points.length || this.preview || this.result)) this.updateVisual();
       },
 
       remove: function () {
+        this.clearStoredMeasurements();
         this.el.removeEventListener('viewer-ui-action', this.onUIAction);
         this.el.removeEventListener('moja-selection-changed', this.onSelectionChanged);
         var self=this;
@@ -3196,7 +3372,8 @@
           colorManagement: true,
           physicallyCorrectLights: false,
           highRefreshRate: true,
-          precision: 'medium'
+          precision: 'high',
+          sortObjects: true
         });
         if (this.modeType === 'mr') {
           this.el.removeAttribute('background');
@@ -3443,7 +3620,18 @@
       handleY: function () {
         if (!this.ready) return;
         if (this.interactionMode === 'measure') {
-          this.getMeasurement().togglePanel();
+          var measurement = this.getMeasurement();
+          if (!measurement) return;
+          if (measurement.panelVisible) {
+            measurement.setPanelVisible(false);
+            return;
+          }
+          if (measurement.hasSavedMeasurements && measurement.hasSavedMeasurements() && !(measurement.hasWorkInProgress && measurement.hasWorkInProgress())) {
+            measurement.clearStoredMeasurements();
+            measurement.clear();
+            return;
+          }
+          measurement.togglePanel();
           return;
         }
         if (this.interactionMode === 'select') {
@@ -3471,7 +3659,7 @@
           var measurement = this.getMeasurement();
           var measureName = measurement && measurement.getModeLabel ? measurement.getModeLabel() : 'POMIAR';
           var snapState = measurement && measurement.getSnapModeLabel ? 'SNAP ' + measurement.getSnapModeLabel() : 'SNAP BASIC';
-          this.modeText.setAttribute('value', measureName + '  •  ' + snapState + '  •  CELOWNIK AKTYWNY  •  TRIGGER: ZAPISZ  •  Y: PANEL');
+          this.modeText.setAttribute('value', measureName + '  •  ' + snapState + '  •  CELOWNIK AKTYWNY  •  TRIGGER: ZAPISZ  •  Y: PANEL / WYCZYŚĆ');
           this.modeText.setAttribute('color', '#FBBF24');
         } else if (this.interactionMode === 'select') {
           this.modeText.setAttribute('value', 'DRZEWO  •  CELOWNIK AKTYWNY  •  TRIGGER: WYBIERZ  •  Y: PANEL  •  PRAWY JOYSTICK: PRZEWIJAJ');
@@ -3609,7 +3797,7 @@
         if (ray) window.setTimeout(function () { ray.refresh(); }, 0);
       },
       setGrip: function (hand, active) {
-        if (this.modeType !== 'mr' || !this.ready || !this.placed || this.interactionMode !== 'move') return;
+        if (this.modeType !== 'mr' || !this.ready || !this.placed) return;
 
         this.grips[hand] = active;
 
@@ -3783,7 +3971,7 @@
         this.rig.object3D.position.z += this.cameraWorldBefore.z - this.cameraWorldAfter.z;
       },
       updateMRMovement: function (dt) {
-        if (this.interactionMode !== 'move' || this.grabMoving || this.freeGrabMoving || this.twoGripRotating) return;
+        if (!this.placed || this.grabMoving || this.freeGrabMoving || this.twoGripRotating) return;
         var x = Math.abs(this.axes.left.x) > 0.12 ? this.axes.left.x : 0;
         var y = Math.abs(this.axes.left.y) > 0.12 ? this.axes.left.y : 0;
         if (x === 0 && y === 0) return;
@@ -3868,8 +4056,8 @@
 </head>
 <body>
   <div class="topbar">
-    <a class="pill" href="index.html?v=19">← Viewer</a>
-    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v19</div>
+    <a class="pill" href="index.html?v=20">← Viewer</a>
+    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v20</div>
     <button id="enterXR" class="pill enter" type="button">ENTER VR</button>
   </div>
 
@@ -3877,9 +4065,9 @@
 
   <div id="landing" class="landing">
     <div class="card">
-      <div id="landingVersion" class="version">META QUEST 3 • v19</div>
+      <div id="landingVersion" class="version">META QUEST 3 • v20</div>
       <h1 id="landingTitle">CK-207-74-5000_VR — Virtual Reality</h1>
-      <p id="landingDescription">Model jest zakotwiczony w skali 1:1. Poruszasz się użytkownikiem, mierzysz i zarządzasz widocznością komponentów.</p>
+      <p id="landingDescription">Model jest zakotwiczony w skali 1:1. Poruszasz się użytkownikiem, stawiasz trwałe wymiary i zarządzasz widocznością komponentów.</p>
 
       <div id="mrScaleBox" class="scale-box" hidden>
         <label for="scaleNumber">Skala modelu</label>
@@ -3901,7 +4089,7 @@
 
       <div id="landingControls" class="controls"></div>
       <div class="actions">
-        <a class="button" href="index.html?v=19">← Wróć</a>
+        <a class="button" href="index.html?v=20">← Wróć</a>
         <button id="landingEnter" class="button primary" type="button">ENTER VR — QUEST 3</button>
       </div>
       <div id="landingNote" class="note">Subtelne krawędzie, oświetlenie modelu 360° i brak ciężkich map cieni.</div>
@@ -3998,16 +4186,16 @@
     </a-entity>
     <a-torus id="teleportMarker" radius="0.14" radius-tubular="0.008" rotation="-90 0 0" color="#34D399" material="shader: flat; depthTest: false; depthWrite: false; transparent: true; opacity: 0.96" visible="false"></a-torus>
 
-    <a-sphere id="measurePointA" radius="0.005" color="#FFFFFF" material="shader: flat; depthTest: false; depthWrite: false" visible="false"></a-sphere>
-    <a-sphere id="measurePointB" radius="0.005" color="#2563EB" material="shader: flat; depthTest: false; depthWrite: false" visible="false"></a-sphere>
-    <a-sphere id="measurePointC" radius="0.005" color="#F97316" material="shader: flat; depthTest: false; depthWrite: false" visible="false"></a-sphere>
+    <a-sphere id="measurePointA" radius="0.0038" color="#FFFFFF" material="shader: flat; depthTest: false; depthWrite: false" visible="false"></a-sphere>
+    <a-sphere id="measurePointB" radius="0.0038" color="#2563EB" material="shader: flat; depthTest: false; depthWrite: false" visible="false"></a-sphere>
+    <a-sphere id="measurePointC" radius="0.0038" color="#F97316" material="shader: flat; depthTest: false; depthWrite: false" visible="false"></a-sphere>
     <a-entity id="measureLine" line="start: 0 0 0; end: 0 0 0; color: #2563EB; opacity: 1" visible="false"></a-entity>
     <a-entity id="measureLine2" line="start: 0 0 0; end: 0 0 0; color: #2563EB; opacity: 1" visible="false"></a-entity>
-    <a-entity id="measureLabel" look-at-camera="camera: #camera; yawOnly: false" scale="0.34 0.34 0.34" visible="false">
+    <a-entity id="measureLabel" look-at-camera="camera: #camera; yawOnly: false" scale="0.42 0.42 0.42" visible="false">
       <a-plane width="1.22" height="0.22" color="#F8FAFC" opacity="0.96" material="shader: flat; transparent: true; depthWrite: false"></a-plane>
-      <a-text id="measureLabelText" value="0 mm" align="center" anchor="center" baseline="center" width="1.12" color="#2563EB" position="0 0 0.006"></a-text>
+      <a-text id="measureLabelText" value="0 mm" align="center" anchor="center" baseline="center" width="1.26" color="#F8FAFC" position="0 0 0.006"></a-text>
     </a-entity>
-    <a-entity id="measureSnapLabel" look-at-camera="camera: #camera; yawOnly: false" scale="0.24 0.24 0.24" visible="false">
+    <a-entity id="measureSnapLabel" look-at-camera="camera: #camera; yawOnly: false" scale="0.28 0.28 0.28" visible="false">
       <a-plane width="0.88" height="0.15" color="#FFFFFF" opacity="0.97" material="shader: flat; transparent: true; depthWrite: false"></a-plane>
       <a-text id="measureSnapLabelText" value="◇ NODE" align="center" anchor="center" baseline="center" width="0.82" color="#F97316" position="0 0 0.006"></a-text>
     </a-entity>
@@ -4319,11 +4507,11 @@
       }
 
       if (mode === 'mr') {
-        document.title = 'CK-207-74-5000_VR — Meta Quest MR v19';
-        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v19';
+        document.title = 'CK-207-74-5000_VR — Meta Quest MR v20';
+        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v20';
         enterXR.textContent = 'ENTER MR';
         enterXR.classList.add('mr');
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v19';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v20';
         landingVersion.classList.add('mr');
         landingTitle.textContent = 'CK-207-74-5000_VR — Mixed Reality';
         landingDescription.textContent = 'Postaw model w pokoju, ustaw dokładną skalę, przesuń go i obróć wokół osi pionowej gestem dwóch gripów.';
@@ -4348,10 +4536,10 @@
           'Trigger: przytrzymaj — widoczny celownik • puść — akcja'
         ], legend);
       } else {
-        document.title = 'CK-207-74-5000_VR — Meta Quest VR v19';
-        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v19';
+        document.title = 'CK-207-74-5000_VR — Meta Quest VR v20';
+        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v20';
         enterXR.textContent = 'ENTER VR';
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v19';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v20';
         landingTitle.textContent = 'CK-207-74-5000_VR — Virtual Reality';
         landingDescription.textContent = 'Model pozostaje zakotwiczony w skali 1:1. Chodzisz, obracasz użytkownika, teleportujesz się, mierzysz i izolujesz komponenty.';
         landingEnter.textContent = 'ENTER VR — QUEST 3';
