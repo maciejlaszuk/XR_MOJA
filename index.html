@@ -6,12 +6,12 @@
   <meta name="theme-color" content="#0f172a">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — MOJA XR v15</title>
+  <title>CK-207-74-5000_VR — MOJA XR v16</title>
 
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
-  <script src="moja-config.js?v=15"></script>
+  <script src="moja-snap.js?v=16"></script>
   <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.3.1/dist/model-viewer.min.js"></script>
 
   <script type="importmap">
@@ -117,7 +117,7 @@
 
     .toolbar {
       position: fixed; z-index: 50; left: 50%; bottom: 12px; transform: translateX(-50%);
-      width: min(1120px, calc(100vw - 24px)); display: grid; grid-template-columns: repeat(8, minmax(76px, 1fr)); gap: 7px;
+      width: min(1120px, calc(100vw - 24px)); display: grid; grid-template-columns: repeat(7, minmax(76px, 1fr)); gap: 7px;
       padding: 8px; border: 1px solid rgba(255,255,255,.13); border-radius: 18px;
       background: rgba(15,23,42,.90); box-shadow: 0 18px 45px rgba(15,23,42,.28); backdrop-filter: blur(16px);
     }
@@ -127,8 +127,7 @@
     .tool.blue { background: #1d4ed8; }
     .tool.green { background: #15803d; }
     .tool.cyan { background: #0369a1; }
-    .tool.violet { background: #6d28d9; }
-
+    
     .interaction-bar {
       position: fixed; z-index: 52; left: 50%; bottom: 82px; transform: translateX(-50%);
       width: min(620px, calc(100vw - 24px)); display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px;
@@ -171,19 +170,6 @@
     .mobile-explode-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; color: #f8fafc; font-size: 10px; font-weight: 900; }
     .mobile-explode output { color: #fde68a; }
 
-    dialog {
-      width: min(520px, calc(100vw - 24px)); border: 1px solid rgba(255,255,255,.16); border-radius: 20px;
-      padding: 0; background: #0f172a; color: #fff; box-shadow: 0 30px 90px rgba(0,0,0,.5);
-    }
-    dialog::backdrop { background: rgba(2,6,23,.72); backdrop-filter: blur(7px); }
-    .dialog-head { display: flex; align-items: center; justify-content: space-between; padding: 16px; border-bottom: 1px solid var(--line); }
-    .dialog-head h2 { margin: 0; font-size: 16px; }
-    .dialog-body { padding: 16px; display: grid; gap: 12px; }
-    .field label { display: block; margin-bottom: 5px; color: #cbd5e1; font-size: 11px; font-weight: 800; }
-    .field input { width: 100%; min-height: 42px; padding: 0 11px; border: 1px solid #475569; border-radius: 11px; background: #111827; color: #fff; }
-    .dialog-actions { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; }
-    .dialog-note { color: #94a3b8; font-size: 11px; line-height: 1.45; }
-    .dialog-status { min-height: 18px; color: #86efac; font-size: 11px; }
 
     #arViewer { position: fixed; width: 1px; height: 1px; left: -20px; bottom: -20px; opacity: 0; pointer-events: none; }
 
@@ -192,7 +178,7 @@
       #propsPanel.open { display: flex; }
       #propsToggle { display: inline-flex; }
       .mobile-explode { display: block; }
-      .toolbar { grid-template-columns: repeat(6, minmax(78px,1fr)); }
+      .toolbar { grid-template-columns: repeat(5, minmax(78px,1fr)); }
     }
 
     @media (max-width: 760px) {
@@ -201,7 +187,7 @@
       .pill small, .pill.status span { display: none; }
       .panel { top: 56px; left: 8px !important; right: 8px !important; bottom: 132px; width: auto; display: none; }
       .panel.open { display: flex !important; }
-      .toolbar { bottom: max(8px, env(safe-area-inset-bottom)); width: calc(100vw - 16px); grid-template-columns: repeat(6,1fr); gap: 5px; padding: 6px; }
+      .toolbar { bottom: max(8px, env(safe-area-inset-bottom)); width: calc(100vw - 16px); grid-template-columns: repeat(5,1fr); gap: 5px; padding: 6px; }
       .interaction-bar { bottom: calc(max(8px, env(safe-area-inset-bottom)) + 58px); width: calc(100vw - 16px); gap: 5px; padding: 5px; }
       .mode-tool { min-height: 40px; font-size: 10px; }
       .measure-hud { top: 54px; width: calc(100vw - 16px); padding: 9px 10px; }
@@ -223,7 +209,7 @@
 
   <div class="topbar">
     <button id="treeToggle" class="pill mobile-toggle" type="button">☰ Drzewo</button>
-    <div class="pill"><strong>CK-207-74-5000_VR</strong><small>MOJA XR v15</small></div>
+    <div class="pill"><strong>CK-207-74-5000_VR</strong><small>MOJA XR v16</small></div>
     <button id="propsToggle" class="pill mobile-toggle" type="button">iProperties</button>
     <div id="loadStatus" class="pill status"><span>Ładowanie modelu…</span></div>
   </div>
@@ -231,7 +217,7 @@
   <aside id="treePanel" class="panel">
     <div class="panel-head">
       <h2>Struktura IAM / Part Number</h2>
-      <p>Wybierz tryb ZAZNACZ. Kliknij wiersz albo element modelu; Ctrl pozwala zaznaczyć kilka pozycji.</p>
+      <p>Wybierz ZAZNACZ. Każde kliknięcie dodaje albo usuwa komponent z bieżącego wyboru.</p>
       <input id="treeSearch" class="search" type="search" placeholder="Szukaj Part Number / Description…">
       <div class="mobile-explode">
         <div class="mobile-explode-head"><span>Rozsuń model</span><output id="explodeValueMobile">0%</output></div>
@@ -261,10 +247,10 @@
 
   <div id="measureHud" class="measure-hud" hidden>
     <div class="measure-hud-head">
-      <strong>POMIAR 2-PUNKTOWY</strong>
+      <strong>POMIAR 2-PUNKTOWY • SNAP AUTO</strong>
       <button id="measureClear" type="button">WYCZYŚĆ POMIAR</button>
     </div>
-    <div id="measurePrompt" class="measure-prompt">Kliknij punkt A na modelu.</div>
+    <div id="measurePrompt" class="measure-prompt">SNAP: wierzchołek • krawędź • środek krawędzi • środek otworu.</div>
     <div class="measure-grid">
       <div class="measure-cell"><span>L</span><strong id="measureL">—</strong></div>
       <div class="measure-cell"><span>ΔX</span><strong id="measureX">—</strong></div>
@@ -289,62 +275,33 @@
       <output id="explodeValue">0%</output>
     </div>
     <button id="arButton" class="tool cyan" type="button"><strong>AR</strong><span>telefon</span></button>
-    <a id="mrButton" class="tool green" href="quest.html?mode=mr&v=15" style="text-decoration:none;color:#fff"><strong>MR</strong><span>Quest 3</span></a>
-    <a id="vrButton" class="tool blue" href="quest.html?mode=vr&v=15" style="text-decoration:none;color:#fff"><strong>VR</strong><span>Quest 3</span></a>
-    <button id="roomButton" class="tool violet" type="button"><strong>Pokój VR</strong><span>współpraca</span></button>
+    <a id="mrButton" class="tool green" href="quest.html?mode=mr&v=16" style="text-decoration:none;color:#fff"><strong>MR</strong><span>Quest 3</span></a>
+    <a id="vrButton" class="tool blue" href="quest.html?mode=vr&v=16" style="text-decoration:none;color:#fff"><strong>VR</strong><span>Quest 3</span></a>
   </nav>
 
   <model-viewer
     id="arViewer"
-    src="CK-207-74-5000_VR.glb?v=15"
-    ios-src="CK-207-74-5000_VR.usdz?v=15"
+    src="CK-207-74-5000_VR.glb?v=16"
+    ios-src="CK-207-74-5000_VR.usdz?v=16"
     ar
     ar-modes="webxr scene-viewer quick-look"
     ar-placement="floor"
     shadow-intensity="0">
   </model-viewer>
 
-  <dialog id="roomDialog">
-    <div class="dialog-head">
-      <h2>Wspólny pokój VR</h2>
-      <button id="closeRoom" class="btn" type="button">Zamknij</button>
-    </div>
-    <div class="dialog-body">
-      <div class="field">
-        <label for="userName">Twoja nazwa widoczna w VR</label>
-        <input id="userName" maxlength="32" autocomplete="nickname" placeholder="Maciek">
-      </div>
-      <div class="field">
-        <label for="guestName">Nazwa uczestnika wpisana do linku</label>
-        <input id="guestName" maxlength="32" autocomplete="off" placeholder="Klient">
-      </div>
-      <div class="field">
-        <label for="roomCode">Kod pokoju — ten sam u wszystkich</label>
-        <div style="display:grid;grid-template-columns:1fr 120px;gap:8px">
-          <input id="roomCode" maxlength="64" autocomplete="off">
-          <button id="newRoom" class="btn" type="button">Nowy kod</button>
-        </div>
-      </div>
-      <div class="dialog-actions">
-        <button id="enterHostVr" class="btn primary" type="button">Wejdź jako prowadzący VR</button>
-        <button id="copyGuestVr" class="btn ok" type="button">Kopiuj link dla gościa VR</button>
-        <button id="enterHostMr" class="btn" type="button">Wejdź jako prowadzący MR</button>
-        <button id="copyGuestMr" class="btn" type="button">Kopiuj link dla gościa MR</button>
-      </div>
-      <div id="roomStatus" class="dialog-status"></div>
-      <div class="dialog-note">
-        Pokój działa po uzupełnieniu <b>moja-config.js</b> danymi Supabase. W wersji testowej kod pokoju jest częścią zabezpieczenia — wysyłaj pełny link tylko zaproszonym osobom.
-      </div>
-    </div>
-  </dialog>
 
   <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
+    const snapEngine = window.MOJA_SNAP.createEngine(THREE, {
+      maxAngleRad: ('ontouchstart' in window) ? 0.021 : 0.016,
+      featureAngleDeg: 18
+    });
+
     const MODEL = 'CK-207-74-5000_VR';
-    const VERSION = '15';
+    const VERSION = '16';
     const viewport = document.getElementById('viewport');
     const loadStatus = document.getElementById('loadStatus');
     const treePanel = document.getElementById('treePanel');
@@ -377,6 +334,7 @@
       objectAssigned: new WeakSet(),
       meshToNodeIndex: new WeakMap(),
       selected: new Set(),
+      activeSelectedIndex: -1,
       helpers: new Map(),
       explodable: [],
       explodeFactor: 0,
@@ -687,21 +645,22 @@
         status.textContent = vis === 'hidden' ? '○' : vis === 'mixed' ? '◐' : vis === 'suppressed' ? '×' : '●';
 
         row.append(expander, label, status);
-        row.addEventListener('click', event => selectNode(index, event.ctrlKey || event.metaKey));
+        row.addEventListener('click', () => selectNode(index));
         treeList.appendChild(row);
       });
     }
 
-    function selectNode(index, additive) {
+    function selectNode(index) {
       if (!Number.isInteger(index) || !state.treeNodes[index]) return;
-      const wasOnlySelected = state.selected.size === 1 && state.selected.has(index);
-      if (!additive) {
-        state.selected.clear();
-        if (!wasOnlySelected) state.selected.add(index);
-      } else if (state.selected.has(index)) {
+      if (state.selected.has(index)) {
         state.selected.delete(index);
+        if (state.activeSelectedIndex === index) {
+          const remaining = [...state.selected];
+          state.activeSelectedIndex = remaining.length ? remaining[remaining.length - 1] : -1;
+        }
       } else {
         state.selected.add(index);
+        state.activeSelectedIndex = index;
       }
       syncHelpers();
       renderTree();
@@ -714,6 +673,7 @@
 
     function clearSelection() {
       state.selected.clear();
+      state.activeSelectedIndex = -1;
       syncHelpers();
       renderTree();
       renderProperties();
@@ -749,7 +709,8 @@
         propertyList.innerHTML = '<div class="empty-state">Wybierz komponent z drzewa albo kliknij model.</div>';
         return;
       }
-      const node = state.treeNodes[indexes[0]];
+      const activeIndex = state.selected.has(state.activeSelectedIndex) ? state.activeSelectedIndex : indexes[indexes.length - 1];
+      const node = state.treeNodes[activeIndex];
       const raw = node.raw || {};
       const fixed = [
         ['Part Number', raw.partNumber || node.label],
@@ -874,9 +835,7 @@
 
     function setInteractionMode(mode) {
       if (!['orbit', 'select', 'measure'].includes(mode)) return;
-      const previous = state.interactionMode;
       state.interactionMode = mode;
-      if (previous === 'select' && mode !== 'select') clearSelection();
       setModeButtonState();
     }
 
@@ -900,10 +859,15 @@
       line.geometry.computeBoundingSphere();
     }
 
-    function createMeasuredPoint(hit) {
-      if (!hit?.object || !hit?.point) return null;
-      hit.object.updateMatrixWorld(true);
-      return { object: hit.object, local: hit.object.worldToLocal(hit.point.clone()) };
+    function createMeasuredPoint(snap) {
+      if (!snap?.object || !snap?.point) return null;
+      snap.object.updateMatrixWorld(true);
+      return {
+        object: snap.object,
+        local: snap.object.worldToLocal(snap.point.clone()),
+        snapKind: snap.kind || 'surface',
+        snapLabel: snap.label || 'PUNKT POWIERZCHNI'
+      };
     }
 
     function resolveMeasuredPoint(stored, output) {
@@ -916,7 +880,10 @@
 
     function resetMeasureReadout() {
       measureL.textContent = measureX.textContent = measureY.textContent = measureZ.textContent = '—';
-      measurePrompt.textContent = state.measurement.points[0] ? 'Punkt A gotowy. Kliknij punkt B.' : 'Kliknij punkt A na modelu.';
+      const pointA = state.measurement.points[0];
+      measurePrompt.textContent = pointA
+        ? 'A: ' + pointA.snapLabel + ' • wskaż punkt B.'
+        : 'SNAP AUTO: wierzchołek • krawędź • środek krawędzi • środek otworu.';
     }
 
     function clearMeasurement() {
@@ -926,8 +893,13 @@
       resetMeasureReadout();
     }
 
-    function addMeasurementPoint(hit) {
-      const stored = createMeasuredPoint(hit);
+    function addMeasurementPoint(hits) {
+      const usableHits = Array.isArray(hits) ? hits : [];
+      const snap = snapEngine.snapFromIntersections(usableHits, raycaster.ray, {
+        maxAngleRad: ('ontouchstart' in window) ? 0.021 : 0.016,
+        searchObjects: state.meshes
+      });
+      const stored = createMeasuredPoint(snap);
       if (!stored) return;
       if (state.measurement.points[0] && state.measurement.points[1]) clearMeasurement();
       if (!state.measurement.points[0]) state.measurement.points[0] = stored;
@@ -977,7 +949,7 @@
       measureX.textContent = formatMm(dx);
       measureY.textContent = formatMm(dy);
       measureZ.textContent = formatMm(dz);
-      measurePrompt.textContent = 'Wynik w układzie modelu viewera. Trzeci punkt rozpoczyna nowy pomiar.';
+      measurePrompt.textContent = 'SNAP A: ' + pointA.snapLabel + ' • SNAP B: ' + pointB.snapLabel + ' • trzeci punkt rozpoczyna nowy pomiar.';
     }
 
     function clearInteraction() {
@@ -985,16 +957,16 @@
       clearMeasurement();
     }
 
-    function findPointerHit(event) {
+    function findPointerHits(event) {
       const rect = renderer.domElement.getBoundingClientRect();
       pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
-      return raycaster.intersectObjects(state.meshes.filter(mesh => mesh.visible), false)[0] || null;
+      return raycaster.intersectObjects(state.meshes.filter(mesh => mesh.visible), false).slice(0, 12);
     }
 
-    function selectHit(hit, additive) {
-      if (!hit) { clearSelection(); return; }
+    function selectHit(hit) {
+      if (!hit) return;
       let current = hit.object;
       let index = -1;
       while (current) {
@@ -1002,8 +974,7 @@
         if (Number.isInteger(mapped)) { index = mapped; break; }
         current = current.parent;
       }
-      if (index >= 0) selectNode(index, additive);
-      else clearSelection();
+      if (index >= 0) selectNode(index);
     }
 
     const raycaster = new THREE.Raycaster();
@@ -1018,9 +989,9 @@
       const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
       pointerDown = null;
       if (moved > 8 || state.interactionMode === 'orbit') return;
-      const hit = findPointerHit(event);
-      if (state.interactionMode === 'select') selectHit(hit, event.ctrlKey || event.metaKey);
-      else if (state.interactionMode === 'measure' && hit) addMeasurementPoint(hit);
+      const hits = findPointerHits(event);
+      if (state.interactionMode === 'select') selectHit(hits[0] || null);
+      else if (state.interactionMode === 'measure') addMeasurementPoint(hits);
     });
 
     orbitModeButton.addEventListener('click', () => setInteractionMode('orbit'));
@@ -1116,62 +1087,6 @@
       treeList.innerHTML = '<div class="empty-state">Nie udało się wczytać ' + escapeHtml(MODEL) + '.glb.<br>Sprawdź nazwy plików i publikację Pages.</div>';
     });
 
-    // ---------------------------------------------------------------------
-    // Pokój współpracy — generowanie linków. Sama synchronizacja działa w
-    // quest.html przez moja-collab.js.
-    // ---------------------------------------------------------------------
-    const roomDialog = document.getElementById('roomDialog');
-    const userName = document.getElementById('userName');
-    const guestName = document.getElementById('guestName');
-    const roomCode = document.getElementById('roomCode');
-    const roomStatus = document.getElementById('roomStatus');
-
-    function randomRoom() {
-      const bytes = new Uint8Array(12);
-      crypto.getRandomValues(bytes);
-      return [...bytes].map(value => value.toString(16).padStart(2, '0')).join('').toUpperCase();
-    }
-
-    function safeRoom(value) { return String(value || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0,64); }
-    function safeName(value) { return String(value || '').trim().slice(0,32) || 'Użytkownik'; }
-
-    userName.value = localStorage.getItem('moja-ck-207-74-5000_vr-v15-user-name') || 'Maciek';
-    guestName.value = localStorage.getItem('moja-ck-207-74-5000_vr-v15-guest-name') || 'Klient';
-    roomCode.value = localStorage.getItem('moja-ck-207-74-5000_vr-v15-room') || randomRoom();
-
-    function saveRoomInputs() {
-      userName.value = safeName(userName.value);
-      guestName.value = safeName(guestName.value);
-      roomCode.value = safeRoom(roomCode.value) || randomRoom();
-      localStorage.setItem('moja-ck-207-74-5000_vr-v15-user-name', userName.value);
-      localStorage.setItem('moja-ck-207-74-5000_vr-v15-guest-name', guestName.value);
-      localStorage.setItem('moja-ck-207-74-5000_vr-v15-room', roomCode.value);
-    }
-
-    function questUrl(mode, role) {
-      saveRoomInputs();
-      const url = new URL('quest.html', window.location.href);
-      url.searchParams.set('mode', mode);
-      url.searchParams.set('v', VERSION);
-      url.searchParams.set('room', roomCode.value);
-      url.searchParams.set('name', role === 'host' ? userName.value : guestName.value);
-      url.searchParams.set('role', role);
-      if (role !== 'host') url.searchParams.set('follow', '1');
-      return url.toString();
-    }
-
-    async function copyText(value, message) {
-      try { await navigator.clipboard.writeText(value); roomStatus.textContent = message; }
-      catch { window.prompt('Skopiuj link:', value); }
-    }
-
-    document.getElementById('roomButton').addEventListener('click', () => roomDialog.showModal());
-    document.getElementById('closeRoom').addEventListener('click', () => roomDialog.close());
-    document.getElementById('newRoom').addEventListener('click', () => { roomCode.value = randomRoom(); saveRoomInputs(); roomStatus.textContent = 'Utworzono nowy kod pokoju.'; });
-    document.getElementById('enterHostVr').addEventListener('click', () => { window.location.href = questUrl('vr','host'); });
-    document.getElementById('enterHostMr').addEventListener('click', () => { window.location.href = questUrl('mr','host'); });
-    document.getElementById('copyGuestVr').addEventListener('click', () => copyText(questUrl('vr','guest'), 'Skopiowano link VR dla uczestnika.'));
-    document.getElementById('copyGuestMr').addEventListener('click', () => copyText(questUrl('mr','guest'), 'Skopiowano link MR dla uczestnika.'));
   </script>
 </body>
 </html>
