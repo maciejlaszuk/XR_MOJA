@@ -6,20 +6,20 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — Meta Quest Viewer v14</title>
+  <title>CK-207-74-5000_VR — Meta Quest Viewer v15</title>
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
-  <script src="moja-config.js?v=14"></script>
+  <script src="moja-config.js?v=15"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.4"></script>
-  <script src="moja-collab.js?v=14" defer></script>
+  <script src="moja-collab.js?v=15" defer></script>
   <script>
     (function () {
       var params = new URLSearchParams(window.location.search);
       window.QUEST_MODE = params.get('mode') === 'mr' ? 'mr' : 'vr';
       var stored = 100;
       try {
-        var parsed = Number(window.localStorage.getItem('moja-ck-207-74-5000_vr-v14'));
+        var parsed = Number(window.localStorage.getItem('moja-ck-207-74-5000_vr-v15'));
         if (Number.isFinite(parsed)) stored = parsed;
       } catch (error) {
         stored = 100;
@@ -465,6 +465,64 @@
       }
     });
 
+    AFRAME.registerComponent('presentation-ray', {
+      schema: {
+        objects: {default: '.ray-target'},
+        marker: {type: 'selector'},
+        color: {type: 'color', default: '#FF3B30'},
+        far: {type: 'number', default: 50}
+      },
+      init: function () {
+        this.active = false;
+        this.currentIntersection = null;
+        this.onTriggerDown = this.setActive.bind(this, true);
+        this.onTriggerUp = this.setActive.bind(this, false);
+        this.configure = this.configure.bind(this);
+        this.el.addEventListener('triggerdown', this.onTriggerDown);
+        this.el.addEventListener('triggerup', this.onTriggerUp);
+        this.el.addEventListener('controllerconnected', this.configure);
+        window.setTimeout(this.configure, 0);
+      },
+      configure: function () {
+        this.el.setAttribute('raycaster', {
+          objects: this.data.objects,
+          far: this.data.far,
+          showLine: false,
+          lineColor: this.data.color,
+          lineOpacity: 0.96,
+          interval: 0
+        });
+        this.refresh();
+        if (this.data.marker) this.data.marker.object3D.visible = false;
+      },
+      refresh: function () {
+        var raycaster = this.el.components.raycaster;
+        if (raycaster && raycaster.refreshObjects) raycaster.refreshObjects();
+      },
+      setActive: function (active) {
+        this.active = Boolean(active);
+        this.el.setAttribute('raycaster', 'showLine', this.active);
+        if (!this.active && this.data.marker) this.data.marker.object3D.visible = false;
+      },
+      tick: function () {
+        var raycaster = this.el.components.raycaster;
+        var intersections = raycaster && raycaster.intersections;
+        this.currentIntersection = intersections && intersections.length ? intersections[0] : null;
+        if (!this.active || !this.data.marker) return;
+        if (!this.currentIntersection) {
+          this.data.marker.object3D.visible = false;
+          return;
+        }
+        this.data.marker.object3D.position.copy(this.currentIntersection.point);
+        this.data.marker.object3D.visible = true;
+      },
+      remove: function () {
+        this.el.removeEventListener('triggerdown', this.onTriggerDown);
+        this.el.removeEventListener('triggerup', this.onTriggerUp);
+        this.el.removeEventListener('controllerconnected', this.configure);
+      }
+    });
+
     AFRAME.registerComponent('measurement-tool', {
       schema: {
         target: {type: 'selector'},
@@ -473,6 +531,8 @@
         line: {type: 'selector'},
         label: {type: 'selector'},
         labelText: {type: 'selector'},
+        hud: {type: 'selector'},
+        hudText: {type: 'selector'},
         color: {type: 'color', default: '#F59E0B'}
       },
 
@@ -492,6 +552,7 @@
         this.axisVisuals = {};
         this.createAxisVisuals();
         this.styleMainLabel();
+        if (this.data.hud) this.data.hud.object3D.visible = false;
         this.clear();
       },
 
@@ -556,6 +617,20 @@ this.data.labelText.setAttribute('color', '#FDE68A');
 
       setEnabled: function (enabled) {
         this.enabled = Boolean(enabled);
+        if (this.data.hud) this.data.hud.object3D.visible = this.enabled;
+        this.updateHud();
+      },
+
+      updateHud: function (text) {
+        if (!this.data.hud || !this.data.hudText) return;
+        this.data.hud.object3D.visible = this.enabled;
+        if (!this.enabled) return;
+        if (text) {
+          this.data.hudText.setAttribute('value', text);
+          return;
+        }
+        if (!this.points[0]) this.data.hudText.setAttribute('value', 'POMIAR  •  WYBIERZ PUNKT A');
+        else if (!this.points[1]) this.data.hudText.setAttribute('value', 'PUNKT A GOTOWY  •  WYBIERZ PUNKT B');
       },
 
       toggle: function () {
@@ -618,6 +693,7 @@ this.data.target.object3D.localToWorld(output);
         this.hideAxisVisual(this.axisVisuals.x);
         this.hideAxisVisual(this.axisVisuals.y);
         this.hideAxisVisual(this.axisVisuals.z);
+        this.updateHud();
       },
 
       setLine: function (element, start, end, color) {
@@ -709,6 +785,7 @@ if (this.data.label) this.data.label.object3D.visible = false;
 this.hideAxisVisual(this.axisVisuals.x);
 this.hideAxisVisual(this.axisVisuals.y);
 this.hideAxisVisual(this.axisVisuals.z);
+this.updateHud();
 return;
         }
 
@@ -747,6 +824,10 @@ this.data.labelText.setAttribute(
   'ΔZ ' + Math.round(components.dz * 1000) + ' mm  •  ' + coordinateText
 );
         }
+        this.updateHud(
+          'L ' + Math.round(distance * 1000) + ' mm  •  ΔX ' + Math.round(components.dx * 1000) +
+          '  •  ΔY ' + Math.round(components.dy * 1000) + '  •  ΔZ ' + Math.round(components.dz * 1000) + ' mm'
+        );
       },
 
       tick: function () {
@@ -843,7 +924,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         panel: {type: 'selector'},
         valueText: {type: 'selector'},
         detailText: {type: 'selector'},
-        storageKey: {default: 'moja-ck-207-74-5000_vr-v14-lighting360'}
+        storageKey: {default: 'moja-ck-207-74-5000_vr-v15-lighting360'}
       },
 
       init: function () {
@@ -1604,6 +1685,15 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         summary: {type: 'selector'},
         scrollTrack: {type: 'selector'},
         scrollThumb: {type: 'selector'},
+        propertiesPanel: {type: 'selector'},
+        propertyTitle: {type: 'selector'},
+        propertyCount: {type: 'selector'},
+        propertyPartNumber: {type: 'selector'},
+        propertyDescription: {type: 'selector'},
+        propertyMaterial: {type: 'selector'},
+        propertyMass: {type: 'selector'},
+        propertyOccurrence: {type: 'selector'},
+        propertyFile: {type: 'selector'},
         structureUrl: {default: ''},
         rows: {type: 'int', default: 8}
       },
@@ -1619,6 +1709,15 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         this.summary = this.data.summary;
         this.scrollTrack = this.data.scrollTrack;
         this.scrollThumb = this.data.scrollThumb;
+        this.propertiesPanel = this.data.propertiesPanel;
+        this.propertyTitle = this.data.propertyTitle;
+        this.propertyCount = this.data.propertyCount;
+        this.propertyPartNumber = this.data.propertyPartNumber;
+        this.propertyDescription = this.data.propertyDescription;
+        this.propertyMaterial = this.data.propertyMaterial;
+        this.propertyMass = this.data.propertyMass;
+        this.propertyOccurrence = this.data.propertyOccurrence;
+        this.propertyFile = this.data.propertyFile;
 
         this.enabled = false;
         this.panelVisible = false;
@@ -1651,6 +1750,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         if (this.right) this.right.addEventListener('thumbstickmoved', this.onRightThumbstickMoved);
 
         if (this.panel) this.panel.object3D.visible = false;
+        if (this.propertiesPanel) this.propertiesPanel.object3D.visible = false;
         if (this.asset && this.asset.getObject3D('mesh')) {
           window.setTimeout(this.buildComponents.bind(this), 0);
         }
@@ -1839,6 +1939,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
           documentType: String((data && data.documentType) || '').toLowerCase(),
           suppressed: Boolean(data && data.suppressed),
           sourceVisible: !(data && data.visible === false),
+          raw: data || {},
           labelBase: labelBase,
           label: labelBase,
           expanded: depth === 0
@@ -2059,6 +2160,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
       setPanelVisible: function (visible) {
         this.panelVisible = Boolean(visible) && this.enabled;
         if (this.panel) this.panel.object3D.visible = this.panelVisible;
+        if (this.propertiesPanel) this.propertiesPanel.object3D.visible = this.panelVisible;
         this.updatePanelInteractivity();
         this.renderPanel();
         this.refreshRaycaster();
@@ -2069,12 +2171,13 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
       },
 
       updatePanelInteractivity: function () {
-        if (!this.panel) return;
         var active = this.panelVisible && this.enabled;
-
-        this.panel.querySelectorAll('.component-ui').forEach(function (element) {
-          if (active) element.classList.add('ray-target');
-          else element.classList.remove('ray-target');
+        [this.panel, this.propertiesPanel].forEach(function (root) {
+          if (!root) return;
+          root.querySelectorAll('.component-ui').forEach(function (element) {
+            if (active) element.classList.add('ray-target');
+            else element.classList.remove('ray-target');
+          });
         });
       },
 
@@ -2211,6 +2314,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         });
         this.helpers.clear();
         if (render !== false) this.renderPanel();
+        else this.renderProperties();
       },
 
       setComponentVisibility: function (index, visible) {
@@ -2347,7 +2451,42 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         this.scrollTrack.object3D.visible = rowCount > visibleRows;
       },
 
+      renderProperties: function () {
+        if (!this.propertiesPanel) return;
+        this.propertiesPanel.object3D.visible = this.panelVisible && this.enabled;
+        var selectedIndexes = Array.from(this.selected);
+        var node = selectedIndexes.length ? this.treeNodes[selectedIndexes[0]] : null;
+        var setText = function (element, value) {
+          if (element) element.setAttribute('value', value);
+        };
+
+        if (!node) {
+          setText(this.propertyTitle, 'iPROPERTIES');
+          setText(this.propertyCount, 'WYBIERZ KOMPONENT Z LEWEGO PANELU LUB MODELU');
+          setText(this.propertyPartNumber, 'PART NUMBER\n—');
+          setText(this.propertyDescription, 'DESCRIPTION\n—');
+          setText(this.propertyMaterial, 'MATERIAL\n—');
+          setText(this.propertyMass, 'MASS\n—');
+          setText(this.propertyOccurrence, 'OCCURRENCE\n—');
+          setText(this.propertyFile, 'FILE\n—');
+          return;
+        }
+
+        var mass = Number.isFinite(node.massKg)
+          ? node.massKg.toLocaleString('pl-PL', {maximumFractionDigits: 3}) + ' kg'
+          : '—';
+        setText(this.propertyTitle, node.label || 'iPROPERTIES');
+        setText(this.propertyCount, selectedIndexes.length + ' ZAZNACZONYCH  •  POKAZANO PIERWSZY');
+        setText(this.propertyPartNumber, 'PART NUMBER\n' + (node.partNumber || node.label || '—'));
+        setText(this.propertyDescription, 'DESCRIPTION\n' + (node.description || '—'));
+        setText(this.propertyMaterial, 'MATERIAL\n' + (node.material || '—'));
+        setText(this.propertyMass, 'MASS\n' + mass);
+        setText(this.propertyOccurrence, 'OCCURRENCE\n' + (node.occurrenceName || '—'));
+        setText(this.propertyFile, 'FILE\n' + (node.fileName || '—'));
+      },
+
       renderPanel: function () {
+        this.renderProperties();
         if (!this.list || !this.header || !this.summary) return;
         while (this.list.firstChild) this.list.removeChild(this.list.firstChild);
 
@@ -2706,10 +2845,11 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
           });
           this.right.addEventListener('thumbsticktouchend', function () { self.axes.right.set(0, 0); });
           this.right.addEventListener('triggerdown', function () { self.updateRayColor(); });
-          this.right.addEventListener('abuttondown', function () { self.verticalUp = true; });
-          this.right.addEventListener('abuttonup', function () { self.verticalUp = false; });
-          this.right.addEventListener('bbuttondown', function () { self.verticalDown = true; });
-          this.right.addEventListener('bbuttonup', function () { self.verticalDown = false; });
+          this.right.addEventListener('abuttondown', function () { self.verticalDown = true; });
+          this.right.addEventListener('abuttonup', function () { self.verticalDown = false; });
+          this.right.addEventListener('bbuttondown', function () { self.verticalUp = true; });
+          this.right.addEventListener('bbuttonup', function () { self.verticalUp = false; });
+          this.right.addEventListener('thumbstickdown', function () { self.handleClearShortcut(); });
           this.right.addEventListener('gripdown', function () { self.setGrip('right', true); });
           this.right.addEventListener('gripup', function () { self.setGrip('right', false); });
         }
@@ -2819,7 +2959,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         this.updateScalePanel();
         if (this.ready && this.placed) this.updateInfo();
         try {
-          window.localStorage.setItem('moja-ck-207-74-5000_vr-v14', String(this.scalePercent));
+          window.localStorage.setItem('moja-ck-207-74-5000_vr-v15', String(this.scalePercent));
         } catch (error) {}
         if (!silent) {
           window.dispatchEvent(new CustomEvent('moja-scale-changed', {detail: {percent: this.scalePercent}}));
@@ -2873,6 +3013,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         var selection = this.getSelection();
         var measurement = this.getMeasurement();
         var annotation = this.getAnnotation();
+        var previousMode = this.interactionMode;
 
         if (this.modeType === 'vr') {
           if (this.interactionMode === 'nav') this.interactionMode = 'measure';
@@ -2886,6 +3027,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
           else this.interactionMode = 'move';
         }
 
+        if (selection && previousMode === 'select' && this.interactionMode !== 'select') selection.clearSelection();
         measurement.setEnabled(this.interactionMode === 'measure');
         if (selection) selection.setEnabled(this.interactionMode === 'select');
         if (annotation) annotation.setEnabled(this.interactionMode === 'annotate');
@@ -2895,6 +3037,16 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         this.updateModeUI();
         this.updateRayColor();
       },
+      handleClearShortcut: function () {
+        if (!this.ready) return;
+        if (this.interactionMode === 'measure') {
+          this.getMeasurement().clear();
+        } else if (this.interactionMode === 'select') {
+          var selection = this.getSelection();
+          if (selection) selection.clearSelection();
+        }
+      },
+
       handleY: function () {
         if (!this.ready) return;
         if (this.interactionMode === 'measure') {
@@ -2923,24 +3075,24 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
           return;
         }
         if (this.interactionMode === 'measure') {
-          this.modeText.setAttribute('value', 'POMIAR  •  TRIGGER: PUNKT  •  Y: WYCZYŚĆ  •  X: KOMPONENTY');
+          this.modeText.setAttribute('value', 'POMIAR  •  PRAWY TRIGGER: PUNKT  •  R-STICK: WYCZYŚĆ  •  LEWY TRIGGER: LASER');
           this.modeText.setAttribute('color', '#FBBF24');
         } else if (this.interactionMode === 'select') {
-          this.modeText.setAttribute('value', 'DRZEWO  •  TRIGGER: WYBIERZ  •  Y: PANEL  •  PRAWY JOYSTICK: PRZEWIJAJ  •  +/−: ROZWIŃ');
+          this.modeText.setAttribute('value', 'KOMPONENTY  •  PRAWY TRIGGER: WYBIERZ/ODZNACZ  •  Y: HUD  •  R-STICK: WYCZYŚĆ  •  LEWY TRIGGER: LASER');
           this.modeText.setAttribute('color', '#C4B5FD');
         } else if (this.interactionMode === 'annotate') {
-          this.modeText.setAttribute('value', 'ADNOTACJE 3D  •  RYSUJ: TRZYMAJ TRIGGER  •  TEKST: PUŚĆ TRIGGER W PUNKCIE LASERA  •  Y: PANEL');
+          this.modeText.setAttribute('value', 'ADNOTACJE 3D  •  PRAWY TRIGGER: RYSUJ/TEKST  •  Y: HUD  •  LEWY TRIGGER: LASER PREZENTACYJNY');
           this.modeText.setAttribute('color', '#F9A8D4');
         } else if (this.modeType === 'mr') {
           this.modeText.setAttribute(
             'value',
             this.freeGrab3D
-              ? 'MR FREE GRAB 3D  •  1 GRIP: PRZESUŃ + OBRÓĆ  •  2 GRIPY: OBRÓT Y  •  Y: SKALA'
-              : 'MR  •  L: PRZESUŃ  •  PRAWY GRIP: PRZESUŃ  •  2 GRIPY: OBRÓT Y  •  Y: SKALA'
+              ? 'MR FREE GRAB 3D  •  1 GRIP: PRZESUŃ + OBRÓĆ  •  B: GÓRA  •  A: DÓŁ  •  LEWY: LASER'
+              : 'MR  •  L: PRZESUŃ  •  PRAWY GRIP: PRZESUŃ  •  B: GÓRA  •  A: DÓŁ  •  LEWY: LASER'
           );
           this.modeText.setAttribute('color', '#D1FAE5');
         } else {
-          this.modeText.setAttribute('value', 'NAWIGACJA  •  L: RUCH  •  R: OBRÓT  •  A/B: GÓRA/DÓŁ  •  TRIGGER: TELEPORT');
+          this.modeText.setAttribute('value', 'NAWIGACJA  •  L: RUCH  •  R: OBRÓT  •  B: GÓRA  •  A: DÓŁ  •  PRAWY TRIGGER: TELEPORT  •  LEWY: LASER');
           this.modeText.setAttribute('color', '#E0F2FE');
         }
       },
@@ -2956,7 +3108,13 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
       onRaySelect: function (event) {
         if (!this.ready) return;
         var intersection = event.detail && event.detail.intersection;
-        if (!intersection) return;
+        if (!intersection) {
+          if (this.interactionMode === 'select') {
+            var emptySelection = this.getSelection();
+            if (emptySelection) emptySelection.clearSelection();
+          }
+          return;
+        }
         var targetEl = MOJA.getInteractiveEl(intersection);
         if (targetEl && targetEl.classList && targetEl.classList.contains('ui-click')) {
           targetEl.emit('click', {intersection: intersection}, false);
@@ -2969,7 +3127,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         }
         if (this.interactionMode === 'select') {
           var selection = this.getSelection();
-          if (selection) selection.selectIntersection(intersection);
+          if (selection && !selection.selectIntersection(intersection)) selection.clearSelection();
           return;
         }
         if (this.interactionMode === 'annotate') return;
@@ -3253,8 +3411,8 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
 </head>
 <body>
   <div class="topbar">
-    <a class="pill" href="index.html?v=14">← Viewer</a>
-    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v14</div>
+    <a class="pill" href="index.html?v=15">← Viewer</a>
+    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v15</div>
     <button id="enterXR" class="pill enter" type="button">ENTER VR</button>
   </div>
 
@@ -3262,7 +3420,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
 
   <div id="landing" class="landing">
     <div class="card">
-      <div id="landingVersion" class="version">META QUEST 3 • v14</div>
+      <div id="landingVersion" class="version">META QUEST 3 • v15</div>
       <h1 id="landingTitle">CK-207-74-5000_VR — Virtual Reality</h1>
       <p id="landingDescription">Model jest zakotwiczony w skali 1:1. Poruszasz się użytkownikiem, mierzysz i zarządzasz widocznością komponentów.</p>
 
@@ -3286,7 +3444,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
 
       <div id="landingControls" class="controls"></div>
       <div class="actions">
-        <a class="button" href="index.html?v=14">← Wróć</a>
+        <a class="button" href="index.html?v=15">← Wróć</a>
         <button id="landingEnter" class="button primary" type="button">ENTER VR — QUEST 3</button>
       </div>
       <div id="landingNote" class="note">Subtelne krawędzie, oświetlenie modelu 360° i brak ciężkich map cieni.</div>
@@ -3296,14 +3454,14 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
   <a-scene
     id="scene"
     quest-viewer="pivot: #modelPivot; asset: #modelAsset; rig: #rig; camera: #camera; left: #leftHand; right: #rightHand; floor: #floor; grid: #metricGrid; reticle: #placementReticle; info: #modelInfo; infoText: #modelInfoText; modeText: #modeText; teleportMarker: #teleportMarker; scalePanel: #scalePanel; scaleValueText: #scaleValueText; scaleKnob: #scaleKnob; componentPanel: #componentPanel; freeGrabButton: #freeGrabButton; freeGrabButtonText: #freeGrabButtonText"
-    component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; scrollTrack: #componentScrollTrack; scrollThumb: #componentScrollThumb; structureUrl: CK-207-74-5000_VR.structure.json?v=14; rows: 8"
-    lighting-control="ambient: #ambientLight; front: #lightFront; back: #lightBack; left: #lightLeft; right: #lightRight; top: #lightTop; bottom: #lightBottom; panel: #lightingPanel; valueText: #lightingValueText; detailText: #lightingDetailText; storageKey: moja-ck-207-74-5000_vr-v14-lighting360"
+    component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; scrollTrack: #componentScrollTrack; scrollThumb: #componentScrollThumb; propertiesPanel: #propertiesPanel; propertyTitle: #propertyTitle; propertyCount: #propertyCount; propertyPartNumber: #propertyPartNumber; propertyDescription: #propertyDescription; propertyMaterial: #propertyMaterial; propertyMass: #propertyMass; propertyOccurrence: #propertyOccurrence; propertyFile: #propertyFile; structureUrl: CK-207-74-5000_VR.structure.json?v=15; rows: 8"
+    lighting-control="ambient: #ambientLight; front: #lightFront; back: #lightBack; left: #lightLeft; right: #lightRight; top: #lightTop; bottom: #lightBottom; panel: #lightingPanel; valueText: #lightingValueText; detailText: #lightingDetailText; storageKey: moja-ck-207-74-5000_vr-v15-lighting360"
     annotation-control="pivot: #modelPivot; root: #annotationRoot; camera: #camera; right: #rightHand; panel: #annotationPanel; keyboard: #annotationKeyboard; preview: #annotationTextPreview; status: #annotationStatus"
-    measurement-tool="target: #modelPivot; pointA: #measurePointA; pointB: #measurePointB; line: #measureLine; label: #measureLabel; labelText: #measureLabelText; color: #F59E0B"
+    measurement-tool="target: #modelPivot; pointA: #measurePointA; pointB: #measurePointB; line: #measureLine; label: #measureLabel; labelText: #measureLabelText; hud: #measureHud; hudText: #measureHudText; color: #F59E0B"
     loading-screen="backgroundColor: #0B1220; dotsColor: #60A5FA">
 
     <a-assets timeout="120000">
-      <a-asset-item id="modelSource" src="CK-207-74-5000_VR.glb?v=14"></a-asset-item>
+      <a-asset-item id="modelSource" src="CK-207-74-5000_VR.glb?v=15"></a-asset-item>
     </a-assets>
     <!-- OŚWIETLENIE MODELU 360° — bez map cieni -->
     <a-entity id="ambientLight"
@@ -3378,6 +3536,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
     </a-entity>
 
     <a-sphere id="pointerDot" radius="0.017" color="#38BDF8" material="shader: flat" visible="false"></a-sphere>
+    <a-sphere id="presentationDot" radius="0.018" color="#FF3B30" material="shader: flat" visible="false"></a-sphere>
     <a-torus id="teleportMarker" radius="0.14" radius-tubular="0.008" rotation="-90 0 0" color="#34D399" material="shader: flat" visible="false"></a-torus>
 
     <a-sphere id="measurePointA" radius="0.020" color="#F59E0B" material="shader: flat" visible="false"></a-sphere>
@@ -3394,9 +3553,16 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
           <a-plane width="1.55" height="0.105" color="#0F172A" opacity="0.66" material="shader: flat; transparent: true"></a-plane>
           <a-text id="modeText" value="ŁADOWANIE" align="center" anchor="center" baseline="center" width="1.44" color="#E0F2FE" position="0 0 0.006"></a-text>
         </a-entity>
+        <a-entity id="measureHud" position="0 0.39 -0.96" scale="0.72 0.72 0.72" visible="false">
+          <a-plane width="1.46" height="0.13" color="#111827" opacity="0.82" material="shader: flat; transparent: true; depthWrite: false"></a-plane>
+          <a-text id="measureHudText" value="POMIAR • WYBIERZ PUNKT A" align="center" anchor="center" baseline="center" width="1.35" color="#FDE68A" position="0 0 0.006"></a-text>
+        </a-entity>
       </a-camera>
 
-      <a-entity id="leftHand" meta-touch-controls="hand: left">
+      <a-entity id="leftHand"
+        meta-touch-controls="hand: left"
+        raycaster="objects: .ray-target; far: 50; showLine: false; lineColor: #FF3B30; lineOpacity: 0.96; interval: 0"
+        presentation-ray="objects: .ray-target; marker: #presentationDot; color: #FF3B30; far: 50">
         <a-entity id="scalePanel" position="0.07 0.12 -0.29" rotation="-35 0 0" scale="0.54 0.54 0.54" visible="false">
           <a-plane width="0.72" height="0.68" color="#0F172A" opacity="0.94" material="shader: flat; transparent: true"></a-plane>
           <a-text value="SKALA MODELU" align="center" width="0.66" color="#E2E8F0" position="0 0.205 0.006"></a-text>
@@ -3492,6 +3658,23 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
           </a-plane>
           <a-plane class="component-ui ui-click" width="0.24" height="0.060" color="#475569" position="0.290 -0.430 0.012" viewer-button="action: component-close">
             <a-text value="ZAMKNIJ" align="center" width="0.33" color="#FFFFFF" position="0 0 0.006"></a-text>
+          </a-plane>
+        </a-entity>
+
+        <a-entity id="propertiesPanel" position="0.10 0.16 -0.37" rotation="-35 0 0" scale="0.52 0.52 0.52" visible="false">
+          <a-plane width="0.78" height="1.02" color="#071827" opacity="0.97" material="shader: flat; transparent: true"></a-plane>
+          <a-text id="propertyTitle" value="iPROPERTIES" align="center" width="0.68" wrap-count="28" color="#BAE6FD" position="0 0.445 0.008"></a-text>
+          <a-text id="propertyCount" value="WYBIERZ KOMPONENT" align="center" width="0.68" wrap-count="38" color="#94A3B8" position="0 0.385 0.008"></a-text>
+
+          <a-text id="propertyPartNumber" value="PART NUMBER\n—" align="left" anchor="left" width="0.64" wrap-count="30" color="#F8FAFC" position="-0.33 0.290 0.008"></a-text>
+          <a-text id="propertyDescription" value="DESCRIPTION\n—" align="left" anchor="left" width="0.64" wrap-count="34" color="#E2E8F0" position="-0.33 0.165 0.008"></a-text>
+          <a-text id="propertyMaterial" value="MATERIAL\n—" align="left" anchor="left" width="0.64" wrap-count="30" color="#F8FAFC" position="-0.33 0.010 0.008"></a-text>
+          <a-text id="propertyMass" value="MASS\n—" align="left" anchor="left" width="0.64" wrap-count="30" color="#F8FAFC" position="-0.33 -0.095 0.008"></a-text>
+          <a-text id="propertyOccurrence" value="OCCURRENCE\n—" align="left" anchor="left" width="0.64" wrap-count="30" color="#CBD5E1" position="-0.33 -0.205 0.008"></a-text>
+          <a-text id="propertyFile" value="FILE\n—" align="left" anchor="left" width="0.64" wrap-count="30" color="#CBD5E1" position="-0.33 -0.330 0.008"></a-text>
+
+          <a-plane class="component-ui ui-click" width="0.56" height="0.062" color="#475569" position="0 -0.445 0.012" viewer-button="action: component-close">
+            <a-text value="ZAMKNIJ HUD" align="center" width="0.62" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
         </a-entity>
 
@@ -3668,6 +3851,30 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
       var numberInput = document.getElementById('scaleNumber');
       var rangeInput = document.getElementById('scaleRange');
 
+      function configureHeadLockedHud() {
+        var camera = document.getElementById('camera');
+        if (!camera) return;
+        var settings = [
+          ['componentPanel', '-0.64 -0.02 -1.08', '0 18 0', '0.60 0.60 0.60'],
+          ['propertiesPanel', '0.64 -0.02 -1.08', '0 -18 0', '0.62 0.62 0.62'],
+          ['scalePanel', '-0.64 -0.02 -1.08', '0 18 0', '0.66 0.66 0.66'],
+          ['lightingPanel', '-0.64 -0.02 -1.08', '0 18 0', '0.68 0.68 0.68'],
+          ['annotationPanel', '-0.64 -0.02 -1.08', '0 18 0', '0.62 0.62 0.62'],
+          ['annotationKeyboard', '0 -0.03 -0.96', '0 0 0', '0.66 0.66 0.66']
+        ];
+        settings.forEach(function (entry) {
+          var panel = document.getElementById(entry[0]);
+          if (!panel) return;
+          if (panel.parentElement !== camera) camera.appendChild(panel);
+          panel.setAttribute('position', entry[1]);
+          panel.setAttribute('rotation', entry[2]);
+          panel.setAttribute('scale', entry[3]);
+        });
+      }
+
+      if (scene && scene.hasLoaded) configureHeadLockedHud();
+      else if (scene) scene.addEventListener('loaded', configureHeadLockedHud, {once: true});
+
       function pills(values, target) {
         target.innerHTML = '';
         values.forEach(function (value) {
@@ -3678,11 +3885,11 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
       }
 
       if (mode === 'mr') {
-        document.title = 'CK-207-74-5000_VR — Meta Quest MR v14';
-        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v14';
+        document.title = 'CK-207-74-5000_VR — Meta Quest MR v15';
+        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v15';
         enterXR.textContent = 'ENTER MR';
         enterXR.classList.add('mr');
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v14';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v15';
         landingVersion.classList.add('mr');
         landingTitle.textContent = 'CK-207-74-5000_VR — Mixed Reality';
         landingDescription.textContent = 'Postaw model w pokoju, ustaw dokładną skalę, przesuń go i obróć wokół osi pionowej gestem dwóch gripów.';
@@ -3694,23 +3901,25 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
           'L joystick: przesuń model',
           'Prawy grip: przesunięcie / FREE GRAB 3D',
           '2 gripy: obrót osi Y',
-          'A / B: góra / dół',
+          'B: góra  •  A: dół',
           'X: ruch → pomiar → komponenty → adnotacje',
-          'Y: panel / wyczyść'
+          'Lewy Trigger: laser prezentacyjny',
+          'Y: pokaż/ukryj HUD'
         ], landingControls);
         pills([
           'L: przesuń model',
           '2 gripy: obrót modelu',
-          'A/B: góra/dół',
+          'B: góra  •  A: dół',
           'X: tryb',
-          'Y: panel',
-          'Trigger: wskaż'
+          'Y: HUD',
+          'Prawy Trigger: akcja',
+          'Lewy Trigger: laser'
         ], legend);
       } else {
-        document.title = 'CK-207-74-5000_VR — Meta Quest VR v14';
-        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v14';
+        document.title = 'CK-207-74-5000_VR — Meta Quest VR v15';
+        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v15';
         enterXR.textContent = 'ENTER VR';
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v14';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v15';
         landingTitle.textContent = 'CK-207-74-5000_VR — Virtual Reality';
         landingDescription.textContent = 'Model pozostaje zakotwiczony w skali 1:1. Chodzisz, obracasz użytkownika, teleportujesz się, mierzysz i izolujesz komponenty.';
         landingEnter.textContent = 'ENTER VR — QUEST 3';
@@ -3718,18 +3927,20 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         pills([
           'L joystick: chodzenie',
           'R joystick: obrót użytkownika',
-          'A / B: góra / dół',
-          'Trigger: teleport / punkt',
+          'B: góra  •  A: dół',
+          'Prawy Trigger: teleport / punkt',
           'X: nawigacja → pomiar → komponenty → adnotacje',
-          'Y: wyczyść / panel'
+          'Lewy Trigger: laser prezentacyjny',
+          'Y: HUD  •  R-stick klik: wyczyść'
         ], landingControls);
         pills([
           'L: chodzenie',
           'R: obrót użytkownika',
-          'A/B: góra/dół',
-          'Trigger: teleport',
+          'B: góra  •  A: dół',
+          'Prawy Trigger: teleport',
+          'Lewy Trigger: laser',
           'X: tryb',
-          'Y: panel'
+          'Y: HUD'
         ], legend);
       }
 
@@ -3744,7 +3955,7 @@ if (visual.label.parentNode) visual.label.parentNode.removeChild(visual.label);
         window.MOJA_START_SCALE = current;
         numberInput.value = String(current);
         rangeInput.value = String(Math.max(10, Math.min(300, current)));
-        try { window.localStorage.setItem('moja-ck-207-74-5000_vr-v14', String(current)); } catch (error) {}
+        try { window.localStorage.setItem('moja-ck-207-74-5000_vr-v15', String(current)); } catch (error) {}
         if (emit) window.dispatchEvent(new CustomEvent('moja-scale-request', {detail: {percent: current}}));
       }
 
