@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#0f172a">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — MOJA XR v17</title>
+  <title>CK-207-74-5000_VR — MOJA XR v18</title>
 
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
-  <script src="moja-snap.js?v=17"></script>
-  <script src="moja-measure.js?v=17"></script>
+  <script src="moja-snap.js?v=18"></script>
+  <script src="moja-measure.js?v=18"></script>
 
   <script type="importmap">
   {
@@ -256,7 +256,7 @@
 
   <div class="topbar">
     <button id="treeToggle" class="pill mobile-toggle" type="button">☰ Drzewo</button>
-    <div class="pill"><strong>CK-207-74-5000_VR</strong><small>MOJA XR v17</small></div>
+    <div class="pill"><strong>CK-207-74-5000_VR</strong><small>MOJA XR v18</small></div>
     <button id="propsToggle" class="pill mobile-toggle" type="button">iProperties</button>
     <div id="loadStatus" class="pill status"><span>Ładowanie modelu…</span></div>
   </div>
@@ -305,7 +305,6 @@
       <button class="measure-type" data-measure-type="xyz" type="button">XYZ</button>
       <button class="measure-type" data-measure-type="angle" type="button">KĄT</button>
       <button class="measure-type" data-measure-type="point" type="button">PUNKT XYZ</button>
-      <button class="measure-type" data-measure-type="laser" type="button">LASER</button>
       <button class="measure-type" data-measure-type="area" type="button">POWIERZCHNIA</button>
       <button class="measure-type" data-measure-type="min-distance" type="button">MIN. PART–PART</button>
     </div>
@@ -361,14 +360,14 @@
       <output id="explodeValue">0%</output>
     </div>
     <button id="arButton" class="tool cyan" type="button"><strong>AR</strong><span>telefon</span></button>
-    <a id="mrButton" class="tool green" href="quest.html?mode=mr&v=17" style="text-decoration:none;color:#fff"><strong>MR</strong><span>Quest 3</span></a>
-    <a id="vrButton" class="tool blue" href="quest.html?mode=vr&v=17" style="text-decoration:none;color:#fff"><strong>VR</strong><span>Quest 3</span></a>
+    <a id="mrButton" class="tool green" href="quest.html?mode=mr&v=18" style="text-decoration:none;color:#fff"><strong>MR</strong><span>Quest 3</span></a>
+    <a id="vrButton" class="tool blue" href="quest.html?mode=vr&v=18" style="text-decoration:none;color:#fff"><strong>VR</strong><span>Quest 3</span></a>
   </nav>
 
   <model-viewer
     id="arViewer"
-    src="CK-207-74-5000_VR.glb?v=17"
-    ios-src="CK-207-74-5000_VR.usdz?v=17"
+    src="CK-207-74-5000_VR.glb?v=18"
+    ios-src="CK-207-74-5000_VR.usdz?v=18"
     ar
     ar-modes="webxr scene-viewer quick-look"
     ar-placement="floor"
@@ -502,7 +501,6 @@
     const measurePathXWorld = new THREE.Vector3();
     const measurePathXYWorld = new THREE.Vector3();
     const measureRootScale = new THREE.Vector3(1, 1, 1);
-    const cameraWorld = new THREE.Vector3();
     const screenA = new THREE.Vector2();
     const screenB = new THREE.Vector2();
     const screenC = new THREE.Vector2();
@@ -1030,7 +1028,7 @@
 
     function measurementTypeName(type) {
       return ({
-        distance: 'DYSTANS', xyz: 'XYZ', angle: 'KĄT', point: 'PUNKT XYZ', laser: 'LASER', area: 'POWIERZCHNIA', 'min-distance': 'MIN. PART–PART'
+        distance: 'DYSTANS', xyz: 'XYZ', angle: 'KĄT', point: 'PUNKT XYZ', area: 'POWIERZCHNIA', 'min-distance': 'MIN. PART–PART'
       })[type] || 'POMIAR';
     }
 
@@ -1051,7 +1049,7 @@
     }
 
     function setMeasurementType(type) {
-      if (!['distance', 'xyz', 'angle', 'point', 'laser', 'area', 'min-distance'].includes(type)) return;
+      if (!['distance', 'xyz', 'angle', 'point', 'area', 'min-distance'].includes(type)) return;
       state.measurement.type = type;
       clearMeasurement(true);
       updateMeasurementControls();
@@ -1072,9 +1070,6 @@
       } else if (measurement.type === 'point') {
         measurePrompt.textContent = 'Wskaż punkt. Viewer pokaże współrzędne X/Y/Z w układzie modelu.';
         if (!measurement.points.length && !measurement.hover) setMeasureResults([['X','—'],['Y','—'],['Z','—'],['SNAP','—']]);
-      } else if (measurement.type === 'laser') {
-        measurePrompt.textContent = 'Pomiar od kamery do wskazanego punktu. Podgląd jest ciągły; kliknięcie przypina wynik.';
-        if (!measurement.points.length && !measurement.hover) setMeasureResults([['LASER','—'],['SNAP','—']]);
       } else if (measurement.type === 'area') {
         measurePrompt.textContent = measurement.result
           ? 'Powierzchnia wydzielona z połączonych trójkątów GLB. Kliknij inną powierzchnię, aby przeliczyć.'
@@ -1273,21 +1268,6 @@
         return;
       }
 
-      if (measurement.type === 'laser') {
-        const point = points[0] || hover;
-        if (!point || !resolveMeasuredPoint(point, measureWorldA) || !projectWorld(measureWorldA, screenA)) return;
-        camera.getWorldPosition(cameraWorld);
-        const rect = renderer.domElement.getBoundingClientRect();
-        screenB.set(rect.left + rect.width * 0.5, rect.top + rect.height * 0.5);
-        showSvgLine(measureLineMain, screenB, screenA, !points[0]);
-        showSvgMarker(measureMarkerA, screenA, !points[0]);
-        const length = cameraWorld.distanceTo(measureWorldA);
-        midpoint2D(screenB, screenA, screenC);
-        placeFloat(measureMainLabel, screenC.x, screenC.y - 14, formatMm(length,true));
-        setMeasureResults([['LASER',formatLength(length,true)],['SNAP',shortSnapLabel(point.snapKind)]]);
-        return;
-      }
-
       if (measurement.type === 'area' && measurement.result) {
         const result = measurement.result;
         const stored = result.storedCentroid;
@@ -1353,7 +1333,7 @@
       } else if (measurement.type === 'angle') {
         if (measurement.points.length >= 3) measurement.points = [];
         measurement.points.push(stored);
-      } else if (measurement.type === 'point' || measurement.type === 'laser') {
+      } else if (measurement.type === 'point') {
         measurement.points = [stored];
       } else if (measurement.type === 'area') {
         const surface = measureEngine.surfacePatchFromIntersection(measurement.hoverIntersection, {smoothAngleDeg: 14});
