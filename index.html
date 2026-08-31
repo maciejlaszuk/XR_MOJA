@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#0f172a">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — MOJA XR v16</title>
+  <title>CK-207-74-5000_VR — MOJA XR v17</title>
 
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
-  <script src="moja-snap.js?v=16"></script>
-  <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.3.1/dist/model-viewer.min.js"></script>
+  <script src="moja-snap.js?v=17"></script>
+  <script src="moja-measure.js?v=17"></script>
 
   <script type="importmap">
   {
@@ -22,6 +22,7 @@
     }
   }
   </script>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.3.1/dist/model-viewer.min.js"></script>
 
   <style>
     :root {
@@ -144,20 +145,61 @@
     .mode-tool.clear { background: #475569; }
 
     .measure-hud {
-      position: fixed; z-index: 48; top: 66px; left: 50%; transform: translateX(-50%);
-      width: min(470px, calc(100vw - 24px)); padding: 11px 13px;
-      border: 1px solid rgba(245,158,11,.55); border-radius: 16px;
-      background: rgba(15,23,42,.94); color: #fff; box-shadow: 0 18px 48px rgba(15,23,42,.28); backdrop-filter: blur(14px);
+      position: fixed; z-index: 55; top: 66px; left: 50%; transform: translateX(-50%);
+      width: min(820px, calc(100vw - 24px)); padding: 10px 12px;
+      border: 1px solid rgba(56,189,248,.46); border-radius: 16px;
+      background: rgba(15,23,42,.95); color: #fff; box-shadow: 0 18px 48px rgba(15,23,42,.31); backdrop-filter: blur(14px);
     }
     .measure-hud[hidden] { display: none; }
     .measure-hud-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-    .measure-hud-head strong { color: #fde68a; font-size: 11px; letter-spacing: .06em; }
-    .measure-hud-head button { min-height: 28px; padding: 0 9px; border: 0; border-radius: 8px; background: #7c2d12; color: #fff; font-size: 10px; font-weight: 900; cursor: pointer; }
-    .measure-prompt { margin-top: 5px; color: #cbd5e1; font-size: 10px; }
-    .measure-grid { margin-top: 8px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-    .measure-cell { padding: 7px 6px; border: 1px solid rgba(148,163,184,.22); border-radius: 9px; background: rgba(30,41,59,.72); text-align: center; }
-    .measure-cell span { display: block; color: #94a3b8; font-size: 9px; font-weight: 900; }
-    .measure-cell strong { display: block; margin-top: 3px; color: #fff; font-size: 11px; }
+    .measure-hud-head strong { color: #bae6fd; font-size: 11px; letter-spacing: .06em; white-space: nowrap; }
+    .measure-actions { display: flex; align-items: center; gap: 6px; }
+    .measure-head-button { min-height: 28px; padding: 0 9px; border: 1px solid rgba(255,255,255,.12); border-radius: 8px; background: #334155; color: #fff; font-size: 9px; font-weight: 900; cursor: pointer; }
+    .measure-head-button.snap-on { background: #0369a1; border-color: #7dd3fc; }
+    .measure-head-button.snap-off { background: #7c2d12; border-color: #fdba74; }
+    .measure-head-button.clear { background: #7c2d12; }
+    .measure-type-row, .snap-filter-row { display: flex; align-items: center; gap: 5px; overflow-x: auto; scrollbar-width: thin; }
+    .measure-type-row { margin-top: 8px; padding-bottom: 2px; }
+    .measure-type { flex: 0 0 auto; min-height: 31px; padding: 0 10px; border: 1px solid rgba(148,163,184,.28); border-radius: 9px; background: #1e293b; color: #cbd5e1; font-size: 9px; font-weight: 900; cursor: pointer; white-space: nowrap; }
+    .measure-type.active { background: #075985; border-color: #7dd3fc; color: #fff; }
+    .snap-filter-row { margin-top: 7px; }
+    .snap-filter-label { flex: 0 0 auto; color: #94a3b8; font-size: 9px; font-weight: 900; }
+    .snap-filter { flex: 0 0 auto; min-height: 25px; padding: 0 8px; border: 1px solid rgba(148,163,184,.25); border-radius: 999px; background: #111827; color: #94a3b8; font-size: 8px; font-weight: 900; cursor: pointer; }
+    .snap-filter.active { background: #0f766e; border-color: #5eead4; color: #ecfeff; }
+    .snap-filter:disabled { opacity: .32; cursor: default; }
+    .measure-prompt { margin-top: 7px; color: #cbd5e1; font-size: 9px; line-height: 1.35; }
+    .measure-grid { margin-top: 7px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+    .measure-cell { min-width: 0; padding: 6px 5px; border: 1px solid rgba(148,163,184,.22); border-radius: 8px; background: rgba(30,41,59,.72); text-align: center; }
+    .measure-cell[hidden] { display: none; }
+    .measure-cell span { display: block; overflow: hidden; color: #94a3b8; font-size: 8px; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; }
+    .measure-cell strong { display: block; margin-top: 3px; overflow: hidden; color: #fff; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+    .measure-compute { display: none; width: 100%; min-height: 34px; margin-top: 7px; border: 1px solid #86efac; border-radius: 9px; background: #166534; color: #fff; font-size: 10px; font-weight: 900; cursor: pointer; }
+    .measure-compute.show { display: block; }
+    .measure-compute:disabled { opacity: .48; cursor: progress; }
+
+    .measure-overlay { position: fixed; z-index: 44; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+    .measure-overlay line, .measure-overlay path { vector-effect: non-scaling-stroke; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    .measure-overlay .direct { stroke: #2563eb; stroke-width: 2.6; }
+    .measure-overlay .preview { stroke-dasharray: 7 5; opacity: .86; }
+    .measure-overlay .axis-x { stroke: #ef4444; stroke-width: 2.1; }
+    .measure-overlay .axis-y { stroke: #22c55e; stroke-width: 2.1; }
+    .measure-overlay .axis-z { stroke: #3b82f6; stroke-width: 2.1; }
+    .measure-overlay .angle-arc { stroke: #2563eb; stroke-width: 2.6; }
+    .measure-overlay .endpoint { fill: #fff; stroke: #2563eb; stroke-width: 2; }
+    .measure-overlay .endpoint.preview-point { fill: #f59e0b; stroke: #fff; }
+
+    .measure-float { position: fixed; z-index: 47; display: none; transform: translate(-50%, -50%); pointer-events: none; white-space: nowrap; }
+    .measure-float.show { display: block; }
+    .measure-value-label { padding: 4px 8px; border: 1px solid rgba(15,23,42,.22); border-radius: 7px; background: rgba(248,250,252,.96); color: #2563eb; box-shadow: 0 3px 10px rgba(15,23,42,.22); font-size: 12px; font-weight: 800; }
+    .measure-value-label.secondary { color: #334155; font-size: 10px; }
+    .measure-coordinates { padding: 6px 8px; border-radius: 8px; background: rgba(248,250,252,.96); color: #0f172a; box-shadow: 0 3px 10px rgba(15,23,42,.22); font-size: 10px; font-weight: 800; line-height: 1.45; }
+    .measure-coordinates b.x { color: #ef4444; } .measure-coordinates b.y { color: #16a34a; } .measure-coordinates b.z { color: #2563eb; }
+    .snap-indicator { padding: 4px 7px; border: 1px solid rgba(15,23,42,.26); border-radius: 7px; background: rgba(255,255,255,.97); color: #0f172a; box-shadow: 0 3px 11px rgba(15,23,42,.24); font-size: 9px; font-weight: 900; letter-spacing: .02em; }
+    .snap-indicator .snap-symbol { display: inline-grid; width: 15px; height: 15px; margin-right: 4px; place-items: center; border: 2px solid #f97316; color: #f97316; line-height: 1; }
+    .snap-indicator[data-kind="center"] .snap-symbol { border-radius: 50%; }
+    .snap-indicator[data-kind="midpoint"] .snap-symbol { border: 0; font-size: 17px; }
+    .snap-indicator[data-kind="perpendicular"] .snap-symbol { border: 0; font-size: 16px; }
+    .snap-indicator[data-kind="edge"] .snap-symbol, .snap-indicator[data-kind="surface"] .snap-symbol { border: 0; font-size: 15px; }
     #viewport[data-mode="select"] canvas, #viewport[data-mode="measure"] canvas { cursor: crosshair; }
 
     .explode-wrap { grid-column: span 2; display: grid; grid-template-columns: 62px 1fr 42px; align-items: center; gap: 8px; padding: 0 11px; border-radius: 12px; background: #1e293b; }
@@ -190,10 +232,15 @@
       .toolbar { bottom: max(8px, env(safe-area-inset-bottom)); width: calc(100vw - 16px); grid-template-columns: repeat(5,1fr); gap: 5px; padding: 6px; }
       .interaction-bar { bottom: calc(max(8px, env(safe-area-inset-bottom)) + 58px); width: calc(100vw - 16px); gap: 5px; padding: 5px; }
       .mode-tool { min-height: 40px; font-size: 10px; }
-      .measure-hud { top: 54px; width: calc(100vw - 16px); padding: 9px 10px; }
-      .measure-grid { gap: 4px; }
-      .measure-cell { padding: 6px 3px; }
-      .measure-cell strong { font-size: 10px; }
+      .measure-hud { top: 54px; width: calc(100vw - 16px); max-height: 42vh; overflow-y: auto; padding: 8px 9px; }
+      .measure-hud-head strong { font-size: 9px; }
+      .measure-actions { gap: 4px; }
+      .measure-head-button { padding: 0 7px; font-size: 8px; }
+      .measure-grid { grid-template-columns: repeat(4, 1fr); gap: 4px; }
+      .measure-cell { padding: 5px 3px; }
+      .measure-cell strong { font-size: 9px; }
+      .measure-type { padding: 0 8px; }
+      .measure-prompt { font-size: 8px; }
       .tool { min-height: 48px; }
       .tool span { display: none; }
       .explode-wrap { display: none; }
@@ -209,7 +256,7 @@
 
   <div class="topbar">
     <button id="treeToggle" class="pill mobile-toggle" type="button">☰ Drzewo</button>
-    <div class="pill"><strong>CK-207-74-5000_VR</strong><small>MOJA XR v16</small></div>
+    <div class="pill"><strong>CK-207-74-5000_VR</strong><small>MOJA XR v17</small></div>
     <button id="propsToggle" class="pill mobile-toggle" type="button">iProperties</button>
     <div id="loadStatus" class="pill status"><span>Ładowanie modelu…</span></div>
   </div>
@@ -247,17 +294,56 @@
 
   <div id="measureHud" class="measure-hud" hidden>
     <div class="measure-hud-head">
-      <strong>POMIAR 2-PUNKTOWY • SNAP AUTO</strong>
-      <button id="measureClear" type="button">WYCZYŚĆ POMIAR</button>
+      <strong id="measureTitle">POMIAR • DYSTANS</strong>
+      <div class="measure-actions">
+        <button id="snapToggle" class="measure-head-button snap-on" type="button">SNAP: ON</button>
+        <button id="measureClear" class="measure-head-button clear" type="button">WYCZYŚĆ</button>
+      </div>
     </div>
-    <div id="measurePrompt" class="measure-prompt">SNAP: wierzchołek • krawędź • środek krawędzi • środek otworu.</div>
+    <div class="measure-type-row" aria-label="Rodzaj pomiaru">
+      <button class="measure-type active" data-measure-type="distance" type="button">DYSTANS</button>
+      <button class="measure-type" data-measure-type="xyz" type="button">XYZ</button>
+      <button class="measure-type" data-measure-type="angle" type="button">KĄT</button>
+      <button class="measure-type" data-measure-type="point" type="button">PUNKT XYZ</button>
+      <button class="measure-type" data-measure-type="laser" type="button">LASER</button>
+      <button class="measure-type" data-measure-type="area" type="button">POWIERZCHNIA</button>
+      <button class="measure-type" data-measure-type="min-distance" type="button">MIN. PART–PART</button>
+    </div>
+    <div class="snap-filter-row" aria-label="Filtry punktów snap">
+      <span class="snap-filter-label">SNAPY:</span>
+      <button class="snap-filter active" data-snap-filter="vertex" type="button">NODE</button>
+      <button class="snap-filter active" data-snap-filter="midpoint" type="button">MID</button>
+      <button class="snap-filter active" data-snap-filter="center" type="button">CENTER</button>
+      <button class="snap-filter active" data-snap-filter="edge" type="button">EDGE</button>
+      <button class="snap-filter active" data-snap-filter="perpendicular" type="button">PERP ⟂</button>
+      <button class="snap-filter active" data-snap-filter="surface" type="button">FACE</button>
+    </div>
+    <div id="measurePrompt" class="measure-prompt">Kliknij pierwszy punkt. Podgląd wymiaru pojawi się przed drugim kliknięciem.</div>
     <div class="measure-grid">
-      <div class="measure-cell"><span>L</span><strong id="measureL">—</strong></div>
-      <div class="measure-cell"><span>ΔX</span><strong id="measureX">—</strong></div>
-      <div class="measure-cell"><span>ΔY</span><strong id="measureY">—</strong></div>
-      <div class="measure-cell"><span>ΔZ</span><strong id="measureZ">—</strong></div>
+      <div class="measure-cell" id="measureCell1"><span id="measureName1">L</span><strong id="measureValue1">—</strong></div>
+      <div class="measure-cell" id="measureCell2"><span id="measureName2">ΔX</span><strong id="measureValue2">—</strong></div>
+      <div class="measure-cell" id="measureCell3"><span id="measureName3">ΔY</span><strong id="measureValue3">—</strong></div>
+      <div class="measure-cell" id="measureCell4"><span id="measureName4">ΔZ</span><strong id="measureValue4">—</strong></div>
+      <div class="measure-cell" id="measureCell5"><span id="measureName5">SNAP</span><strong id="measureValue5">—</strong></div>
     </div>
+    <button id="measureCompute" class="measure-compute" type="button">OBLICZ MINIMALNY DYSTANS DLA 2 ZAZNACZONYCH CZĘŚCI</button>
   </div>
+
+  <svg id="measureOverlay" class="measure-overlay" aria-hidden="true">
+    <line id="measureLineMain" class="direct" x1="0" y1="0" x2="0" y2="0" visibility="hidden"></line>
+    <line id="measureLineSecond" class="direct" x1="0" y1="0" x2="0" y2="0" visibility="hidden"></line>
+    <line id="measureLineX" class="axis-x" x1="0" y1="0" x2="0" y2="0" visibility="hidden"></line>
+    <line id="measureLineY" class="axis-y" x1="0" y1="0" x2="0" y2="0" visibility="hidden"></line>
+    <line id="measureLineZ" class="axis-z" x1="0" y1="0" x2="0" y2="0" visibility="hidden"></line>
+    <path id="measureAngleArc" class="angle-arc" d="" visibility="hidden"></path>
+    <circle id="measureMarkerA" class="endpoint" cx="0" cy="0" r="3.2" visibility="hidden"></circle>
+    <circle id="measureMarkerB" class="endpoint" cx="0" cy="0" r="3.2" visibility="hidden"></circle>
+    <circle id="measureMarkerC" class="endpoint" cx="0" cy="0" r="3.2" visibility="hidden"></circle>
+  </svg>
+  <div id="measureMainLabel" class="measure-float measure-value-label"></div>
+  <div id="measureSecondaryLabel" class="measure-float measure-value-label secondary"></div>
+  <div id="measureCoordinateLabel" class="measure-float measure-coordinates"></div>
+  <div id="snapIndicator" class="measure-float snap-indicator" data-kind="surface"><span class="snap-symbol">●</span><span id="snapIndicatorText">FACE</span></div>
 
   <nav class="interaction-bar" aria-label="Tryb interakcji z modelem">
     <button id="orbitMode" class="mode-tool active" type="button">OBRÓT</button>
@@ -275,14 +361,14 @@
       <output id="explodeValue">0%</output>
     </div>
     <button id="arButton" class="tool cyan" type="button"><strong>AR</strong><span>telefon</span></button>
-    <a id="mrButton" class="tool green" href="quest.html?mode=mr&v=16" style="text-decoration:none;color:#fff"><strong>MR</strong><span>Quest 3</span></a>
-    <a id="vrButton" class="tool blue" href="quest.html?mode=vr&v=16" style="text-decoration:none;color:#fff"><strong>VR</strong><span>Quest 3</span></a>
+    <a id="mrButton" class="tool green" href="quest.html?mode=mr&v=17" style="text-decoration:none;color:#fff"><strong>MR</strong><span>Quest 3</span></a>
+    <a id="vrButton" class="tool blue" href="quest.html?mode=vr&v=17" style="text-decoration:none;color:#fff"><strong>VR</strong><span>Quest 3</span></a>
   </nav>
 
   <model-viewer
     id="arViewer"
-    src="CK-207-74-5000_VR.glb?v=16"
-    ios-src="CK-207-74-5000_VR.usdz?v=16"
+    src="CK-207-74-5000_VR.glb?v=17"
+    ios-src="CK-207-74-5000_VR.usdz?v=17"
     ar
     ar-modes="webxr scene-viewer quick-look"
     ar-placement="floor"
@@ -299,9 +385,13 @@
       maxAngleRad: ('ontouchstart' in window) ? 0.021 : 0.016,
       featureAngleDeg: 18
     });
+    const measureEngine = window.MOJA_MEASURE.createEngine(THREE, {
+      surfaceSmoothAngleDeg: 14,
+      minDistanceMaxTrianglesPerSet: 9000
+    });
 
     const MODEL = 'CK-207-74-5000_VR';
-    const VERSION = '16';
+    const VERSION = '17';
     const viewport = document.getElementById('viewport');
     const loadStatus = document.getElementById('loadStatus');
     const treePanel = document.getElementById('treePanel');
@@ -318,11 +408,32 @@
     const measureModeButton = document.getElementById('measureMode');
     const clearInteractionButton = document.getElementById('clearInteraction');
     const measureHud = document.getElementById('measureHud');
+    const measureTitle = document.getElementById('measureTitle');
     const measurePrompt = document.getElementById('measurePrompt');
-    const measureL = document.getElementById('measureL');
-    const measureX = document.getElementById('measureX');
-    const measureY = document.getElementById('measureY');
-    const measureZ = document.getElementById('measureZ');
+    const snapToggle = document.getElementById('snapToggle');
+    const measureCompute = document.getElementById('measureCompute');
+    const measureTypeButtons = [...document.querySelectorAll('[data-measure-type]')];
+    const snapFilterButtons = [...document.querySelectorAll('[data-snap-filter]')];
+    const measureCells = [1,2,3,4,5].map(index => ({
+      cell: document.getElementById('measureCell' + index),
+      name: document.getElementById('measureName' + index),
+      value: document.getElementById('measureValue' + index)
+    }));
+    const measureOverlay = document.getElementById('measureOverlay');
+    const measureLineMain = document.getElementById('measureLineMain');
+    const measureLineSecond = document.getElementById('measureLineSecond');
+    const measureLineX = document.getElementById('measureLineX');
+    const measureLineY = document.getElementById('measureLineY');
+    const measureLineZ = document.getElementById('measureLineZ');
+    const measureAngleArc = document.getElementById('measureAngleArc');
+    const measureMarkerA = document.getElementById('measureMarkerA');
+    const measureMarkerB = document.getElementById('measureMarkerB');
+    const measureMarkerC = document.getElementById('measureMarkerC');
+    const measureMainLabel = document.getElementById('measureMainLabel');
+    const measureSecondaryLabel = document.getElementById('measureSecondaryLabel');
+    const measureCoordinateLabel = document.getElementById('measureCoordinateLabel');
+    const snapIndicator = document.getElementById('snapIndicator');
+    const snapIndicatorText = document.getElementById('snapIndicatorText');
 
     const state = {
       modelRoot: null,
@@ -340,7 +451,17 @@
       explodeFactor: 0,
       query: '',
       interactionMode: 'orbit',
-      measurement: { points: [null, null] }
+      measurement: {
+        type: 'distance',
+        snapEnabled: true,
+        filters: { vertex: true, midpoint: true, center: true, edge: true, perpendicular: true, surface: true },
+        points: [],
+        hover: null,
+        hoverIntersection: null,
+        result: null,
+        busy: false,
+        computeToken: 0
+      }
     };
 
     const scene = new THREE.Scene();
@@ -371,34 +492,9 @@
     grid.material.opacity = 0.28;
     scene.add(grid);
 
-    const measurementGroup = new THREE.Group();
-    measurementGroup.name = '__MOJA_MEASUREMENT__';
-    scene.add(measurementGroup);
-
-    const markerGeometry = new THREE.SphereGeometry(0.02, 20, 14);
-    const markerA = new THREE.Mesh(markerGeometry, new THREE.MeshBasicMaterial({ color: 0xf59e0b, depthTest: false, toneMapped: false }));
-    const markerB = new THREE.Mesh(markerGeometry, new THREE.MeshBasicMaterial({ color: 0xfde047, depthTest: false, toneMapped: false }));
-    markerA.renderOrder = 120; markerB.renderOrder = 120;
-    measurementGroup.add(markerA, markerB);
-
-    function createMeasureLine(color) {
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute([0,0,0, 0,0,0], 3));
-      const material = new THREE.LineBasicMaterial({ color, depthTest: false, transparent: true, opacity: 0.96, toneMapped: false });
-      const line = new THREE.Line(geometry, material);
-      line.frustumCulled = false; line.renderOrder = 119; measurementGroup.add(line);
-      return line;
-    }
-
-    const measureDirect = createMeasureLine(0xf59e0b);
-    const measureAxisX = createMeasureLine(0xef4444);
-    const measureAxisY = createMeasureLine(0x22c55e);
-    const measureAxisZ = createMeasureLine(0x3b82f6);
-    markerA.visible = markerB.visible = false;
-    measureDirect.visible = measureAxisX.visible = measureAxisY.visible = measureAxisZ.visible = false;
-
     const measureWorldA = new THREE.Vector3();
     const measureWorldB = new THREE.Vector3();
+    const measureWorldC = new THREE.Vector3();
     const measureLocalA = new THREE.Vector3();
     const measureLocalB = new THREE.Vector3();
     const measurePathXLocal = new THREE.Vector3();
@@ -406,6 +502,13 @@
     const measurePathXWorld = new THREE.Vector3();
     const measurePathXYWorld = new THREE.Vector3();
     const measureRootScale = new THREE.Vector3(1, 1, 1);
+    const cameraWorld = new THREE.Vector3();
+    const screenA = new THREE.Vector2();
+    const screenB = new THREE.Vector2();
+    const screenC = new THREE.Vector2();
+    const screenD = new THREE.Vector2();
+    const coordinateTemp = new THREE.Vector3();
+    const currentPointer = { x: window.innerWidth * 0.5, y: window.innerHeight * 0.5, inside: false };
 
     function resize() {
       const rect = viewport.getBoundingClientRect();
@@ -665,6 +768,7 @@
       syncHelpers();
       renderTree();
       renderProperties();
+      invalidateMinimumDistance();
       if (window.innerWidth <= 1100) {
         if (window.innerWidth <= 760) treePanel.classList.remove('open');
         propsPanel.classList.add('open');
@@ -677,6 +781,7 @@
       syncHelpers();
       renderTree();
       renderProperties();
+      invalidateMinimumDistance();
     }
 
     function syncHelpers() {
@@ -764,7 +869,11 @@
       afterVisibilityChange();
     }
     function showAll() { state.meshes.forEach(mesh => { mesh.visible = true; }); afterVisibilityChange(); }
-    function afterVisibilityChange() { syncHelpers(); renderTree(); }
+    function afterVisibilityChange() {
+      syncHelpers();
+      renderTree();
+      invalidateMinimumDistance();
+    }
 
     function fitView() {
       if (!state.modelRoot) return;
@@ -836,27 +945,43 @@
     function setInteractionMode(mode) {
       if (!['orbit', 'select', 'measure'].includes(mode)) return;
       state.interactionMode = mode;
+      if (mode !== 'measure') {
+        state.measurement.hover = null;
+        state.measurement.hoverIntersection = null;
+        snapIndicator.classList.remove('show');
+        clearOverlay();
+      }
       setModeButtonState();
+      if (mode === 'measure') updateMeasurementControls();
     }
 
-    function formatMm(valueMetres) {
+    function formatMm(valueMetres, approximate = false) {
       if (!Number.isFinite(valueMetres)) return '—';
-      return Math.round(valueMetres * 1000).toLocaleString('pl-PL') + ' mm';
+      const mm = Math.round(valueMetres * 1000).toLocaleString('pl-PL');
+      return (approximate ? '≈ ' : '') + mm + ' mm';
     }
 
-    function formatLength(valueMetres) {
+    function formatLength(valueMetres, approximate = false) {
       if (!Number.isFinite(valueMetres)) return '—';
-      return valueMetres.toLocaleString('pl-PL', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' m';
+      if (Math.abs(valueMetres) < 1) return formatMm(valueMetres, approximate);
+      return (approximate ? '≈ ' : '') + valueMetres.toLocaleString('pl-PL', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' m';
     }
 
-    function setMeasureLine(line, start, end, visible = true) {
-      line.visible = Boolean(visible);
-      if (!visible) return;
-      const array = line.geometry.attributes.position.array;
-      array[0] = start.x; array[1] = start.y; array[2] = start.z;
-      array[3] = end.x; array[4] = end.y; array[5] = end.z;
-      line.geometry.attributes.position.needsUpdate = true;
-      line.geometry.computeBoundingSphere();
+    function formatArea(valueSquareMetres, approximate = false) {
+      if (!Number.isFinite(valueSquareMetres)) return '—';
+      return (approximate ? '≈ ' : '') + valueSquareMetres.toLocaleString('pl-PL', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' m²';
+    }
+
+    function snapSymbol(kind) {
+      return ({
+        vertex: '◇', midpoint: '△', center: '⊙', edge: '─', perpendicular: '⟂', surface: '●'
+      })[kind] || '●';
+    }
+
+    function shortSnapLabel(kind) {
+      return ({
+        vertex: 'NODE', midpoint: 'MIDPOINT', center: 'CENTER', edge: 'EDGE', perpendicular: 'PERP ⟂', surface: 'FACE'
+      })[kind] || 'POINT';
     }
 
     function createMeasuredPoint(snap) {
@@ -866,7 +991,22 @@
         object: snap.object,
         local: snap.object.worldToLocal(snap.point.clone()),
         snapKind: snap.kind || 'surface',
-        snapLabel: snap.label || 'PUNKT POWIERZCHNI'
+        snapLabel: snap.label || 'PUNKT POWIERZCHNI',
+        sourceIntersection: snap.sourceIntersection || null
+      };
+    }
+
+    function createMeasuredWorldPoint(point, object, snapKind, snapLabel) {
+      if (!point) return null;
+      const targetObject = object || state.modelRoot;
+      if (!targetObject) return null;
+      targetObject.updateMatrixWorld(true);
+      return {
+        object: targetObject,
+        local: targetObject.worldToLocal(point.clone()),
+        snapKind: snapKind || 'calculated',
+        snapLabel: snapLabel || 'PUNKT OBLICZONY',
+        sourceIntersection: null
       };
     }
 
@@ -878,78 +1018,425 @@
       return output;
     }
 
-    function resetMeasureReadout() {
-      measureL.textContent = measureX.textContent = measureY.textContent = measureZ.textContent = '—';
-      const pointA = state.measurement.points[0];
-      measurePrompt.textContent = pointA
-        ? 'A: ' + pointA.snapLabel + ' • wskaż punkt B.'
-        : 'SNAP AUTO: wierzchołek • krawędź • środek krawędzi • środek otworu.';
+    function setMeasureResults(items) {
+      measureCells.forEach((entry, index) => {
+        const item = items[index];
+        entry.cell.hidden = !item;
+        if (!item) return;
+        entry.name.textContent = item[0];
+        entry.value.textContent = item[1];
+      });
     }
 
-    function clearMeasurement() {
-      state.measurement.points = [null, null];
-      markerA.visible = markerB.visible = false;
-      measureDirect.visible = measureAxisX.visible = measureAxisY.visible = measureAxisZ.visible = false;
+    function measurementTypeName(type) {
+      return ({
+        distance: 'DYSTANS', xyz: 'XYZ', angle: 'KĄT', point: 'PUNKT XYZ', laser: 'LASER', area: 'POWIERZCHNIA', 'min-distance': 'MIN. PART–PART'
+      })[type] || 'POMIAR';
+    }
+
+    function updateMeasurementControls() {
+      const measurement = state.measurement;
+      measureTitle.textContent = 'POMIAR • ' + measurementTypeName(measurement.type);
+      measureTypeButtons.forEach(button => button.classList.toggle('active', button.dataset.measureType === measurement.type));
+      snapToggle.textContent = measurement.snapEnabled ? 'SNAP: ON' : 'SNAP: OFF';
+      snapToggle.className = 'measure-head-button ' + (measurement.snapEnabled ? 'snap-on' : 'snap-off');
+      snapFilterButtons.forEach(button => {
+        const key = button.dataset.snapFilter;
+        button.classList.toggle('active', Boolean(measurement.filters[key]));
+        button.disabled = !measurement.snapEnabled || measurement.type === 'min-distance';
+      });
+      measureCompute.classList.toggle('show', measurement.type === 'min-distance');
+      measureCompute.disabled = measurement.busy;
       resetMeasureReadout();
     }
 
-    function addMeasurementPoint(hits) {
-      const usableHits = Array.isArray(hits) ? hits : [];
-      const snap = snapEngine.snapFromIntersections(usableHits, raycaster.ray, {
-        maxAngleRad: ('ontouchstart' in window) ? 0.021 : 0.016,
-        searchObjects: state.meshes
-      });
-      const stored = createMeasuredPoint(snap);
-      if (!stored) return;
-      if (state.measurement.points[0] && state.measurement.points[1]) clearMeasurement();
-      if (!state.measurement.points[0]) state.measurement.points[0] = stored;
-      else state.measurement.points[1] = stored;
-      updateMeasurement();
+    function setMeasurementType(type) {
+      if (!['distance', 'xyz', 'angle', 'point', 'laser', 'area', 'min-distance'].includes(type)) return;
+      state.measurement.type = type;
+      clearMeasurement(true);
+      updateMeasurementControls();
     }
 
-    function updateMeasurement() {
-      const pointA = state.measurement.points[0];
-      const pointB = state.measurement.points[1];
-      if (!pointA || !state.modelRoot || !resolveMeasuredPoint(pointA, measureWorldA)) {
-        markerA.visible = markerB.visible = false;
-        measureDirect.visible = measureAxisX.visible = measureAxisY.visible = measureAxisZ.visible = false;
-        resetMeasureReadout();
-        return;
+    function resetMeasureReadout() {
+      const measurement = state.measurement;
+      const count = measurement.points.length;
+      if (measurement.type === 'distance' || measurement.type === 'xyz') {
+        measurePrompt.textContent = count === 0
+          ? 'Kliknij punkt A. SNAP jest pokazywany przy kursorze; po pierwszym kliknięciu wymiar buduje się na żywo.'
+          : (count === 1 ? 'Punkt A zapisany jako ' + measurement.points[0].snapLabel + '. Wskaż punkt B.' : 'Pomiar gotowy. Kolejne kliknięcie rozpocznie nowy pomiar.');
+        if (count < 2 && !measurement.hover) setMeasureResults([['L','—'],['ΔX','—'],['ΔY','—'],['ΔZ','—'],['SNAP', count ? shortSnapLabel(measurement.points[0].snapKind) : '—']]);
+      } else if (measurement.type === 'angle') {
+        const prompts = ['Kliknij pierwszy punkt ramienia A.', 'Kliknij wierzchołek kąta.', 'Wskaż trzeci punkt ramienia B — kąt jest liczony na żywo.', 'Kąt gotowy. Kolejne kliknięcie rozpocznie nowy pomiar.'];
+        measurePrompt.textContent = prompts[Math.min(count, 3)];
+        if (count < 2 && !measurement.hover) setMeasureResults([['KĄT','—'],['A–V','—'],['V–B','—']]);
+      } else if (measurement.type === 'point') {
+        measurePrompt.textContent = 'Wskaż punkt. Viewer pokaże współrzędne X/Y/Z w układzie modelu.';
+        if (!measurement.points.length && !measurement.hover) setMeasureResults([['X','—'],['Y','—'],['Z','—'],['SNAP','—']]);
+      } else if (measurement.type === 'laser') {
+        measurePrompt.textContent = 'Pomiar od kamery do wskazanego punktu. Podgląd jest ciągły; kliknięcie przypina wynik.';
+        if (!measurement.points.length && !measurement.hover) setMeasureResults([['LASER','—'],['SNAP','—']]);
+      } else if (measurement.type === 'area') {
+        measurePrompt.textContent = measurement.result
+          ? 'Powierzchnia wydzielona z połączonych trójkątów GLB. Kliknij inną powierzchnię, aby przeliczyć.'
+          : 'Kliknij powierzchnię. Viewer wydzieli połączony płat siatki i policzy jego pole.';
+        if (!measurement.result) setMeasureResults([['POLE','—'],['TRÓJKĄTY','—']]);
+      } else if (measurement.type === 'min-distance') {
+        const selectedCount = state.selected.size;
+        if (measurement.busy) {
+          measurePrompt.textContent = 'Obliczanie minimalnego dystansu siatek GLB…';
+        } else if (measurement.result) {
+          measurePrompt.textContent = measurement.result.approximate
+            ? 'Wynik przybliżony: duża siatka została próbkowana. Kliknij OBLICZ po każdej zmianie położenia modelu.'
+            : 'Minimalny dystans policzony na pełnej triangulacji. Kliknij OBLICZ po każdej zmianie położenia modelu.';
+        } else {
+          measurePrompt.textContent = 'Zaznacz dokładnie 2 części, wróć do POMIAR i kliknij OBLICZ. Aktualnie zaznaczono: ' + selectedCount + '.';
+          setMeasureResults([['MIN. DYSTANS','—'],['CZĘŚĆ A','—'],['CZĘŚĆ B','—']]);
+        }
       }
+    }
 
-      markerA.position.copy(measureWorldA); markerA.visible = true;
-      if (!pointB || !resolveMeasuredPoint(pointB, measureWorldB)) {
-        markerB.visible = false;
-        measureDirect.visible = measureAxisX.visible = measureAxisY.visible = measureAxisZ.visible = false;
-        resetMeasureReadout();
-        return;
+    function clearOverlay() {
+      [measureLineMain, measureLineSecond, measureLineX, measureLineY, measureLineZ, measureAngleArc, measureMarkerA, measureMarkerB, measureMarkerC].forEach(element => element.setAttribute('visibility', 'hidden'));
+      [measureMainLabel, measureSecondaryLabel, measureCoordinateLabel].forEach(element => element.classList.remove('show'));
+    }
+
+    function clearMeasurement(clearHover = true) {
+      state.measurement.computeToken += 1;
+      state.measurement.points = [];
+      state.measurement.result = null;
+      state.measurement.busy = false;
+      if (clearHover) {
+        state.measurement.hover = null;
+        state.measurement.hoverIntersection = null;
       }
+      clearOverlay();
+      updateMeasurementControls();
+    }
 
-      markerB.position.copy(measureWorldB); markerB.visible = true;
+    function projectWorld(point, output) {
+      if (!point) return false;
+      const projected = point.clone().project(camera);
+      if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y) || projected.z < -1 || projected.z > 1.5) return false;
+      const rect = renderer.domElement.getBoundingClientRect();
+      output.set(rect.left + (projected.x * 0.5 + 0.5) * rect.width, rect.top + (-projected.y * 0.5 + 0.5) * rect.height);
+      return true;
+    }
+
+    function showSvgLine(element, a, b, preview = false) {
+      if (!a || !b) { element.setAttribute('visibility', 'hidden'); return; }
+      element.setAttribute('x1', a.x); element.setAttribute('y1', a.y);
+      element.setAttribute('x2', b.x); element.setAttribute('y2', b.y);
+      element.setAttribute('visibility', 'visible');
+      element.classList.toggle('preview', preview);
+    }
+
+    function showSvgMarker(element, point, preview = false) {
+      if (!point) { element.setAttribute('visibility', 'hidden'); return; }
+      element.setAttribute('cx', point.x); element.setAttribute('cy', point.y);
+      element.setAttribute('visibility', 'visible');
+      element.classList.toggle('preview-point', preview);
+    }
+
+    function placeFloat(element, x, y, html) {
+      element.style.left = x + 'px';
+      element.style.top = y + 'px';
+      element.innerHTML = html;
+      element.classList.add('show');
+    }
+
+    function midpoint2D(a, b, output) {
+      output.set((a.x + b.x) * 0.5, (a.y + b.y) * 0.5);
+      return output;
+    }
+
+    function measurementComponents(worldA, worldB) {
+      if (!state.modelRoot) return {dx:0,dy:0,dz:0};
       state.modelRoot.updateMatrixWorld(true);
-      measureLocalA.copy(measureWorldA); state.modelRoot.worldToLocal(measureLocalA);
-      measureLocalB.copy(measureWorldB); state.modelRoot.worldToLocal(measureLocalB);
+      measureLocalA.copy(worldA); state.modelRoot.worldToLocal(measureLocalA);
+      measureLocalB.copy(worldB); state.modelRoot.worldToLocal(measureLocalB);
       measurePathXLocal.set(measureLocalB.x, measureLocalA.y, measureLocalA.z);
       measurePathXYLocal.set(measureLocalB.x, measureLocalB.y, measureLocalA.z);
       measurePathXWorld.copy(measurePathXLocal); state.modelRoot.localToWorld(measurePathXWorld);
       measurePathXYWorld.copy(measurePathXYLocal); state.modelRoot.localToWorld(measurePathXYWorld);
       state.modelRoot.getWorldScale(measureRootScale);
+      return {
+        dx: Math.abs(measureLocalB.x - measureLocalA.x) * Math.abs(measureRootScale.x),
+        dy: Math.abs(measureLocalB.y - measureLocalA.y) * Math.abs(measureRootScale.y),
+        dz: Math.abs(measureLocalB.z - measureLocalA.z) * Math.abs(measureRootScale.z)
+      };
+    }
 
-      const dx = Math.abs(measureLocalB.x - measureLocalA.x) * Math.abs(measureRootScale.x);
-      const dy = Math.abs(measureLocalB.y - measureLocalA.y) * Math.abs(measureRootScale.y);
-      const dz = Math.abs(measureLocalB.z - measureLocalA.z) * Math.abs(measureRootScale.z);
-      const length = measureWorldA.distanceTo(measureWorldB);
+    function updateSnapIndicator() {
+      const measurement = state.measurement;
+      if (state.interactionMode !== 'measure' || measurement.type === 'min-distance' || !measurement.hover || !currentPointer.inside) {
+        snapIndicator.classList.remove('show');
+        return;
+      }
+      if (!resolveMeasuredPoint(measurement.hover, measureWorldC) || !projectWorld(measureWorldC, screenC)) {
+        snapIndicator.classList.remove('show');
+        return;
+      }
+      const kind = measurement.hover.snapKind || 'surface';
+      snapIndicator.dataset.kind = kind;
+      snapIndicator.querySelector('.snap-symbol').textContent = snapSymbol(kind);
+      snapIndicatorText.textContent = measurement.snapEnabled ? shortSnapLabel(kind) : 'SNAP OFF';
+      const x = Math.min(window.innerWidth - 75, Math.max(75, screenC.x + 34));
+      const y = Math.min(window.innerHeight - 35, Math.max(35, screenC.y - 24));
+      snapIndicator.style.left = x + 'px'; snapIndicator.style.top = y + 'px';
+      snapIndicator.classList.add('show');
+    }
 
-      setMeasureLine(measureDirect, measureWorldA, measureWorldB);
-      setMeasureLine(measureAxisX, measureWorldA, measurePathXWorld, dx > 0.000001);
-      setMeasureLine(measureAxisY, measurePathXWorld, measurePathXYWorld, dy > 0.000001);
-      setMeasureLine(measureAxisZ, measurePathXYWorld, measureWorldB, dz > 0.000001);
+    function setAngleArc(vertex, first, second) {
+      const v1 = {x:first.x-vertex.x, y:first.y-vertex.y};
+      const v2 = {x:second.x-vertex.x, y:second.y-vertex.y};
+      const l1 = Math.hypot(v1.x,v1.y); const l2 = Math.hypot(v2.x,v2.y);
+      if (l1 < 2 || l2 < 2) { measureAngleArc.setAttribute('visibility','hidden'); return; }
+      const r = Math.min(48, Math.max(22, Math.min(l1,l2)*0.24));
+      const a1 = Math.atan2(v1.y,v1.x); const a2 = Math.atan2(v2.y,v2.x);
+      let delta = a2-a1;
+      while (delta <= -Math.PI) delta += Math.PI*2;
+      while (delta > Math.PI) delta -= Math.PI*2;
+      const endAngle = a1 + delta;
+      const p1 = {x:vertex.x+Math.cos(a1)*r, y:vertex.y+Math.sin(a1)*r};
+      const p2 = {x:vertex.x+Math.cos(endAngle)*r, y:vertex.y+Math.sin(endAngle)*r};
+      const large = Math.abs(delta) > Math.PI ? 1 : 0;
+      const sweep = delta >= 0 ? 1 : 0;
+      measureAngleArc.setAttribute('d', `M ${p1.x} ${p1.y} A ${r} ${r} 0 ${large} ${sweep} ${p2.x} ${p2.y}`);
+      measureAngleArc.setAttribute('visibility','visible');
+    }
 
-      measureL.textContent = formatLength(length);
-      measureX.textContent = formatMm(dx);
-      measureY.textContent = formatMm(dy);
-      measureZ.textContent = formatMm(dz);
-      measurePrompt.textContent = 'SNAP A: ' + pointA.snapLabel + ' • SNAP B: ' + pointB.snapLabel + ' • trzeci punkt rozpoczyna nowy pomiar.';
+    function updateMeasurementOverlay() {
+      clearOverlay();
+      updateSnapIndicator();
+      if (state.interactionMode !== 'measure' || !state.modelRoot) return;
+      const measurement = state.measurement;
+      const hover = measurement.hover;
+      const points = measurement.points;
+
+      if (measurement.type === 'distance' || measurement.type === 'xyz') {
+        const pointA = points[0];
+        const pointB = points[1] || (points[0] ? hover : null);
+        if (!pointA || !resolveMeasuredPoint(pointA, measureWorldA) || !projectWorld(measureWorldA, screenA)) return;
+        showSvgMarker(measureMarkerA, screenA, false);
+        if (!pointB || !resolveMeasuredPoint(pointB, measureWorldB) || !projectWorld(measureWorldB, screenB)) return;
+        const preview = !points[1];
+        showSvgLine(measureLineMain, screenA, screenB, preview);
+        showSvgMarker(measureMarkerB, screenB, preview);
+        const length = measureWorldA.distanceTo(measureWorldB);
+        const components = measurementComponents(measureWorldA, measureWorldB);
+        midpoint2D(screenA, screenB, screenD);
+        placeFloat(measureMainLabel, screenD.x, screenD.y - 15, formatMm(length, true));
+        setMeasureResults([['L',formatLength(length,true)],['ΔX',formatMm(components.dx)],['ΔY',formatMm(components.dy)],['ΔZ',formatMm(components.dz)],['SNAP B',shortSnapLabel(pointB.snapKind)]]);
+        measurePrompt.textContent = preview ? 'PODGLĄD LIVE • A: ' + pointA.snapLabel + ' • B: ' + pointB.snapLabel : 'POMIAR GOTOWY • A: ' + pointA.snapLabel + ' • B: ' + pointB.snapLabel;
+
+        if (measurement.type === 'xyz') {
+          if (projectWorld(measurePathXWorld, screenC) && projectWorld(measurePathXYWorld, screenD)) {
+            showSvgLine(measureLineX, screenA, screenC, preview);
+            showSvgLine(measureLineY, screenC, screenD, preview);
+            showSvgLine(measureLineZ, screenD, screenB, preview);
+            placeFloat(measureCoordinateLabel, Math.min(window.innerWidth-80, screenB.x+66), Math.max(65, screenB.y),
+              '<b class="x">X</b> ' + formatMm(components.dx) + '<br><b class="y">Y</b> ' + formatMm(components.dy) + '<br><b class="z">Z</b> ' + formatMm(components.dz));
+          }
+        }
+        return;
+      }
+
+      if (measurement.type === 'angle') {
+        const first = points[0];
+        const vertex = points[1] || (points[0] ? hover : null);
+        const third = points[2] || (points[1] ? hover : null);
+        if (!first || !resolveMeasuredPoint(first, measureWorldA) || !projectWorld(measureWorldA, screenA)) return;
+        showSvgMarker(measureMarkerA, screenA, false);
+        if (!vertex || !resolveMeasuredPoint(vertex, measureWorldB) || !projectWorld(measureWorldB, screenB)) return;
+        showSvgLine(measureLineMain, screenA, screenB, !points[1]);
+        showSvgMarker(measureMarkerB, screenB, !points[1]);
+        if (!third || !resolveMeasuredPoint(third, measureWorldC) || !projectWorld(measureWorldC, screenC)) return;
+        const preview = !points[2];
+        showSvgLine(measureLineSecond, screenB, screenC, preview);
+        showSvgMarker(measureMarkerC, screenC, preview);
+        setAngleArc(screenB, screenA, screenC);
+        const angle = measureEngine.angleDegrees(measureWorldA, measureWorldB, measureWorldC);
+        placeFloat(measureMainLabel, screenB.x + 45, screenB.y - 32, '≈ ' + angle.toLocaleString('pl-PL',{maximumFractionDigits:2}) + '°');
+        setMeasureResults([['KĄT','≈ '+angle.toLocaleString('pl-PL',{maximumFractionDigits:2})+'°'],['A–V',formatMm(measureWorldA.distanceTo(measureWorldB),true)],['V–B',formatMm(measureWorldB.distanceTo(measureWorldC),true)],['SNAP',shortSnapLabel(third.snapKind)]]);
+        measurePrompt.textContent = preview ? 'PODGLĄD KĄTA LIVE • kliknij trzeci punkt.' : 'KĄT GOTOWY • kolejne kliknięcie rozpocznie nowy.';
+        return;
+      }
+
+      if (measurement.type === 'point') {
+        const point = points[0] || hover;
+        if (!point || !resolveMeasuredPoint(point, measureWorldA) || !projectWorld(measureWorldA, screenA)) return;
+        showSvgMarker(measureMarkerA, screenA, !points[0]);
+        measureEngine.modelCoordinates(measureWorldA, state.modelRoot, coordinateTemp);
+        placeFloat(measureCoordinateLabel, Math.min(window.innerWidth-90, screenA.x+78), Math.max(70, screenA.y-10),
+          '<b class="x">X</b> ' + formatMm(coordinateTemp.x) + '<br><b class="y">Y</b> ' + formatMm(coordinateTemp.y) + '<br><b class="z">Z</b> ' + formatMm(coordinateTemp.z));
+        setMeasureResults([['X',formatMm(coordinateTemp.x)],['Y',formatMm(coordinateTemp.y)],['Z',formatMm(coordinateTemp.z)],['SNAP',shortSnapLabel(point.snapKind)]]);
+        return;
+      }
+
+      if (measurement.type === 'laser') {
+        const point = points[0] || hover;
+        if (!point || !resolveMeasuredPoint(point, measureWorldA) || !projectWorld(measureWorldA, screenA)) return;
+        camera.getWorldPosition(cameraWorld);
+        const rect = renderer.domElement.getBoundingClientRect();
+        screenB.set(rect.left + rect.width * 0.5, rect.top + rect.height * 0.5);
+        showSvgLine(measureLineMain, screenB, screenA, !points[0]);
+        showSvgMarker(measureMarkerA, screenA, !points[0]);
+        const length = cameraWorld.distanceTo(measureWorldA);
+        midpoint2D(screenB, screenA, screenC);
+        placeFloat(measureMainLabel, screenC.x, screenC.y - 14, formatMm(length,true));
+        setMeasureResults([['LASER',formatLength(length,true)],['SNAP',shortSnapLabel(point.snapKind)]]);
+        return;
+      }
+
+      if (measurement.type === 'area' && measurement.result) {
+        const result = measurement.result;
+        const stored = result.storedCentroid;
+        if (stored && resolveMeasuredPoint(stored, measureWorldA) && projectWorld(measureWorldA, screenA)) {
+          showSvgMarker(measureMarkerA, screenA, false);
+          placeFloat(measureMainLabel, screenA.x, screenA.y - 25, formatArea(result.area, result.approximate));
+        }
+        setMeasureResults([['POLE',formatArea(result.area,result.approximate)],['TRÓJKĄTY',String(result.triangleCount)],['ZAKRES',result.patch?'PŁAT':'CAŁY MESH']]);
+        return;
+      }
+
+      if (measurement.type === 'min-distance' && measurement.result) {
+        const result = measurement.result;
+        if (!resolveMeasuredPoint(result.storedA, measureWorldA) || !resolveMeasuredPoint(result.storedB, measureWorldB)) return;
+        if (!projectWorld(measureWorldA, screenA) || !projectWorld(measureWorldB, screenB)) return;
+        showSvgLine(measureLineMain, screenA, screenB, false);
+        showSvgMarker(measureMarkerA, screenA, false);
+        showSvgMarker(measureMarkerB, screenB, false);
+        midpoint2D(screenA, screenB, screenC);
+        placeFloat(measureMainLabel, screenC.x, screenC.y - 15, formatMm(result.distance,result.approximate));
+        setMeasureResults([['MIN. DYSTANS',formatLength(result.distance,result.approximate)],['CZĘŚĆ A',result.nameA],['CZĘŚĆ B',result.nameB],['SIATKA',result.approximate?'PRÓBKOWANA':'PEŁNA']]);
+      }
+    }
+
+    function getBasePointForSnap() {
+      const points = state.measurement.points;
+      if (!points.length) return null;
+      const source = state.measurement.type === 'angle' && points.length > 1 ? points[1] : points[points.length - 1];
+      return resolveMeasuredPoint(source, measureWorldA) ? measureWorldA.clone() : null;
+    }
+
+    function findSnap(hits) {
+      const usableHits = Array.isArray(hits) ? hits : [];
+      return snapEngine.snapFromIntersections(usableHits, raycaster.ray, {
+        enabled: state.measurement.snapEnabled,
+        filters: state.measurement.filters,
+        basePoint: getBasePointForSnap(),
+        maxAngleRad: ('ontouchstart' in window) ? 0.021 : 0.016,
+        searchObjects: state.meshes
+      });
+    }
+
+    function updateMeasurementHover(hits) {
+      if (state.interactionMode !== 'measure' || state.measurement.type === 'min-distance') return;
+      const snap = findSnap(hits);
+      state.measurement.hover = createMeasuredPoint(snap);
+      state.measurement.hoverIntersection = snap?.sourceIntersection || hits?.[0] || null;
+      updateMeasurementOverlay();
+    }
+
+    function addMeasurementPoint(hits) {
+      const measurement = state.measurement;
+      if (measurement.type === 'min-distance') return;
+      const snap = findSnap(hits);
+      const stored = createMeasuredPoint(snap);
+      if (!stored) return;
+      measurement.hover = stored;
+      measurement.hoverIntersection = snap?.sourceIntersection || hits?.[0] || null;
+
+      if (measurement.type === 'distance' || measurement.type === 'xyz') {
+        if (measurement.points.length >= 2) measurement.points = [];
+        measurement.points.push(stored);
+      } else if (measurement.type === 'angle') {
+        if (measurement.points.length >= 3) measurement.points = [];
+        measurement.points.push(stored);
+      } else if (measurement.type === 'point' || measurement.type === 'laser') {
+        measurement.points = [stored];
+      } else if (measurement.type === 'area') {
+        const surface = measureEngine.surfacePatchFromIntersection(measurement.hoverIntersection, {smoothAngleDeg: 14});
+        if (!surface) {
+          measurePrompt.textContent = 'Nie udało się wydzielić powierzchni w tym miejscu.';
+          return;
+        }
+        measurement.result = {
+          area: surface.area,
+          triangleCount: surface.triangleCount,
+          patch: surface.patch,
+          approximate: surface.approximate,
+          storedCentroid: createMeasuredWorldPoint(surface.centroid, surface.object, 'surface', 'ŚRODEK POWIERZCHNI')
+        };
+      }
+      resetMeasureReadout();
+      updateMeasurementOverlay();
+    }
+
+    function selectedNodeMeshes(index) {
+      const node = state.treeNodes[index];
+      return node ? [...new Set(node.meshes.filter(mesh => mesh.visible))] : [];
+    }
+
+    async function computeMinimumDistance() {
+      if (state.measurement.busy) return;
+      const indexes = [...state.selected];
+      if (indexes.length !== 2) {
+        measurePrompt.textContent = 'Zaznacz dokładnie 2 części. Aktualnie zaznaczono: ' + indexes.length + '.';
+        return;
+      }
+      const meshesA = selectedNodeMeshes(indexes[0]);
+      const meshesB = selectedNodeMeshes(indexes[1]);
+      if (!meshesA.length || !meshesB.length) {
+        measurePrompt.textContent = 'Jedna z zaznaczonych pozycji nie ma widocznej geometrii.';
+        return;
+      }
+      const computeToken = ++state.measurement.computeToken;
+      state.measurement.busy = true;
+      state.measurement.result = null;
+      updateMeasurementControls();
+      try {
+        const result = await measureEngine.closestDistanceBetweenObjectSets(meshesA, meshesB, {
+          maxTrianglesPerSet: 9000,
+          yieldEvery: 1800,
+          onProgress: progress => { measurePrompt.textContent = 'Obliczanie… najlepszy wynik: ' + (Number.isFinite(progress.bestDistance) ? formatMm(progress.bestDistance,true) : 'szukanie'); }
+        });
+        if (computeToken !== state.measurement.computeToken) return;
+        if (!result) throw new Error('Brak dwóch rozłącznych zestawów geometrii.');
+        const nodeA = state.treeNodes[indexes[0]];
+        const nodeB = state.treeNodes[indexes[1]];
+        state.measurement.result = {
+          distance: result.distance,
+          approximate: result.approximate,
+          storedA: createMeasuredWorldPoint(result.pointA, result.objectA || state.modelRoot, 'calculated', 'MINIMUM A'),
+          storedB: createMeasuredWorldPoint(result.pointB, result.objectB || state.modelRoot, 'calculated', 'MINIMUM B'),
+          nameA: nodeA?.label || 'A',
+          nameB: nodeB?.label || 'B'
+        };
+        measurePrompt.textContent = result.approximate
+          ? 'Wynik przybliżony: duża siatka została próbkowana. Dla mniejszych części obliczenie jest pełne.'
+          : 'Minimalny dystans policzony na pełnej triangulacji zaznaczonych części.';
+      } catch (error) {
+        if (computeToken !== state.measurement.computeToken) return;
+        console.error(error);
+        measurePrompt.textContent = 'Błąd pomiaru minimalnego dystansu: ' + error.message;
+      } finally {
+        if (computeToken === state.measurement.computeToken) {
+          state.measurement.busy = false;
+          updateMeasurementControls();
+          updateMeasurementOverlay();
+        }
+      }
+    }
+
+    function invalidateMinimumDistance() {
+      const measurement = state.measurement;
+      if (measurement.type !== 'min-distance') return;
+      measurement.computeToken += 1;
+      measurement.busy = false;
+      measurement.result = null;
+      clearOverlay();
+      resetMeasureReadout();
     }
 
     function clearInteraction() {
@@ -980,11 +1467,29 @@
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     let pointerDown = null;
+    let lastHoverAt = 0;
+
     renderer.domElement.addEventListener('pointerdown', event => {
       pointerDown = { x: event.clientX, y: event.clientY };
+      currentPointer.x = event.clientX; currentPointer.y = event.clientY; currentPointer.inside = true;
     });
     renderer.domElement.addEventListener('pointercancel', () => { pointerDown = null; });
+    renderer.domElement.addEventListener('pointerleave', () => {
+      currentPointer.inside = false;
+      state.measurement.hover = null;
+      state.measurement.hoverIntersection = null;
+      snapIndicator.classList.remove('show');
+    });
+    renderer.domElement.addEventListener('pointermove', event => {
+      currentPointer.x = event.clientX; currentPointer.y = event.clientY; currentPointer.inside = true;
+      if (!state.modelRoot || state.interactionMode !== 'measure' || state.measurement.type === 'min-distance') return;
+      const now = performance.now();
+      if (now - lastHoverAt < 45) return;
+      lastHoverAt = now;
+      updateMeasurementHover(findPointerHits(event));
+    });
     renderer.domElement.addEventListener('pointerup', event => {
+      currentPointer.x = event.clientX; currentPointer.y = event.clientY; currentPointer.inside = true;
       if (!state.modelRoot || event.button !== 0 || !pointerDown) return;
       const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
       pointerDown = null;
@@ -998,7 +1503,21 @@
     selectModeButton.addEventListener('click', () => setInteractionMode('select'));
     measureModeButton.addEventListener('click', () => setInteractionMode('measure'));
     clearInteractionButton.addEventListener('click', clearInteraction);
-    document.getElementById('measureClear').addEventListener('click', clearMeasurement);
+    document.getElementById('measureClear').addEventListener('click', () => clearMeasurement());
+    measureCompute.addEventListener('click', computeMinimumDistance);
+    snapToggle.addEventListener('click', () => {
+      state.measurement.snapEnabled = !state.measurement.snapEnabled;
+      state.measurement.hover = null;
+      state.measurement.hoverIntersection = null;
+      snapIndicator.classList.remove('show');
+      updateMeasurementControls();
+    });
+    measureTypeButtons.forEach(button => button.addEventListener('click', () => setMeasurementType(button.dataset.measureType)));
+    snapFilterButtons.forEach(button => button.addEventListener('click', () => {
+      const key = button.dataset.snapFilter;
+      state.measurement.filters[key] = !state.measurement.filters[key];
+      updateMeasurementControls();
+    }));
     window.addEventListener('keydown', event => {
       if (event.key === 'Escape') clearInteraction();
       else if (event.key === '1') setInteractionMode('orbit');
@@ -1006,7 +1525,7 @@
       else if (event.key === '3') setInteractionMode('measure');
     });
     setModeButtonState();
-    resetMeasureReadout();
+    updateMeasurementControls();
 
     searchInput.addEventListener('input', () => { state.query = searchInput.value; renderTree(); });
     document.getElementById('expandAll').addEventListener('click', () => { state.treeNodes.forEach(node => { if (node.children.length) node.expanded = true; }); renderTree(); });
@@ -1024,6 +1543,7 @@
       if (explodeRangeMobile) explodeRangeMobile.value = String(percent);
       if (explodeValueMobile) explodeValueMobile.textContent = percent + '%';
       applyExplode(percent);
+      if (state.measurement.type === 'min-distance') invalidateMinimumDistance();
     }
     explodeRange.addEventListener('input', () => setExplodeValue(explodeRange.value));
     if (explodeRangeMobile) explodeRangeMobile.addEventListener('input', () => setExplodeValue(explodeRangeMobile.value));
@@ -1045,7 +1565,7 @@
       requestAnimationFrame(animate);
       controls.update();
       state.helpers.forEach(helper => helper.updateMatrixWorld(true));
-      if (state.measurement.points[0]) updateMeasurement();
+      updateMeasurementOverlay();
       renderer.render(scene, camera);
     }
     animate();
@@ -1076,9 +1596,6 @@
       if (structure?.root) buildStructureNode(structure.root, -1, state.modelRoot, state.modelRoot, 0, true);
       else buildFallbackTree(state.modelRoot);
       finalizeTree();
-      const modelDiagonal = new THREE.Box3().setFromObject(state.modelRoot).getSize(new THREE.Vector3()).length();
-      const markerScale = THREE.MathUtils.clamp(modelDiagonal * 0.55, 0.45, 2.8);
-      markerA.scale.setScalar(markerScale); markerB.scale.setScalar(markerScale);
       fitView();
       setStatus((structure?.root ? 'Drzewo IAM' : 'Nazwy GLB') + ' • ' + state.meshes.length + ' brył', 'ok');
     }).catch(error => {
