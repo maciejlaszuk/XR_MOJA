@@ -6,7 +6,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — Meta Quest Viewer v22</title>
+  <title>CK-207-74-5000_VR — Meta Quest Viewer v23</title>
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
@@ -992,21 +992,27 @@
         visual.label.object3D.visible = true;
         this.forceOverlayElement(visual.label, 94);
       },
-      setXYZLabel: function (labelRoot, mainText, xText, yText, zText, position) {
-        if (!labelRoot || !this.data.labelText) return;
+      setXYZLabel: function (labelRoot, mainText, xText, yText, zText, position, refs) {
+        if (!labelRoot) return;
+        refs = refs || {};
         var plane = labelRoot.querySelector('a-plane');
-        var main = labelRoot.querySelector('#measureLabelText') || this.data.labelText;
-        var lx = labelRoot.querySelector('#measureLabelX');
-        var ly = labelRoot.querySelector('#measureLabelY');
-        var lz = labelRoot.querySelector('#measureLabelZ');
+        var main = refs.labelText || labelRoot.querySelector('#measureLabelText') || labelRoot.querySelector('a-text');
+        var lx = refs.labelX || labelRoot.querySelector('#measureLabelX');
+        var ly = refs.labelY || labelRoot.querySelector('#measureLabelY');
+        var lz = refs.labelZ || labelRoot.querySelector('#measureLabelZ');
         if (plane) {
           plane.setAttribute('width', 1.50);
           plane.setAttribute('height', 0.42);
         }
-        if (main) { main.setAttribute('value', mainText); main.setAttribute('color', '#F8FAFC'); main.setAttribute('position', '0 0.125 0.006'); }
-        if (lx) { lx.setAttribute('value', xText); lx.setAttribute('visible', true); }
-        if (ly) { ly.setAttribute('value', yText); ly.setAttribute('visible', true); }
-        if (lz) { lz.setAttribute('value', zText); lz.setAttribute('visible', true); }
+        if (main) {
+          main.setAttribute('value', mainText);
+          main.setAttribute('color', '#F8FAFC');
+          main.setAttribute('position', '0 0.125 0.006');
+          main.setAttribute('visible', true);
+        }
+        if (lx) { lx.setAttribute('value', xText); lx.setAttribute('color', '#EF4444'); lx.setAttribute('visible', true); }
+        if (ly) { ly.setAttribute('value', yText); ly.setAttribute('color', '#22C55E'); ly.setAttribute('visible', true); }
+        if (lz) { lz.setAttribute('value', zText); lz.setAttribute('color', '#3B82F6'); lz.setAttribute('visible', true); }
         this.placeOverlayInFront(position, labelRoot.object3D.position, 0.028);
         labelRoot.object3D.scale.setScalar(this.overlayScaleAt(position, 0.058, 0.34, 0.90));
         labelRoot.object3D.visible = true;
@@ -1089,7 +1095,7 @@
             this.setSavedAxisLine(visual.axisX, this.worldA, this.pathX, '#EF4444');
             this.setSavedAxisLine(visual.axisY, this.pathX, this.pathXY, '#22C55E');
             this.setSavedAxisLine(visual.axisZ, this.pathXY, this.worldB, '#3B82F6');
-            this.setXYZLabel(visual.label, 'L  ' + this.formatMm(distance, true), 'X  ' + this.formatMm(components.dx, false), 'Y  ' + this.formatMm(components.dy, false), 'Z  ' + this.formatMm(components.dz, false), this.midpoint);
+            this.setXYZLabel(visual.label, 'L  ' + this.formatMm(distance, true), 'X  ' + this.formatMm(components.dx, false), 'Y  ' + this.formatMm(components.dy, false), 'Z  ' + this.formatMm(components.dz, false), this.midpoint, {labelText: visual.labelText, labelX: visual.labelX, labelY: visual.labelY, labelZ: visual.labelZ});
           } else {
             this.setSavedLabel(visual, this.midpoint, this.formatMm(distance, true), '#F8FAFC');
           }
@@ -1456,7 +1462,7 @@
             this.setAxisLineOnly(this.axisVisuals.x,this.worldA,this.pathX);
             this.setAxisLineOnly(this.axisVisuals.y,this.pathX,this.pathXY);
             this.setAxisLineOnly(this.axisVisuals.z,this.pathXY,this.worldB);
-            this.setXYZLabel(this.data.label, 'L  ' + this.formatMm(distance,true), 'X  ' + this.formatMm(components.dx,false), 'Y  ' + this.formatMm(components.dy,false), 'Z  ' + this.formatMm(components.dz,false), this.midpoint);
+            this.setXYZLabel(this.data.label, 'L  ' + this.formatMm(distance,true), 'X  ' + this.formatMm(components.dx,false), 'Y  ' + this.formatMm(components.dy,false), 'Z  ' + this.formatMm(components.dz,false), this.midpoint, {labelText: this.data.labelText, labelX: this.data.label.querySelector('#measureLabelX'), labelY: this.data.label.querySelector('#measureLabelY'), labelZ: this.data.label.querySelector('#measureLabelZ')});
           } else {
             this.setMainLabel(this.midpoint,this.formatMm(distance,true),'#F8FAFC');
           }
@@ -4128,7 +4134,7 @@
 <body>
   <div class="topbar">
     <a class="pill" href="index.html?v=20">← Viewer</a>
-    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v22</div>
+    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v23</div>
     <button id="enterXR" class="pill enter" type="button">ENTER VR</button>
   </div>
 
@@ -4136,7 +4142,7 @@
 
   <div id="landing" class="landing">
     <div class="card">
-      <div id="landingVersion" class="version">META QUEST 3 • v22</div>
+      <div id="landingVersion" class="version">META QUEST 3 • v23</div>
       <h1 id="landingTitle">CK-207-74-5000_VR — Virtual Reality</h1>
       <p id="landingDescription">Model jest zakotwiczony w skali 1:1. Poruszasz się użytkownikiem, stawiasz trwałe wymiary i zarządzasz widocznością komponentów.</p>
 
@@ -4581,11 +4587,11 @@
       }
 
       if (mode === 'mr') {
-        document.title = 'CK-207-74-5000_VR — Meta Quest MR v22';
-        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v22';
+        document.title = 'CK-207-74-5000_VR — Meta Quest MR v23';
+        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v23';
         enterXR.textContent = 'ENTER MR';
         enterXR.classList.add('mr');
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v22';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v23';
         landingVersion.classList.add('mr');
         landingTitle.textContent = 'CK-207-74-5000_VR — Mixed Reality';
         landingDescription.textContent = 'Postaw model w pokoju, ustaw dokładną skalę, przesuń go i obróć wokół osi pionowej gestem dwóch gripów.';
@@ -4610,10 +4616,10 @@
           'Trigger: przytrzymaj — widoczny celownik • puść — akcja'
         ], legend);
       } else {
-        document.title = 'CK-207-74-5000_VR — Meta Quest VR v22';
-        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v22';
+        document.title = 'CK-207-74-5000_VR — Meta Quest VR v23';
+        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v23';
         enterXR.textContent = 'ENTER VR';
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v22';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v23';
         landingTitle.textContent = 'CK-207-74-5000_VR — Virtual Reality';
         landingDescription.textContent = 'Model pozostaje zakotwiczony w skali 1:1. Chodzisz, obracasz użytkownika, teleportujesz się, mierzysz i izolujesz komponenty.';
         landingEnter.textContent = 'ENTER VR — QUEST 3';
