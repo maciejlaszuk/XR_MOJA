@@ -6,7 +6,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — Meta Quest Viewer v24</title>
+  <title>CK-207-74-5000_VR — Meta Quest Viewer v25</title>
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
@@ -25,8 +25,8 @@
     })();
   </script>
   <script src="https://aframe.io/releases/1.8.0/aframe.min.js"></script>
-  <script src="moja-snap.js?v=24"></script>
-  <script src="moja-measure.js?v=24"></script>
+  <script src="moja-snap.js?v=25"></script>
+  <script src="moja-measure.js?v=25"></script>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
@@ -825,6 +825,8 @@
       setEnabled: function (enabled) {
         this.enabled = Boolean(enabled);
         this.setPanelVisible(this.enabled);
+        var selection = this.el.components['component-selection'];
+        if (selection && selection.setMeasurementMode) selection.setMeasurementMode(this.enabled && this.mode === 'min-distance');
         if (!this.enabled) {
           this.clearPreview();
           this.hideAllVisuals();
@@ -870,8 +872,13 @@
           if (this.mode === 'distance' || this.mode === 'xyz') line2 = this.points.length === 0 ? 'TRIGGER: A' : (this.points.length === 1 ? 'POINT TO B — LIVE PREVIEW • TRIGGER: CAPTURE' : 'COMPLETE');
           else if (this.mode === 'angle') line2 = ['TRIGGER: A', 'TRIGGER: VERTEX', 'POINT TO B — LIVE PREVIEW • TRIGGER: CAPTURE', 'COMPLETE'][Math.min(this.points.length, 3)];
           else if (this.mode === 'point') line2 = 'TRIGGER: POINT COORDINATES';
-          else if (this.mode === 'area') line2 = 'TRIGGER: MESH SURFACE';
-          else if (this.mode === 'min-distance') line2 = this.busy ? 'CALCULATING…' : 'SELECT 2 PARTS → CALCULATE';
+          else if (this.mode === 'area') line2 = 'TRIGGER: SELECT SURFACE';
+          else if (this.mode === 'min-distance') {
+            var selectedForMinimum = this.getSelectedEntries().length;
+            line2 = this.busy
+              ? 'CALCULATING MINIMUM DISTANCE…'
+              : (selectedForMinimum === 0 ? 'TRIGGER: SELECT PART A' : (selectedForMinimum === 1 ? 'TRIGGER: SELECT PART B' : '2 PARTS SELECTED • AUTO CALCULATE'));
+          }
           this.data.status.setAttribute('value', line1 + '\n' + line2);
         }
 
@@ -890,7 +897,17 @@
         var snapButtonText = document.getElementById('measureBtnSnapText');
         if (snapButtonText) snapButtonText.setAttribute('value', 'SNAP: ' + this.getSnapModeLabel());
         var computeButton = document.getElementById('measureBtnCompute');
-        if (computeButton) computeButton.setAttribute('color', this.mode === 'min-distance' ? '#166534' : '#334155');
+        if (computeButton) {
+          var minimumMode = this.mode === 'min-distance';
+          computeButton.object3D.visible = minimumMode;
+          computeButton.setAttribute('color', minimumMode ? '#166534' : '#334155');
+          if (minimumMode) {
+            computeButton.setAttribute('width', 0.84);
+            computeButton.setAttribute('position', '0 -0.25 0.012');
+          }
+          if (minimumMode && this.panelVisible && this.enabled) computeButton.classList.add('ray-target');
+          else computeButton.classList.remove('ray-target');
+        }
 
         var viewer = this.el.components['quest-viewer'];
         if (viewer && viewer.updateModeUI) viewer.updateModeUI();
@@ -900,6 +917,11 @@
         if (['distance','xyz','angle','point','area','min-distance'].indexOf(mode) < 0) return;
         this.mode = mode;
         this.clear();
+        var selection = this.el.components['component-selection'];
+        if (selection && selection.setMeasurementMode) {
+          selection.setMeasurementMode(this.enabled && mode === 'min-distance');
+          if (mode === 'min-distance') selection.clearSelection(false);
+        }
         this.updatePanel();
       },
 
@@ -1035,15 +1057,65 @@
         this.forceOverlayElement(element, 87);
       },
 
+      createSurfaceHighlight: function (surface) {
+        if (!surface || !surface.object || !surface.object.geometry || !Array.isArray(surface.triangleIndices) || !surface.triangleIndices.length) return null;
+        var sourceGeometry = surface.object.geometry;
+        var position = sourceGeometry.getAttribute('position');
+        var index = sourceGeometry.index;
+        if (!position) return null;
+        var values = new Float32Array(surface.triangleIndices.length * 9);
+        var cursor = 0;
+        surface.triangleIndices.forEach(function (triangleIndex) {
+          for (var corner = 0; corner < 3; corner += 1) {
+            var sourceIndex = index ? index.getX(triangleIndex * 3 + corner) : triangleIndex * 3 + corner;
+            values[cursor++] = position.getX(sourceIndex);
+            values[cursor++] = position.getY(sourceIndex);
+            values[cursor++] = position.getZ(sourceIndex);
+          }
+        });
+        var geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(values, 3));
+        geometry.computeVertexNormals();
+        var material = new THREE.MeshBasicMaterial({
+          color: 0x38bdf8,
+          transparent: true,
+          opacity: 0.32,
+          side: THREE.DoubleSide,
+          depthTest: true,
+          depthWrite: false,
+          polygonOffset: true,
+          polygonOffsetFactor: -2,
+          polygonOffsetUnits: -2,
+          toneMapped: false
+        });
+        var highlight = new THREE.Mesh(geometry, material);
+        highlight.name = '__MOJA_SURFACE_HIGHLIGHT__';
+        highlight.renderOrder = 18;
+        highlight.frustumCulled = false;
+        highlight.raycast = function () {};
+        surface.object.add(highlight);
+        return highlight;
+      },
+
+      disposeSurfaceHighlight: function (highlight) {
+        if (!highlight) return;
+        if (highlight.parent) highlight.parent.remove(highlight);
+        if (highlight.geometry) highlight.geometry.dispose();
+        if (highlight.material) highlight.material.dispose();
+      },
+
       storeMeasurementRecord: function (record) {
-        if (!record) return;
+        if (!record) return null;
         record.visual = this.createSavedVisual();
         this.savedMeasurements.push(record);
+        return record;
       },
 
       clearStoredMeasurements: function () {
+        var self = this;
         this.savedMeasurements.forEach(function (record) {
           if (record.visual && record.visual.root && record.visual.root.parentNode) record.visual.root.parentNode.removeChild(record.visual.root);
+          if (record.surfaceHighlight) self.disposeSurfaceHighlight(record.surfaceHighlight);
         });
         this.savedMeasurements = [];
         this.updatePanel();
@@ -1069,7 +1141,15 @@
           this.preview = null;
           this.previewIntersection = null;
         } else if (this.mode === 'area' && this.result && this.result.type === 'area') {
-          this.storeMeasurementRecord({type: 'area', storedCentroid: this.cloneStoredPoint(this.result.storedCentroid), area: this.result.area, approximate: this.result.approximate});
+          var areaRecord = this.storeMeasurementRecord({
+            type: 'area',
+            storedCentroid: this.cloneStoredPoint(this.result.storedCentroid),
+            area: this.result.area,
+            width: this.result.width,
+            height: this.result.height,
+            approximate: this.result.approximate
+          });
+          if (areaRecord && this.result.surface) areaRecord.surfaceHighlight = this.createSurfaceHighlight(this.result.surface);
           this.result = null;
           this.preview = null;
           this.previewIntersection = null;
@@ -1126,7 +1206,19 @@
           if (!this.resolvePoint(record.storedCentroid, this.worldA)) return;
           this.setSavedMarker(visual.pointA, this.worldA);
           this.midpoint.copy(this.worldA); this.midpoint.y += 0.08;
-          this.setSavedLabel(visual, this.midpoint, this.formatArea(record.area, record.approximate), '#F8FAFC');
+          var sizeText = Number.isFinite(record.width) && Number.isFinite(record.height)
+            ? 'U  ' + this.formatMm(record.width, false) + '\nV  ' + this.formatMm(record.height, false) + '\n'
+            : '';
+          this.setSavedLabel(visual, this.midpoint, sizeText + 'AREA  ' + this.formatArea(record.area, record.approximate), '#F8FAFC');
+          return;
+        }
+        if (record.type === 'min-distance') {
+          if (!this.resolvePoint(record.storedA, this.worldA) || !this.resolvePoint(record.storedB, this.worldB)) return;
+          this.setSavedMarker(visual.pointA, this.worldA);
+          this.setSavedMarker(visual.pointB, this.worldB);
+          this.setSavedLine(visual.line, this.worldA, this.worldB, '#38BDF8');
+          this.midpoint.copy(this.worldA).add(this.worldB).multiplyScalar(0.5); this.midpoint.y += 0.05;
+          this.setSavedLabel(visual, this.midpoint, this.formatMm(record.distance, record.approximate), '#F8FAFC');
         }
       },
 
@@ -1141,6 +1233,13 @@
         this.result = null;
         this.hideAllVisuals();
         this.updatePanel();
+        var entries = this.getSelectedEntries();
+        if (entries.length === 2) {
+          var self = this;
+          window.setTimeout(function () {
+            if (self.mode === 'min-distance' && !self.busy && self.getSelectedEntries().length === 2) self.computeMinimumDistance();
+          }, 80);
+        }
       },
 
       getBasePoint: function () {
@@ -1257,7 +1356,8 @@
           var surface = this.measureEngine && this.measureEngine.surfacePatchFromIntersection(point.sourceIntersection, {smoothAngleDeg:14});
           if (!surface) return false;
           this.result = {
-            type:'area', area:surface.area, approximate:surface.approximate, triangleCount:surface.triangleCount,
+            type:'area', area:surface.area, width:surface.width, height:surface.height,
+            approximate:surface.approximate, triangleCount:surface.triangleCount, surface:surface,
             storedCentroid:this.createWorldStoredPoint(surface.centroid, surface.object, 'surface', 'SURFACE CENTROID')
           };
           this.commitCompletedMeasurement();
@@ -1296,6 +1396,12 @@
             storedA:this.createWorldStoredPoint(result.pointA, result.objectA, 'calculated', 'MINIMUM A'),
             storedB:this.createWorldStoredPoint(result.pointB, result.objectB, 'calculated', 'MINIMUM B')
           };
+          this.storeMeasurementRecord({
+            type:'min-distance', distance:this.result.distance, approximate:this.result.approximate,
+            nameA:this.result.nameA, nameB:this.result.nameB,
+            storedA:this.cloneStoredPoint(this.result.storedA), storedB:this.cloneStoredPoint(this.result.storedB)
+          });
+          this.result = null;
         } catch (error) {
           if (computeToken !== this.computeToken) return;
           if (this.data.status) this.data.status.setAttribute('value', 'MINIMUM-DISTANCE ERROR\n' + error.message);
@@ -2401,6 +2507,7 @@
         this.scrollThumb = this.data.scrollThumb;
 
         this.enabled = false;
+        this.measurementMode = false;
         this.panelVisible = false;
         this.built = false;
         this.buildToken = 0;
@@ -2858,6 +2965,34 @@
         });
       },
 
+      setMeasurementMode: function (active) {
+        this.measurementMode = Boolean(active);
+        if (!this.measurementMode && !this.enabled) this.clearSelection(false);
+        this.syncHelpers();
+        this.renderPanel();
+      },
+
+      selectForMinimumDistance: function (intersection) {
+        if (!this.built) return false;
+        var index = this.findIndexFromIntersection(intersection);
+        if (index < 0) return false;
+        var node = this.treeNodes[index];
+        if (!node || !node.meshes.length) return false;
+
+        if (this.selected.has(index)) {
+          this.selected.delete(index);
+        } else {
+          if (this.selected.size >= 2) this.clearSelection(false);
+          this.selected.add(index);
+        }
+
+        this.revealIndex(index);
+        this.syncHelpers();
+        this.renderPanel();
+        this.el.sceneEl.emit('moja-selection-changed', {}, false);
+        return true;
+      },
+
       refreshRaycaster: function () {
         if (!this.right) return;
         var ray = this.right.components['trigger-ray'];
@@ -2978,7 +3113,7 @@
         var now = window.performance.now();
         if (!this.thumbstickArmed && now - this.lastScrollAt < 220) return;
 
-        this.scrollBy(y > 0 ? -1 : 1);
+        this.scrollBy(y > 0 ? 1 : -1);
         this.lastScrollAt = now;
         this.thumbstickArmed = false;
       },
@@ -3086,7 +3221,7 @@
           }
         });
 
-        if (!this.enabled) {
+        if (!this.enabled && !this.measurementMode) {
           this.helpers.forEach(function (helper) { helper.visible = false; });
           return;
         }
@@ -3792,11 +3927,17 @@
         if (this.modeType === 'mr' && !this.placed) return;
 
         if (this.interactionMode === 'measure') {
+          var measurement = this.getMeasurement();
+          if (measurement && measurement.mode === 'min-distance') {
+            var minimumSelection = this.getSelection();
+            if (minimumSelection && minimumSelection.selectForMinimumDistance) minimumSelection.selectForMinimumDistance(intersection);
+            return;
+          }
           var measureIntersections = allIntersections.filter(function (candidate) {
             var candidateEl = MOJA.getInteractiveEl(candidate);
             return candidateEl && candidateEl.classList && candidateEl.classList.contains('measure-target');
           });
-          this.getMeasurement().addIntersection(
+          measurement.addIntersection(
             measureIntersections.length ? measureIntersections[0] : null,
             detail.ray,
             measureIntersections
@@ -4133,8 +4274,8 @@
 </head>
 <body>
   <div class="topbar">
-    <a class="pill" href="index.html?v=24">← Viewer</a>
-    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v24</div>
+    <a class="pill" href="index.html?v=25">← Viewer</a>
+    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v25</div>
     <button id="enterXR" class="pill enter" type="button">ENTER VR</button>
   </div>
 
@@ -4142,7 +4283,7 @@
 
   <div id="landing" class="landing">
     <div class="card">
-      <div id="landingVersion" class="version">META QUEST 3 • v24</div>
+      <div id="landingVersion" class="version">META QUEST 3 • v25</div>
       <h1 id="landingTitle">CK-207-74-5000_VR — Virtual Reality</h1>
       <p id="landingDescription">The model is anchored at 1:1 scale. Move around, place persistent measurements, and control component visibility.</p>
 
@@ -4166,7 +4307,7 @@
 
       <div id="landingControls" class="controls"></div>
       <div class="actions">
-        <a class="button" href="index.html?v=24">← Back</a>
+        <a class="button" href="index.html?v=25">← Back</a>
         <button id="landingEnter" class="button primary" type="button">ENTER VR — QUEST 3</button>
       </div>
       <div id="landingNote" class="note">Subtle edges, balanced 360° lighting, and no heavy shadow maps.</div>
@@ -4176,14 +4317,14 @@
   <a-scene
     id="scene"
     quest-viewer="pivot: #modelPivot; asset: #modelAsset; rig: #rig; camera: #camera; left: #leftHand; right: #rightHand; floor: #floor; grid: #metricGrid; reticle: #placementReticle; info: #modelInfo; infoText: #modelInfoText; modeText: #modeText; teleportMarker: #teleportMarker; scalePanel: #scalePanel; scaleValueText: #scaleValueText; scaleKnob: #scaleKnob; componentPanel: #componentPanel; freeGrabButton: #freeGrabButton; freeGrabButtonText: #freeGrabButtonText"
-    component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; scrollTrack: #componentScrollTrack; scrollThumb: #componentScrollThumb; structureUrl: CK-207-74-5000_VR.structure.json?v=24; rows: 8"
+    component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; scrollTrack: #componentScrollTrack; scrollThumb: #componentScrollThumb; structureUrl: CK-207-74-5000_VR.structure.json?v=25; rows: 8"
     lighting-control="ambient: #ambientLight; front: #lightFront; back: #lightBack; left: #lightLeft; right: #lightRight; top: #lightTop; bottom: #lightBottom; panel: #lightingPanel; valueText: #lightingValueText; detailText: #lightingDetailText; storageKey: moja-ck-207-74-5000_vr-mr-scale-lighting360"
     annotation-control="pivot: #modelPivot; root: #annotationRoot; camera: #camera; right: #rightHand; panel: #annotationPanel; keyboard: #annotationKeyboard; preview: #annotationTextPreview; status: #annotationStatus"
     measurement-tool="target: #modelPivot; camera: #camera; right: #rightHand; pointA: #measurePointA; pointB: #measurePointB; pointC: #measurePointC; line: #measureLine; line2: #measureLine2; label: #measureLabel; labelText: #measureLabelText; snapLabel: #measureSnapLabel; snapLabelText: #measureSnapLabelText; panel: #measurePanel; status: #measurePanelStatus; color: #2563EB"
     loading-screen="backgroundColor: #0B1220; dotsColor: #60A5FA">
 
     <a-assets timeout="120000">
-      <a-asset-item id="modelSource" src="CK-207-74-5000_VR.glb?v=24"></a-asset-item>
+      <a-asset-item id="modelSource" src="CK-207-74-5000_VR.glb?v=25"></a-asset-item>
     </a-assets>
     <!-- MODEL LIGHTING 360° — bez map cieni -->
     <a-entity id="ambientLight"
@@ -4301,7 +4442,7 @@
           <a-plane id="measureBtnArea" class="measure-ui ui-click" width="0.84" height="0.105" color="#075985" position="0 0.0 0.012" material="shader: flat" viewer-button="action: measure-area"><a-text value="AREA" align="center" width="0.76" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane id="measureBtnMin" class="measure-ui ui-click" width="0.84" height="0.105" color="#075985" position="0 -0.125 0.012" material="shader: flat" viewer-button="action: measure-min"><a-text value="MIN. PART–PART" align="center" width="0.76" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane id="measureBtnSnap" class="measure-ui ui-click" width="0.40" height="0.105" color="#0F766E" position="-0.22 -0.25 0.012" material="shader: flat" viewer-button="action: measure-snap" visible="false"><a-text id="measureBtnSnapText" value="SNAP: AUTO" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
-          <a-plane id="measureBtnCompute" class="measure-ui ui-click" width="0.40" height="0.105" color="#334155" position="0.22 -0.25 0.012" material="shader: flat" viewer-button="action: measure-calc"><a-text value="CALCULATE" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane id="measureBtnCompute" class="measure-ui ui-click" width="0.40" height="0.105" color="#334155" position="0.22 -0.25 0.012" material="shader: flat" viewer-button="action: measure-calc" visible="false"><a-text value="CALCULATE MIN DISTANCE" align="center" width="0.76" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane class="measure-ui ui-click" width="0.40" height="0.105" color="#7C2D12" position="-0.22 -0.375 0.012" material="shader: flat" viewer-button="action: measure-clear"><a-text value="CLEAR" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane class="measure-ui ui-click" width="0.40" height="0.105" color="#334155" position="0.22 -0.375 0.012" material="shader: flat" viewer-button="action: measure-close"><a-text value="CLOSE" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
         </a-entity>
@@ -4587,11 +4728,11 @@
       }
 
       if (mode === 'mr') {
-        document.title = 'CK-207-74-5000_VR — Meta Quest MR v24';
-        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v24';
+        document.title = 'CK-207-74-5000_VR — Meta Quest MR v25';
+        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v25';
         enterXR.textContent = 'ENTER MR';
         enterXR.classList.add('mr');
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v24';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v25';
         landingVersion.classList.add('mr');
         landingTitle.textContent = 'CK-207-74-5000_VR — Mixed Reality';
         landingDescription.textContent = 'Place the model in the room, set an exact scale, move it, and rotate it around the vertical axis using two grips.';
@@ -4616,10 +4757,10 @@
           'Trigger: hold — visible pointer • release — action'
         ], legend);
       } else {
-        document.title = 'CK-207-74-5000_VR — Meta Quest VR v24';
-        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v24';
+        document.title = 'CK-207-74-5000_VR — Meta Quest VR v25';
+        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v25';
         enterXR.textContent = 'ENTER VR';
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v24';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v25';
         landingTitle.textContent = 'CK-207-74-5000_VR — Virtual Reality';
         landingDescription.textContent = 'The model remains anchored at 1:1 scale. Walk, turn, teleport, measure, and isolate components.';
         landingEnter.textContent = 'ENTER VR — QUEST 3';
