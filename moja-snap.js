@@ -1,7 +1,7 @@
 (function (global) {
   'use strict';
 
-  var VERSION = '24';
+  var VERSION = '25';
 
   function createEngine(THREE, userOptions) {
     if (!THREE) throw new Error('MOJA SNAP: THREE library is not available.');
