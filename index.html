@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0f172a">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — MOJA XR v23</title>
+  <title>CK-207-74-5000_VR — MOJA XR v24</title>
 
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
-  <script src="moja-snap.js?v=19"></script>
-  <script src="moja-measure.js?v=19"></script>
+  <script src="moja-snap.js?v=24"></script>
+  <script src="moja-measure.js?v=24"></script>
 
   <script type="importmap">
   {
@@ -87,7 +87,7 @@
       background: rgba(30,41,59,.70); cursor: pointer; user-select: none;
     }
     .tree-row:hover { border-color: rgba(56,189,248,.45); }
-    .tree-row.selected { background: rgba(109,40,217,.58); border-color: #a78bfa; }
+    .tree-row.selected { background: rgba(3,105,161,.68); border-color: #7dd3fc; }
     .tree-row.hidden { opacity: .48; }
     .tree-row.mixed { border-color: #f59e0b; }
     .tree-row.suppressed { opacity: .38; }
@@ -131,7 +131,7 @@
     
     .interaction-bar {
       position: fixed; z-index: 52; left: 50%; bottom: 82px; transform: translateX(-50%);
-      width: min(620px, calc(100vw - 24px)); display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px;
+      width: min(760px, calc(100vw - 24px)); display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px;
       padding: 7px; border: 1px solid rgba(255,255,255,.14); border-radius: 16px;
       background: rgba(15,23,42,.92); box-shadow: 0 16px 42px rgba(15,23,42,.30); backdrop-filter: blur(16px);
     }
@@ -140,7 +140,7 @@
       background: #334155; color: #fff; cursor: pointer; font-size: 11px; font-weight: 900;
     }
     .mode-tool.active { background: #0369a1; border-color: #7dd3fc; box-shadow: inset 0 0 0 1px rgba(255,255,255,.16); }
-    .mode-tool.select-active { background: #6d28d9; border-color: #c4b5fd; }
+    .mode-tool.select-active { background: #075985; border-color: #7dd3fc; }
     .mode-tool.measure-active { background: #b45309; border-color: #fde68a; }
     .mode-tool.clear { background: #475569; }
 
@@ -201,25 +201,48 @@
     .snap-indicator[data-kind="perpendicular"] .snap-symbol { border: 0; font-size: 16px; }
     .snap-indicator[data-kind="edge"] .snap-symbol, .snap-indicator[data-kind="surface"] .snap-symbol { border: 0; font-size: 15px; }
     #viewport[data-mode="select"] canvas, #viewport[data-mode="measure"] canvas { cursor: crosshair; }
+    #viewport[data-mode="pan"] canvas { cursor: grab; }
+    #viewport[data-mode="pan"] canvas:active { cursor: grabbing; }
 
     .explode-wrap { grid-column: span 2; display: grid; grid-template-columns: 62px 1fr 42px; align-items: center; gap: 8px; padding: 0 11px; border-radius: 12px; background: #1e293b; }
     .explode-wrap label { font-size: 10px; font-weight: 900; }
     .explode-wrap output { font-size: 10px; color: #fde68a; text-align: right; }
     input[type="range"] { width: 100%; accent-color: #f59e0b; }
 
-    .mobile-toggle { display: none; }
-    .mobile-explode { display: none; margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: rgba(15,23,42,.58); }
-    .mobile-explode-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; color: #f8fafc; font-size: 10px; font-weight: 900; }
-    .mobile-explode output { color: #fde68a; }
+    .mobile-toggle { display: inline-flex; }
+    .panel-toggle.active { border-color: rgba(125,211,252,.72); background: rgba(3,105,161,.92); }
+    .panel.is-hidden { display: none !important; }
+    .panel-head-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .panel-close {
+      flex: 0 0 30px; width: 30px; height: 30px; border: 1px solid rgba(255,255,255,.12); border-radius: 9px;
+      background: #334155; color: #fff; cursor: pointer; font-size: 17px; line-height: 1;
+    }
+    .panel-close:hover { background: #475569; }
+
+    .selection-card {
+      position: fixed; z-index: 54; left: 50%; bottom: 154px; width: min(420px, calc(100vw - 28px)); transform: translateX(-50%);
+      padding: 12px; border: 1px solid rgba(125,211,252,.48); border-radius: 16px;
+      background: rgba(15,23,42,.96); color: #fff; box-shadow: 0 18px 48px rgba(15,23,42,.34); backdrop-filter: blur(16px);
+    }
+    .selection-card[hidden] { display: none; }
+    .selection-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .selection-card-kicker { color: #7dd3fc; font-size: 9px; font-weight: 900; letter-spacing: .10em; }
+    .selection-card-close { width: 28px; height: 28px; border: 0; border-radius: 8px; background: #334155; color: #fff; cursor: pointer; }
+    .copy-part {
+      width: 100%; min-height: 46px; margin-top: 9px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      border: 1px solid rgba(148,163,184,.30); border-radius: 11px; background: #111827; color: #fff; cursor: pointer; text-align: left;
+    }
+    .copy-part code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f8fafc; font-family: "Cascadia Mono", Consolas, monospace; font-size: 14px; font-weight: 800; }
+    .copy-part span { flex: 0 0 auto; color: #7dd3fc; font-size: 9px; font-weight: 900; text-transform: uppercase; }
+    .selection-description { margin-top: 8px; color: #cbd5e1; font-size: 11px; line-height: 1.4; }
+    .selection-card-actions { display: grid; grid-template-columns: repeat(2,1fr); gap: 7px; margin-top: 10px; }
+
+    .mobile-explode-dock { display: none; }
 
 
     #arViewer { position: fixed; width: 1px; height: 1px; left: -20px; bottom: -20px; opacity: 0; pointer-events: none; }
 
     @media (max-width: 1100px) {
-      #propsPanel { display: none; }
-      #propsPanel.open { display: flex; }
-      #propsToggle { display: inline-flex; }
-      .mobile-explode { display: block; }
       .toolbar { grid-template-columns: repeat(5, minmax(78px,1fr)); }
     }
 
@@ -227,11 +250,11 @@
       .topbar { top: max(8px, env(safe-area-inset-top)); left: 8px; right: 8px; }
       .pill { min-height: 38px; padding: 0 11px; }
       .pill small, .pill.status span { display: none; }
-      .panel { top: 56px; left: 8px !important; right: 8px !important; bottom: 132px; width: auto; display: none; }
+      .panel { top: 56px; left: 8px !important; right: 8px !important; bottom: 182px; width: auto; display: none; }
       .panel.open { display: flex !important; }
       .toolbar { bottom: max(8px, env(safe-area-inset-bottom)); width: calc(100vw - 16px); grid-template-columns: repeat(5,1fr); gap: 5px; padding: 6px; }
-      .interaction-bar { bottom: calc(max(8px, env(safe-area-inset-bottom)) + 58px); width: calc(100vw - 16px); gap: 5px; padding: 5px; }
-      .mode-tool { min-height: 40px; font-size: 10px; }
+      .interaction-bar { bottom: calc(max(8px, env(safe-area-inset-bottom)) + 58px); width: calc(100vw - 16px); gap: 4px; padding: 5px; }
+      .mode-tool { min-height: 40px; padding: 0 4px; font-size: 9px; }
       .measure-hud { top: 54px; width: calc(100vw - 16px); max-height: 42vh; overflow-y: auto; padding: 8px 9px; }
       .viewcube { right: 8px; top: 52px; grid-template-columns: repeat(3, 30px); grid-template-rows: repeat(4, 30px); gap: 3px; padding: 6px; }
       .viewcube .vc { font-size: 8px; border-radius: 7px; }
@@ -246,7 +269,16 @@
       .tool { min-height: 48px; }
       .tool span { display: none; }
       .explode-wrap { display: none; }
-      .mobile-toggle { display: flex; }
+      .mobile-toggle { display: inline-flex; }
+      .mobile-explode-dock {
+        position: fixed; z-index: 53; left: 8px; right: 8px; bottom: calc(max(8px, env(safe-area-inset-bottom)) + 110px);
+        min-height: 46px; padding: 7px 10px; display: grid; grid-template-columns: 62px 1fr 40px; align-items: center; gap: 8px;
+        border: 1px solid rgba(255,255,255,.14); border-radius: 14px; background: rgba(15,23,42,.94); color: #fff;
+        box-shadow: 0 12px 34px rgba(15,23,42,.30); backdrop-filter: blur(14px);
+      }
+      .mobile-explode-dock label { font-size: 9px; font-weight: 900; letter-spacing: .04em; }
+      .mobile-explode-dock output { color: #fde68a; font-size: 10px; font-weight: 900; text-align: right; }
+      .selection-card { left: 8px; right: 8px; bottom: calc(max(8px, env(safe-area-inset-bottom)) + 164px); width: auto; transform: none; }
       #propsPanel { display: none; }
       #propsPanel.open { display: flex; }
       .desktop-only { display: none !important; }
@@ -254,64 +286,80 @@
   </style>
 </head>
 <body>
-  <div id="viewport" aria-label="Widok modelu 3D"></div>
+  <div id="viewport" aria-label="3D model view"></div>
 
   <div class="topbar">
-    <button id="treeToggle" class="pill mobile-toggle" type="button">☰ Drzewo</button>
-    <div class="pill"><strong>CK-207-74-5000_VR</strong><small>MOJA XR v23</small></div>
-    <button id="propsToggle" class="pill mobile-toggle" type="button">iProperties</button>
-    <div id="loadStatus" class="pill status"><span>Ładowanie modelu…</span></div>
+    <button id="treeToggle" class="pill mobile-toggle panel-toggle active" type="button" aria-expanded="true">☰ Model Tree</button>
+    <div class="pill"><strong>CK-207-74-5000_VR</strong><small>MOJA XR v24</small></div>
+    <button id="propsToggle" class="pill mobile-toggle panel-toggle active" type="button" aria-expanded="true">Properties</button>
+    <div id="loadStatus" class="pill status"><span>Loading model…</span></div>
   </div>
 
-  <aside id="treePanel" class="panel">
+  <aside id="treePanel" class="panel" aria-label="Model tree">
     <div class="panel-head">
-      <h2>Struktura IAM / Part Number</h2>
-      <p>Wybierz ZAZNACZ. Każde kliknięcie dodaje albo usuwa komponent z bieżącego wyboru.</p>
-      <input id="treeSearch" class="search" type="search" placeholder="Szukaj Part Number / Description…">
-      <div class="mobile-explode">
-        <div class="mobile-explode-head"><span>Rozsuń model</span><output id="explodeValueMobile">0%</output></div>
-        <input id="explodeRangeMobile" type="range" min="0" max="100" step="1" value="0">
+      <div class="panel-head-row">
+        <div><h2>Model Tree</h2><p>Select a part in the model or tree. Selection stays synchronized in both directions.</p></div>
+        <button id="treeClose" class="panel-close" type="button" aria-label="Hide model tree">×</button>
       </div>
+      <input id="treeSearch" class="search" type="search" placeholder="Search Part Number or Description…">
     </div>
-    <div id="treeList" class="panel-body"><div class="empty-state">Wczytywanie drzewa…</div></div>
+    <div id="treeList" class="panel-body"><div class="empty-state">Loading model tree…</div></div>
     <div class="panel-foot">
-      <button id="expandAll" class="btn" type="button">Rozwiń wszystko</button>
-      <button id="collapseAll" class="btn" type="button">Zwiń wszystko</button>
+      <button id="expandAll" class="btn" type="button">Expand All</button>
+      <button id="collapseAll" class="btn" type="button">Collapse All</button>
     </div>
   </aside>
 
-  <aside id="propsPanel" class="panel">
+  <aside id="propsPanel" class="panel" aria-label="Properties">
     <div class="panel-head">
-      <h2>iProperties</h2>
-      <p>Standardowe właściwości Inventora oraz zakładka Custom.</p>
+      <div class="panel-head-row">
+        <div><h2>Properties</h2><p>Inventor standard and custom iProperties for the active selection.</p></div>
+        <button id="propsClose" class="panel-close" type="button" aria-label="Hide properties">×</button>
+      </div>
     </div>
-    <div id="propertyList" class="panel-body"><div class="empty-state">Wybierz komponent.</div></div>
+    <div id="propertyList" class="panel-body"><div class="empty-state">Select a component.</div></div>
     <div class="panel-foot">
-      <button id="hideSelected" class="btn danger" type="button">Ukryj</button>
-      <button id="isolateSelected" class="btn warn" type="button">Izoluj</button>
-      <button id="showSelected" class="btn ok" type="button">Pokaż</button>
-      <button id="showAll" class="btn" type="button">Włącz wszystko</button>
+      <button id="hideSelected" class="btn danger" type="button">Hide</button>
+      <button id="isolateSelected" class="btn warn" type="button">Isolate</button>
+      <button id="showSelected" class="btn ok" type="button">Show</button>
+      <button id="showAll" class="btn" type="button">Show All</button>
     </div>
   </aside>
+
+
+  <section id="selectionCard" class="selection-card" hidden aria-live="polite">
+    <div class="selection-card-head">
+      <div class="selection-card-kicker">SELECTED COMPONENT</div>
+      <button id="selectionCardClose" class="selection-card-close" type="button" aria-label="Clear selection">×</button>
+    </div>
+    <button id="copyPartNumber" class="copy-part" type="button" title="Copy Part Number">
+      <code id="selectionPartNumber">—</code><span id="copyPartNumberStatus">Copy</span>
+    </button>
+    <div id="selectionDescription" class="selection-description"></div>
+    <div class="selection-card-actions">
+      <button id="focusSelected" class="btn primary" type="button">Focus</button>
+      <button id="openProperties" class="btn" type="button">Properties</button>
+    </div>
+  </section>
 
   <div id="measureHud" class="measure-hud" hidden>
     <div class="measure-hud-head">
-      <strong id="measureTitle">POMIAR • DYSTANS</strong>
+      <strong id="measureTitle">MEASURE • DISTANCE</strong>
       <div class="measure-actions">
         <button id="snapToggle" class="measure-head-button snap-on" type="button">SNAP: ON</button>
-        <button id="measureClear" class="measure-head-button clear" type="button">WYCZYŚĆ</button>
+        <button id="measureClear" class="measure-head-button clear" type="button">CLEAR</button>
       </div>
     </div>
-    <div class="measure-type-row" aria-label="Rodzaj pomiaru">
-      <button class="measure-type active" data-measure-type="distance" type="button">DYSTANS</button>
+    <div class="measure-type-row" aria-label="Measurement type">
+      <button class="measure-type active" data-measure-type="distance" type="button">DISTANCE</button>
       <button class="measure-type" data-measure-type="xyz" type="button">XYZ</button>
-      <button class="measure-type" data-measure-type="angle" type="button">KĄT</button>
-      <button class="measure-type" data-measure-type="point" type="button">PUNKT XYZ</button>
-      <button class="measure-type" data-measure-type="area" type="button">POWIERZCHNIA</button>
+      <button class="measure-type" data-measure-type="angle" type="button">ANGLE</button>
+      <button class="measure-type" data-measure-type="point" type="button">POINT XYZ</button>
+      <button class="measure-type" data-measure-type="area" type="button">AREA</button>
       <button class="measure-type" data-measure-type="min-distance" type="button">MIN. PART–PART</button>
     </div>
-    <div class="snap-filter-row" aria-label="Filtry punktów snap">
-      <span class="snap-filter-label">SNAPY:</span>
+    <div class="snap-filter-row" aria-label="Snap filters">
+      <span class="snap-filter-label">SNAPS:</span>
       <button class="snap-filter active" data-snap-filter="vertex" type="button">NODE</button>
       <button class="snap-filter active" data-snap-filter="midpoint" type="button">MID</button>
       <button class="snap-filter active" data-snap-filter="center" type="button">CENTER</button>
@@ -319,7 +367,7 @@
       <button class="snap-filter active" data-snap-filter="perpendicular" type="button">PERP ⟂</button>
       <button class="snap-filter active" data-snap-filter="surface" type="button">FACE</button>
     </div>
-    <div id="measurePrompt" class="measure-prompt">Kliknij pierwszy punkt. Podgląd wymiaru pojawi się przed drugim kliknięciem.</div>
+    <div id="measurePrompt" class="measure-prompt">Click the first point. A live preview appears before the second click.</div>
     <div class="measure-grid">
       <div class="measure-cell" id="measureCell1"><span id="measureName1">L</span><strong id="measureValue1">—</strong></div>
       <div class="measure-cell" id="measureCell2"><span id="measureName2">ΔX</span><strong id="measureValue2">—</strong></div>
@@ -327,7 +375,7 @@
       <div class="measure-cell" id="measureCell4"><span id="measureName4">ΔZ</span><strong id="measureValue4">—</strong></div>
       <div class="measure-cell" id="measureCell5"><span id="measureName5">SNAP</span><strong id="measureValue5">—</strong></div>
     </div>
-    <button id="measureCompute" class="measure-compute" type="button">OBLICZ MINIMALNY DYSTANS DLA 2 ZAZNACZONYCH CZĘŚCI</button>
+    <button id="measureCompute" class="measure-compute" type="button">CALCULATE MINIMUM DISTANCE BETWEEN 2 SELECTED PARTS</button>
   </div>
 
   <svg id="measureOverlay" class="measure-overlay" aria-hidden="true">
@@ -346,15 +394,22 @@
   <div id="measureCoordinateLabel" class="measure-float measure-coordinates"></div>
   <div id="snapIndicator" class="measure-float snap-indicator" data-kind="surface"><span class="snap-symbol">●</span><span id="snapIndicatorText">FACE</span></div>
 
-  <nav class="interaction-bar" aria-label="Tryb interakcji z modelem">
-    <button id="orbitMode" class="mode-tool active" type="button">OBRÓT</button>
-    <button id="selectMode" class="mode-tool" type="button">ZAZNACZ</button>
-    <button id="measureMode" class="mode-tool" type="button">POMIAR</button>
-    <button id="clearInteraction" class="mode-tool clear" type="button">WYCZYŚĆ</button>
+  <nav class="interaction-bar" aria-label="Model interaction mode">
+    <button id="orbitMode" class="mode-tool active" type="button" title="Orbit — drag to rotate">ORBIT</button>
+    <button id="panMode" class="mode-tool" type="button" title="Pan — drag to move the view">PAN</button>
+    <button id="selectMode" class="mode-tool" type="button" title="Select model components">SELECT</button>
+    <button id="measureMode" class="mode-tool" type="button" title="Measure and inspect">MEASURE</button>
+    <button id="clearInteraction" class="mode-tool clear" type="button" title="Clear selection and measurement">CLEAR</button>
   </nav>
 
+  <div id="mobileExplodeDock" class="mobile-explode-dock" aria-label="Explode model">
+    <label for="explodeRangeMobile">EXPLODE</label>
+    <input id="explodeRangeMobile" type="range" min="0" max="100" step="1" value="0">
+    <output id="explodeValueMobile">0%</output>
+  </div>
 
-  <div class="viewcube" id="viewCube" aria-label="Kostka manipulacji">
+
+  <div class="viewcube" id="viewCube" aria-label="ViewCube">
     <button class="vc blank" type="button" tabindex="-1">.</button>
     <button class="vc" data-view="top" type="button">TOP</button>
     <button class="vc blank" type="button" tabindex="-1">.</button>
@@ -369,23 +424,23 @@
     <button class="vc" data-view="back" type="button">BACK</button>
   </div>
 
-  <nav class="toolbar" aria-label="Narzędzia widoku">
-    <button id="fitView" class="tool" type="button"><strong>Dopasuj</strong><span>cały model</span></button>
-    <button id="showAllBottom" class="tool" type="button"><strong>Włącz</strong><span>wszystko</span></button>
+  <nav class="toolbar" aria-label="Viewing tools">
+    <button id="fitView" class="tool" type="button"><strong>FIT</strong><span>entire model</span></button>
+    <button id="showAllBottom" class="tool" type="button"><strong>SHOW ALL</strong><span>restore visibility</span></button>
     <div class="explode-wrap desktop-only">
-      <label for="explodeRange">Rozsuń</label>
+      <label for="explodeRange">EXPLODE</label>
       <input id="explodeRange" type="range" min="0" max="100" step="1" value="0">
       <output id="explodeValue">0%</output>
     </div>
-    <button id="arButton" class="tool cyan" type="button"><strong>AR</strong><span>telefon</span></button>
-    <a id="mrButton" class="tool green" href="quest.html?mode=mr&v=19" style="text-decoration:none;color:#fff"><strong>MR</strong><span>Quest 3</span></a>
-    <a id="vrButton" class="tool blue" href="quest.html?mode=vr&v=19" style="text-decoration:none;color:#fff"><strong>VR</strong><span>Quest 3</span></a>
+    <button id="arButton" class="tool cyan" type="button"><strong>AR</strong><span>phone</span></button>
+    <a id="mrButton" class="tool green" href="quest.html?mode=mr&v=24" style="text-decoration:none;color:#fff"><strong>MR</strong><span>Quest 3</span></a>
+    <a id="vrButton" class="tool blue" href="quest.html?mode=vr&v=24" style="text-decoration:none;color:#fff"><strong>VR</strong><span>Quest 3</span></a>
   </nav>
 
   <model-viewer
     id="arViewer"
-    src="CK-207-74-5000_VR.glb?v=19"
-    ios-src="CK-207-74-5000_VR.usdz?v=19"
+    src="CK-207-74-5000_VR.glb?v=24"
+    ios-src="CK-207-74-5000_VR.usdz?v=24"
     ar
     ar-modes="webxr scene-viewer quick-look"
     ar-placement="floor"
@@ -408,7 +463,7 @@
     });
 
     const MODEL = 'CK-207-74-5000_VR';
-    const VERSION = '19';
+    const VERSION = '24';
     const viewport = document.getElementById('viewport');
     const loadStatus = document.getElementById('loadStatus');
     const treePanel = document.getElementById('treePanel');
@@ -421,6 +476,7 @@
     const explodeRangeMobile = document.getElementById('explodeRangeMobile');
     const explodeValueMobile = document.getElementById('explodeValueMobile');
     const orbitModeButton = document.getElementById('orbitMode');
+    const panModeButton = document.getElementById('panMode');
     const selectModeButton = document.getElementById('selectMode');
     const measureModeButton = document.getElementById('measureMode');
     const clearInteractionButton = document.getElementById('clearInteraction');
@@ -453,6 +509,17 @@
     const viewCubeButtons = [...document.querySelectorAll('[data-view]')];
     const snapIndicator = document.getElementById('snapIndicator');
     const snapIndicatorText = document.getElementById('snapIndicatorText');
+    const treeToggle = document.getElementById('treeToggle');
+    const propsToggle = document.getElementById('propsToggle');
+    const treeClose = document.getElementById('treeClose');
+    const propsClose = document.getElementById('propsClose');
+    const selectionCard = document.getElementById('selectionCard');
+    const selectionPartNumber = document.getElementById('selectionPartNumber');
+    const selectionDescription = document.getElementById('selectionDescription');
+    const copyPartNumberButton = document.getElementById('copyPartNumber');
+    const copyPartNumberStatus = document.getElementById('copyPartNumberStatus');
+    const focusSelectedButton = document.getElementById('focusSelected');
+    const openPropertiesButton = document.getElementById('openProperties');
 
     const state = {
       modelRoot: null,
@@ -500,6 +567,20 @@
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controls.screenSpacePanning = true;
+    controls.enableZoom = true;
+    controls.zoomToCursor = true;
+
+    function configureNavigationControls(mode) {
+      const orbit = mode === 'orbit';
+      const pan = mode === 'pan';
+      controls.enableRotate = orbit;
+      controls.enablePan = true;
+      controls.mouseButtons.LEFT = orbit ? THREE.MOUSE.ROTATE : (pan ? THREE.MOUSE.PAN : -1);
+      controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
+      controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
+      controls.touches.ONE = orbit ? THREE.TOUCH.ROTATE : THREE.TOUCH.PAN;
+      controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
+    }
 
     scene.add(new THREE.HemisphereLight(0xffffff, 0x7b8794, 2.0));
     const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(6, 10, 8); scene.add(key);
@@ -632,7 +713,7 @@
     }
 
     function createNode(data, parentIndex, depth, object) {
-      const label = cleanName(data?.partNumber) || cleanName(data?.fileName) || cleanName(data?.occurrenceName) || cleanName(object?.name) || 'Obiekt';
+      const label = cleanName(data?.partNumber) || cleanName(data?.fileName) || cleanName(data?.occurrenceName) || cleanName(object?.name) || 'Object';
       const index = state.treeNodes.length;
       const node = {
         index,
@@ -675,7 +756,7 @@
       };
       rootObject.children.forEach(child => walk(child, rootIndex, 1));
       if (!state.treeNodes[rootIndex].children.length) {
-        state.meshes.forEach((mesh, index) => createNode({ id:'mesh-'+index, partNumber: cleanName(mesh.name) || ('Obiekt ' + String(index + 1).padStart(3,'0')), occurrenceName: mesh.name, documentType:'part' }, rootIndex, 1, mesh));
+        state.meshes.forEach((mesh, index) => createNode({ id:'mesh-'+index, partNumber: cleanName(mesh.name) || ('Object ' + String(index + 1).padStart(3,'0')), occurrenceName: mesh.name, documentType:'part' }, rootIndex, 1, mesh));
       }
     }
 
@@ -740,7 +821,7 @@
       treeList.innerHTML = '';
       const rows = flattenVisible();
       if (!rows.length) {
-        treeList.innerHTML = '<div class="empty-state">Brak wyników.</div>';
+        treeList.innerHTML = '<div class="empty-state">No results.</div>';
         return;
       }
       rows.forEach(index => {
@@ -750,6 +831,7 @@
         row.className = 'tree-row ' + (state.selected.has(index) ? 'selected ' : '') + vis + (node.suppressed ? ' suppressed' : '');
         row.style.paddingLeft = (4 + Math.min(node.depth, 8) * 16) + 'px';
         row.title = node.label;
+        row.dataset.nodeIndex = String(index);
 
         const expander = document.createElement('button');
         expander.type = 'button';
@@ -771,7 +853,52 @@
       });
     }
 
-    function selectNode(index) {
+    function revealTreeNode(index, scroll = true) {
+      const node = state.treeNodes[index];
+      if (!node) return;
+      let current = node.parentIndex;
+      while (current >= 0 && state.treeNodes[current]) {
+        state.treeNodes[current].expanded = true;
+        current = state.treeNodes[current].parentIndex;
+      }
+      if (state.query) {
+        state.query = '';
+        searchInput.value = '';
+      }
+      renderTree();
+      if (scroll) {
+        requestAnimationFrame(() => {
+          const row = treeList.querySelector('[data-node-index="' + index + '"]');
+          row?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        });
+      }
+    }
+
+    function activeSelectionNode() {
+      if (state.selected.has(state.activeSelectedIndex)) return state.treeNodes[state.activeSelectedIndex] || null;
+      const indexes = [...state.selected];
+      return indexes.length ? state.treeNodes[indexes[indexes.length - 1]] || null : null;
+    }
+
+    function updateSelectionCard() {
+      const node = activeSelectionNode();
+      if (!node) {
+        selectionCard.hidden = true;
+        selectionPartNumber.textContent = '—';
+        selectionDescription.textContent = '';
+        return;
+      }
+      const raw = node.raw || {};
+      const partNumber = String(raw.partNumber || node.label || '').trim();
+      selectionPartNumber.textContent = partNumber || node.label;
+      const description = String(raw.description || '').trim();
+      const countText = state.selected.size > 1 ? state.selected.size + ' components selected' : '1 component selected';
+      selectionDescription.textContent = description ? description + ' · ' + countText : countText;
+      copyPartNumberStatus.textContent = 'Copy';
+      selectionCard.hidden = false;
+    }
+
+    function selectNode(index, options = {}) {
       if (!Number.isInteger(index) || !state.treeNodes[index]) return;
       if (state.selected.has(index)) {
         state.selected.delete(index);
@@ -784,12 +911,17 @@
         state.activeSelectedIndex = index;
       }
       syncHelpers();
-      renderTree();
+      if (options.fromModel && state.selected.has(index)) revealTreeNode(index, true);
+      else renderTree();
       renderProperties();
+      updateSelectionCard();
       invalidateMinimumDistance();
-      if (window.innerWidth <= 1100) {
-        if (window.innerWidth <= 760) treePanel.classList.remove('open');
-        propsPanel.classList.add('open');
+
+      if (options.fromModel) {
+        showPanel(treePanel, treeToggle, true);
+        if (window.innerWidth > 760) showPanel(propsPanel, propsToggle, true);
+      } else if (window.innerWidth <= 760) {
+        showPanel(propsPanel, propsToggle, true);
       }
     }
 
@@ -799,6 +931,7 @@
       syncHelpers();
       renderTree();
       renderProperties();
+      updateSelectionCard();
       invalidateMinimumDistance();
     }
 
@@ -814,7 +947,7 @@
         if (!node || !node.meshes.some(mesh => mesh.visible)) return;
         let helper = state.helpers.get(index);
         if (!helper) {
-          helper = new THREE.Box3Helper(new THREE.Box3(), 0x7c3aed);
+          helper = new THREE.Box3Helper(new THREE.Box3(), 0x38bdf8);
           helper.material.depthTest = false;
           helper.renderOrder = 100;
           scene.add(helper);
@@ -829,7 +962,7 @@
     function renderProperties() {
       const indexes = [...state.selected];
       if (!indexes.length) {
-        propertyList.innerHTML = '<div class="empty-state">Wybierz komponent z drzewa albo kliknij model.</div>';
+        propertyList.innerHTML = '<div class="empty-state">Select a component in the model or Model Tree.</div>';
         return;
       }
       const activeIndex = state.selected.has(state.activeSelectedIndex) ? state.activeSelectedIndex : indexes[indexes.length - 1];
@@ -839,7 +972,7 @@
         ['Part Number', raw.partNumber || node.label],
         ['Description', raw.description],
         ['Material', raw.material],
-        ['Mass', Number.isFinite(Number(raw.massKg)) ? Number(raw.massKg).toLocaleString('pl-PL', {maximumFractionDigits:3}) + ' kg' : ''],
+        ['Mass', Number.isFinite(Number(raw.massKg)) ? Number(raw.massKg).toLocaleString('en-US', {maximumFractionDigits:3}) + ' kg' : ''],
         ['Occurrence', raw.occurrenceName],
         ['File', raw.fileName],
         ['Document type', raw.documentType],
@@ -847,7 +980,7 @@
       ].filter(item => String(item[1] || '').trim());
 
       let html = '<div class="property-title">' + escapeHtml(node.label) + '</div>';
-      html += '<div class="property-subtitle">' + indexes.length + ' zaznaczonych komponentów</div>';
+      html += '<div class="property-subtitle">' + indexes.length + ' selected component' + (indexes.length === 1 ? '' : 's') + '</div>';
       html += '<div class="property-grid">';
       fixed.forEach(([name,value]) => { html += '<div class="property-row"><div class="name">' + escapeHtml(name) + '</div><div class="value">' + escapeHtml(value) + '</div></div>'; });
       html += '</div>';
@@ -907,6 +1040,23 @@
       camera.near = Math.max(0.001, distance / 1000);
       camera.far = Math.max(1000, distance * 30);
       camera.updateProjectionMatrix();
+      controls.update();
+    }
+
+    function focusSelected() {
+      const node = activeSelectionNode();
+      if (!node || !node.meshes.length) return;
+      const box = new THREE.Box3();
+      node.meshes.forEach(mesh => { if (mesh.visible) box.expandByObject(mesh); });
+      if (box.isEmpty()) return;
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const maxSize = Math.max(size.x, size.y, size.z, 0.05);
+      const distance = maxSize / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5))) * 1.65;
+      const direction = camera.position.clone().sub(controls.target).normalize();
+      if (direction.lengthSq() < 0.001) direction.set(1, 0.7, 1).normalize();
+      controls.target.copy(center);
+      camera.position.copy(center).addScaledVector(direction, distance);
       controls.update();
     }
 
@@ -984,6 +1134,7 @@
 
     function setModeButtonState() {
       orbitModeButton.className = 'mode-tool' + (state.interactionMode === 'orbit' ? ' active' : '');
+      panModeButton.className = 'mode-tool' + (state.interactionMode === 'pan' ? ' active' : '');
       selectModeButton.className = 'mode-tool' + (state.interactionMode === 'select' ? ' active select-active' : '');
       measureModeButton.className = 'mode-tool' + (state.interactionMode === 'measure' ? ' active measure-active' : '');
       viewport.dataset.mode = state.interactionMode;
@@ -991,7 +1142,7 @@
     }
 
     function setInteractionMode(mode) {
-      if (!['orbit', 'select', 'measure'].includes(mode)) return;
+      if (!['orbit', 'pan', 'select', 'measure'].includes(mode)) return;
       state.interactionMode = mode;
       if (mode !== 'measure') {
         state.measurement.hover = null;
@@ -999,25 +1150,26 @@
         snapIndicator.classList.remove('show');
         clearOverlay();
       }
+      configureNavigationControls(mode);
       setModeButtonState();
       if (mode === 'measure') updateMeasurementControls();
     }
 
     function formatMm(valueMetres, approximate = false) {
       if (!Number.isFinite(valueMetres)) return '—';
-      const mm = Math.round(valueMetres * 1000).toLocaleString('pl-PL');
+      const mm = Math.round(valueMetres * 1000).toLocaleString('en-US');
       return (approximate ? '≈ ' : '') + mm + ' mm';
     }
 
     function formatLength(valueMetres, approximate = false) {
       if (!Number.isFinite(valueMetres)) return '—';
       if (Math.abs(valueMetres) < 1) return formatMm(valueMetres, approximate);
-      return (approximate ? '≈ ' : '') + valueMetres.toLocaleString('pl-PL', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' m';
+      return (approximate ? '≈ ' : '') + valueMetres.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' m';
     }
 
     function formatArea(valueSquareMetres, approximate = false) {
       if (!Number.isFinite(valueSquareMetres)) return '—';
-      return (approximate ? '≈ ' : '') + valueSquareMetres.toLocaleString('pl-PL', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' m²';
+      return (approximate ? '≈ ' : '') + valueSquareMetres.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' m²';
     }
 
     function snapSymbol(kind) {
@@ -1039,7 +1191,7 @@
         object: snap.object,
         local: snap.object.worldToLocal(snap.point.clone()),
         snapKind: snap.kind || 'surface',
-        snapLabel: snap.label || 'PUNKT POWIERZCHNI',
+        snapLabel: snap.label || 'FACE POINT',
         sourceIntersection: snap.sourceIntersection || null
       };
     }
@@ -1053,7 +1205,7 @@
         object: targetObject,
         local: targetObject.worldToLocal(point.clone()),
         snapKind: snapKind || 'calculated',
-        snapLabel: snapLabel || 'PUNKT OBLICZONY',
+        snapLabel: snapLabel || 'CALCULATED POINT',
         sourceIntersection: null
       };
     }
@@ -1078,13 +1230,13 @@
 
     function measurementTypeName(type) {
       return ({
-        distance: 'DYSTANS', xyz: 'XYZ', angle: 'KĄT', point: 'PUNKT XYZ', area: 'POWIERZCHNIA', 'min-distance': 'MIN. PART–PART'
-      })[type] || 'POMIAR';
+        distance: 'DISTANCE', xyz: 'XYZ', angle: 'ANGLE', point: 'POINT XYZ', area: 'AREA', 'min-distance': 'MIN. PART–PART'
+      })[type] || 'MEASURE';
     }
 
     function updateMeasurementControls() {
       const measurement = state.measurement;
-      measureTitle.textContent = 'POMIAR • ' + measurementTypeName(measurement.type);
+      measureTitle.textContent = 'MEASURE • ' + measurementTypeName(measurement.type);
       measureTypeButtons.forEach(button => button.classList.toggle('active', button.dataset.measureType === measurement.type));
       snapToggle.textContent = measurement.snapEnabled ? 'SNAP: ON' : 'SNAP: OFF';
       snapToggle.className = 'measure-head-button ' + (measurement.snapEnabled ? 'snap-on' : 'snap-off');
@@ -1110,32 +1262,32 @@
       const count = measurement.points.length;
       if (measurement.type === 'distance' || measurement.type === 'xyz') {
         measurePrompt.textContent = count === 0
-          ? 'Kliknij punkt A. SNAP jest pokazywany przy kursorze; po pierwszym kliknięciu wymiar buduje się na żywo.'
-          : (count === 1 ? 'Punkt A zapisany jako ' + measurement.points[0].snapLabel + '. Wskaż punkt B.' : 'Pomiar gotowy. Kolejne kliknięcie rozpocznie nowy pomiar.');
+          ? 'Click point A. The active snap is shown at the cursor; after the first click, the measurement previews live.'
+          : (count === 1 ? 'Point A captured as ' + measurement.points[0].snapLabel + '. Point to B.' : 'Measurement complete. The next click starts a new measurement.');
         if (count < 2 && !measurement.hover) setMeasureResults([['L','—'],['ΔX','—'],['ΔY','—'],['ΔZ','—'],['SNAP', count ? shortSnapLabel(measurement.points[0].snapKind) : '—']]);
       } else if (measurement.type === 'angle') {
-        const prompts = ['Kliknij pierwszy punkt ramienia A.', 'Kliknij wierzchołek kąta.', 'Wskaż trzeci punkt ramienia B — kąt jest liczony na żywo.', 'Kąt gotowy. Kolejne kliknięcie rozpocznie nowy pomiar.'];
+        const prompts = ['Click the first point on arm A.', 'Click the angle vertex.', 'Point to the third point on arm B — the angle previews live.', 'Angle complete. The next click starts a new measurement.'];
         measurePrompt.textContent = prompts[Math.min(count, 3)];
-        if (count < 2 && !measurement.hover) setMeasureResults([['KĄT','—'],['A–V','—'],['V–B','—']]);
+        if (count < 2 && !measurement.hover) setMeasureResults([['ANGLE','—'],['A–V','—'],['V–B','—']]);
       } else if (measurement.type === 'point') {
-        measurePrompt.textContent = 'Wskaż punkt. Viewer pokaże współrzędne X/Y/Z w układzie modelu.';
+        measurePrompt.textContent = 'Point to a location. The viewer shows X/Y/Z coordinates in the model coordinate system.';
         if (!measurement.points.length && !measurement.hover) setMeasureResults([['X','—'],['Y','—'],['Z','—'],['SNAP','—']]);
       } else if (measurement.type === 'area') {
         measurePrompt.textContent = measurement.result
-          ? 'Powierzchnia wydzielona z połączonych trójkątów GLB. Kliknij inną powierzchnię, aby przeliczyć.'
-          : 'Kliknij powierzchnię. Viewer wydzieli połączony płat siatki i policzy jego pole.';
-        if (!measurement.result) setMeasureResults([['POLE','—'],['TRÓJKĄTY','—']]);
+          ? 'Area calculated from connected GLB triangles. Click another surface to recalculate.'
+          : 'Click a surface. The viewer detects the connected mesh patch and calculates its area.';
+        if (!measurement.result) setMeasureResults([['AREA','—'],['TRIANGLES','—']]);
       } else if (measurement.type === 'min-distance') {
         const selectedCount = state.selected.size;
         if (measurement.busy) {
-          measurePrompt.textContent = 'Obliczanie minimalnego dystansu siatek GLB…';
+          measurePrompt.textContent = 'Calculating minimum distance between GLB meshes…';
         } else if (measurement.result) {
           measurePrompt.textContent = measurement.result.approximate
-            ? 'Wynik przybliżony: duża siatka została próbkowana. Kliknij OBLICZ po każdej zmianie położenia modelu.'
-            : 'Minimalny dystans policzony na pełnej triangulacji. Kliknij OBLICZ po każdej zmianie położenia modelu.';
+            ? 'Approximate result: a large mesh was sampled. Recalculate after changing model positions.'
+            : 'Minimum distance calculated on full triangulation. Recalculate after changing model positions.';
         } else {
-          measurePrompt.textContent = 'Zaznacz dokładnie 2 części, wróć do POMIAR i kliknij OBLICZ. Aktualnie zaznaczono: ' + selectedCount + '.';
-          setMeasureResults([['MIN. DYSTANS','—'],['CZĘŚĆ A','—'],['CZĘŚĆ B','—']]);
+          measurePrompt.textContent = 'Select exactly 2 parts, return to MEASURE and click CALCULATE. Currently selected: ' + selectedCount + '.';
+          setMeasureResults([['MIN. DISTANCE','—'],['PART A','—'],['PART B','—']]);
         }
       }
     }
@@ -1224,7 +1376,7 @@
       const kind = measurement.hover.snapKind || 'surface';
       snapIndicator.dataset.kind = kind;
       snapIndicator.querySelector('.snap-symbol').textContent = snapSymbol(kind);
-      snapIndicatorText.textContent = measurement.snapEnabled ? shortSnapLabel(kind) : 'SNAP OFF';
+      snapIndicatorText.textContent = measurement.snapEnabled ? shortSnapLabel(kind) : 'FREE';
       const x = Math.min(window.innerWidth - 75, Math.max(75, screenC.x + 34));
       const y = Math.min(window.innerHeight - 35, Math.max(35, screenC.y - 24));
       snapIndicator.style.left = x + 'px'; snapIndicator.style.top = y + 'px';
@@ -1272,7 +1424,7 @@
         midpoint2D(screenA, screenB, screenD);
         placeFloat(measureMainLabel, screenD.x, screenD.y - 15, formatMm(length, true));
         setMeasureResults([['L',formatLength(length,true)],['ΔX',formatMm(components.dx)],['ΔY',formatMm(components.dy)],['ΔZ',formatMm(components.dz)],['SNAP B',shortSnapLabel(pointB.snapKind)]]);
-        measurePrompt.textContent = preview ? 'PODGLĄD LIVE • A: ' + pointA.snapLabel + ' • B: ' + pointB.snapLabel : 'POMIAR GOTOWY • A: ' + pointA.snapLabel + ' • B: ' + pointB.snapLabel;
+        measurePrompt.textContent = preview ? 'LIVE PREVIEW • A: ' + pointA.snapLabel + ' • B: ' + pointB.snapLabel : 'MEASUREMENT COMPLETE • A: ' + pointA.snapLabel + ' • B: ' + pointB.snapLabel;
 
         if (measurement.type === 'xyz') {
           if (projectWorld(measurePathXWorld, screenC) && projectWorld(measurePathXYWorld, screenD)) {
@@ -1301,9 +1453,9 @@
         showSvgMarker(measureMarkerC, screenC, preview);
         setAngleArc(screenB, screenA, screenC);
         const angle = measureEngine.angleDegrees(measureWorldA, measureWorldB, measureWorldC);
-        placeFloat(measureMainLabel, screenB.x + 45, screenB.y - 32, '≈ ' + angle.toLocaleString('pl-PL',{maximumFractionDigits:2}) + '°');
-        setMeasureResults([['KĄT','≈ '+angle.toLocaleString('pl-PL',{maximumFractionDigits:2})+'°'],['A–V',formatMm(measureWorldA.distanceTo(measureWorldB),true)],['V–B',formatMm(measureWorldB.distanceTo(measureWorldC),true)],['SNAP',shortSnapLabel(third.snapKind)]]);
-        measurePrompt.textContent = preview ? 'PODGLĄD KĄTA LIVE • kliknij trzeci punkt.' : 'KĄT GOTOWY • kolejne kliknięcie rozpocznie nowy.';
+        placeFloat(measureMainLabel, screenB.x + 45, screenB.y - 32, '≈ ' + angle.toLocaleString('en-US',{maximumFractionDigits:2}) + '°');
+        setMeasureResults([['ANGLE','≈ '+angle.toLocaleString('en-US',{maximumFractionDigits:2})+'°'],['A–V',formatMm(measureWorldA.distanceTo(measureWorldB),true)],['V–B',formatMm(measureWorldB.distanceTo(measureWorldC),true)],['SNAP',shortSnapLabel(third.snapKind)]]);
+        measurePrompt.textContent = preview ? 'LIVE ANGLE PREVIEW • click the third point.' : 'ANGLE COMPLETE • the next click starts a new measurement.';
         return;
       }
 
@@ -1325,7 +1477,7 @@
           showSvgMarker(measureMarkerA, screenA, false);
           placeFloat(measureMainLabel, screenA.x, screenA.y - 25, formatArea(result.area, result.approximate));
         }
-        setMeasureResults([['POLE',formatArea(result.area,result.approximate)],['TRÓJKĄTY',String(result.triangleCount)],['ZAKRES',result.patch?'PŁAT':'CAŁY MESH']]);
+        setMeasureResults([['AREA',formatArea(result.area,result.approximate)],['TRIANGLES',String(result.triangleCount)],['SCOPE',result.patch?'PATCH':'ENTIRE MESH']]);
         return;
       }
 
@@ -1338,7 +1490,7 @@
         showSvgMarker(measureMarkerB, screenB, false);
         midpoint2D(screenA, screenB, screenC);
         placeFloat(measureMainLabel, screenC.x, screenC.y - 15, formatMm(result.distance,result.approximate));
-        setMeasureResults([['MIN. DYSTANS',formatLength(result.distance,result.approximate)],['CZĘŚĆ A',result.nameA],['CZĘŚĆ B',result.nameB],['SIATKA',result.approximate?'PRÓBKOWANA':'PEŁNA']]);
+        setMeasureResults([['MIN. DISTANCE',formatLength(result.distance,result.approximate)],['PART A',result.nameA],['PART B',result.nameB],['MESH',result.approximate?'SAMPLED':'FULL']]);
       }
     }
 
@@ -1388,7 +1540,7 @@
       } else if (measurement.type === 'area') {
         const surface = measureEngine.surfacePatchFromIntersection(measurement.hoverIntersection, {smoothAngleDeg: 14});
         if (!surface) {
-          measurePrompt.textContent = 'Nie udało się wydzielić powierzchni w tym miejscu.';
+          measurePrompt.textContent = 'Could not detect a connected surface patch at this location.';
           return;
         }
         measurement.result = {
@@ -1396,7 +1548,7 @@
           triangleCount: surface.triangleCount,
           patch: surface.patch,
           approximate: surface.approximate,
-          storedCentroid: createMeasuredWorldPoint(surface.centroid, surface.object, 'surface', 'ŚRODEK POWIERZCHNI')
+          storedCentroid: createMeasuredWorldPoint(surface.centroid, surface.object, 'surface', 'SURFACE CENTROID')
         };
       }
       resetMeasureReadout();
@@ -1412,7 +1564,7 @@
       if (state.measurement.busy) return;
       const indexes = [...state.selected];
       if (indexes.length !== 2) {
-        measurePrompt.textContent = 'Zaznacz dokładnie 2 części. Aktualnie zaznaczono: ' + indexes.length + '.';
+        measurePrompt.textContent = 'Select exactly 2 parts. Currently selected: ' + indexes.length + '.';
         return;
       }
       const meshesA = selectedNodeMeshes(indexes[0]);
@@ -1429,10 +1581,10 @@
         const result = await measureEngine.closestDistanceBetweenObjectSets(meshesA, meshesB, {
           maxTrianglesPerSet: 9000,
           yieldEvery: 1800,
-          onProgress: progress => { measurePrompt.textContent = 'Obliczanie… najlepszy wynik: ' + (Number.isFinite(progress.bestDistance) ? formatMm(progress.bestDistance,true) : 'szukanie'); }
+          onProgress: progress => { measurePrompt.textContent = 'Calculating… best result: ' + (Number.isFinite(progress.bestDistance) ? formatMm(progress.bestDistance,true) : 'searching'); }
         });
         if (computeToken !== state.measurement.computeToken) return;
-        if (!result) throw new Error('Brak dwóch rozłącznych zestawów geometrii.');
+        if (!result) throw new Error('Two separate geometry sets were not found.');
         const nodeA = state.treeNodes[indexes[0]];
         const nodeB = state.treeNodes[indexes[1]];
         state.measurement.result = {
@@ -1444,12 +1596,12 @@
           nameB: nodeB?.label || 'B'
         };
         measurePrompt.textContent = result.approximate
-          ? 'Wynik przybliżony: duża siatka została próbkowana. Dla mniejszych części obliczenie jest pełne.'
-          : 'Minimalny dystans policzony na pełnej triangulacji zaznaczonych części.';
+          ? 'Approximate result: a large mesh was sampled. Smaller parts use full calculation.'
+          : 'Minimum distance calculated on full triangulation of the selected parts.';
       } catch (error) {
         if (computeToken !== state.measurement.computeToken) return;
         console.error(error);
-        measurePrompt.textContent = 'Błąd pomiaru minimalnego dystansu: ' + error.message;
+        measurePrompt.textContent = 'Minimum-distance error: ' + error.message;
       } finally {
         if (computeToken === state.measurement.computeToken) {
           state.measurement.busy = false;
@@ -1491,7 +1643,7 @@
         if (Number.isInteger(mapped)) { index = mapped; break; }
         current = current.parent;
       }
-      if (index >= 0) selectNode(index);
+      if (index >= 0) selectNode(index, { fromModel: true });
     }
 
     const raycaster = new THREE.Raycaster();
@@ -1523,13 +1675,14 @@
       if (!state.modelRoot || event.button !== 0 || !pointerDown) return;
       const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
       pointerDown = null;
-      if (moved > 8 || state.interactionMode === 'orbit') return;
+      if (moved > 8 || state.interactionMode === 'orbit' || state.interactionMode === 'pan') return;
       const hits = findPointerHits(event);
       if (state.interactionMode === 'select') selectHit(hits[0] || null);
       else if (state.interactionMode === 'measure') addMeasurementPoint(hits);
     });
 
     orbitModeButton.addEventListener('click', () => setInteractionMode('orbit'));
+    panModeButton.addEventListener('click', () => setInteractionMode('pan'));
     selectModeButton.addEventListener('click', () => setInteractionMode('select'));
     measureModeButton.addEventListener('click', () => setInteractionMode('measure'));
     clearInteractionButton.addEventListener('click', clearInteraction);
@@ -1551,9 +1704,11 @@
     window.addEventListener('keydown', event => {
       if (event.key === 'Escape') clearInteraction();
       else if (event.key === '1') setInteractionMode('orbit');
-      else if (event.key === '2') setInteractionMode('select');
-      else if (event.key === '3') setInteractionMode('measure');
+      else if (event.key === '2') setInteractionMode('pan');
+      else if (event.key === '3') setInteractionMode('select');
+      else if (event.key === '4') setInteractionMode('measure');
     });
+    configureNavigationControls('orbit');
     setModeButtonState();
     updateMeasurementControls();
 
@@ -1579,8 +1734,71 @@
     explodeRange.addEventListener('input', () => setExplodeValue(explodeRange.value));
     if (explodeRangeMobile) explodeRangeMobile.addEventListener('input', () => setExplodeValue(explodeRangeMobile.value));
 
-    document.getElementById('treeToggle').addEventListener('click', () => { propsPanel.classList.remove('open'); treePanel.classList.toggle('open'); });
-    document.getElementById('propsToggle').addEventListener('click', () => { treePanel.classList.remove('open'); propsPanel.classList.toggle('open'); });
+    function updatePanelButton(panel, button) {
+      const visible = window.innerWidth <= 760 ? panel.classList.contains('open') : !panel.classList.contains('is-hidden');
+      button.classList.toggle('active', visible);
+      button.setAttribute('aria-expanded', String(visible));
+    }
+
+    function showPanel(panel, button, visible) {
+      if (window.innerWidth <= 760) {
+        if (visible) {
+          const otherPanel = panel === treePanel ? propsPanel : treePanel;
+          const otherButton = panel === treePanel ? propsToggle : treeToggle;
+          otherPanel.classList.remove('open');
+          updatePanelButton(otherPanel, otherButton);
+          panel.classList.add('open');
+        } else {
+          panel.classList.remove('open');
+        }
+      } else {
+        panel.classList.toggle('is-hidden', !visible);
+      }
+      updatePanelButton(panel, button);
+    }
+
+    function togglePanel(panel, button) {
+      const currentlyVisible = window.innerWidth <= 760 ? panel.classList.contains('open') : !panel.classList.contains('is-hidden');
+      showPanel(panel, button, !currentlyVisible);
+    }
+
+    treeToggle.addEventListener('click', () => togglePanel(treePanel, treeToggle));
+    propsToggle.addEventListener('click', () => togglePanel(propsPanel, propsToggle));
+    treeClose.addEventListener('click', () => showPanel(treePanel, treeToggle, false));
+    propsClose.addEventListener('click', () => showPanel(propsPanel, propsToggle, false));
+    selectionCard.querySelector('#selectionCardClose').addEventListener('click', clearSelection);
+    openPropertiesButton.addEventListener('click', () => showPanel(propsPanel, propsToggle, true));
+    focusSelectedButton.addEventListener('click', focusSelected);
+
+    async function copyText(value) {
+      const textValue = String(value || '').trim();
+      if (!textValue) return false;
+      try {
+        await navigator.clipboard.writeText(textValue);
+        return true;
+      } catch {
+        const area = document.createElement('textarea');
+        area.value = textValue;
+        area.style.position = 'fixed'; area.style.opacity = '0';
+        document.body.appendChild(area); area.select();
+        const copied = document.execCommand('copy');
+        area.remove();
+        return copied;
+      }
+    }
+
+    copyPartNumberButton.addEventListener('click', async () => {
+      const copied = await copyText(selectionPartNumber.textContent);
+      copyPartNumberStatus.textContent = copied ? 'Copied' : 'Copy failed';
+      window.setTimeout(() => { if (!selectionCard.hidden) copyPartNumberStatus.textContent = 'Copy'; }, 1400);
+    });
+
+    updatePanelButton(treePanel, treeToggle);
+    updatePanelButton(propsPanel, propsToggle);
+    window.addEventListener('resize', () => {
+      updatePanelButton(treePanel, treeToggle);
+      updatePanelButton(propsPanel, propsToggle);
+    });
 
     document.getElementById('arButton').addEventListener('click', async () => {
       const arViewer = document.getElementById('arViewer');
@@ -1588,7 +1806,7 @@
         if (typeof arViewer.activateAR === 'function') await arViewer.activateAR();
         else arViewer.click();
       } catch (error) {
-        alert('Na tym urządzeniu/przeglądarce nie udało się uruchomić natywnego AR. Otwórz stronę w Safari na iPhone albo Chrome na Androidzie.');
+        alert('Native AR could not be started on this device or browser. Open the page in Safari on iPhone or Chrome on Android.');
       }
     });
 
@@ -1628,11 +1846,11 @@
       else buildFallbackTree(state.modelRoot);
       finalizeTree();
       fitView();
-      setStatus((structure?.root ? 'Drzewo IAM' : 'Nazwy GLB') + ' • ' + state.meshes.length + ' brył', 'ok');
+      setStatus((structure?.root ? 'IAM tree' : 'GLB names') + ' • ' + state.meshes.length + ' solids', 'ok');
     }).catch(error => {
       console.error(error);
-      setStatus('Błąd wczytywania modelu', 'error');
-      treeList.innerHTML = '<div class="empty-state">Nie udało się wczytać ' + escapeHtml(MODEL) + '.glb.<br>Sprawdź nazwy plików i publikację Pages.</div>';
+      setStatus('Model loading error', 'error');
+      treeList.innerHTML = '<div class="empty-state">Could not load ' + escapeHtml(MODEL) + '.glb.<br>Check file names and the Pages deployment.</div>';
     });
 
   </script>
