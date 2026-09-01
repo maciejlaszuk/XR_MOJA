@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#0f172a">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — MOJA XR v24</title>
+  <title>CK-207-74-5000_VR — MOJA XR v25</title>
 
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
-  <script src="moja-snap.js?v=24"></script>
-  <script src="moja-measure.js?v=24"></script>
+  <script src="moja-snap.js?v=25"></script>
+  <script src="moja-measure.js?v=25"></script>
 
   <script type="importmap">
   {
@@ -204,6 +204,58 @@
     #viewport[data-mode="pan"] canvas { cursor: grab; }
     #viewport[data-mode="pan"] canvas:active { cursor: grabbing; }
 
+    .viewcube-widget {
+      position: fixed; z-index: 80; top: 70px; right: 360px; width: 132px;
+      padding: 9px; border: 1px solid rgba(255,255,255,.16); border-radius: 16px;
+      background: rgba(15,23,42,.88); box-shadow: 0 16px 42px rgba(15,23,42,.30);
+      backdrop-filter: blur(14px); user-select: none;
+    }
+    .viewcube-stage {
+      position: relative; width: 112px; height: 112px; margin: 0 auto;
+      perspective: 420px; touch-action: none; cursor: grab;
+    }
+    .viewcube-stage:active { cursor: grabbing; }
+    .viewcube-cube {
+      position: absolute; left: 20px; top: 20px; width: 72px; height: 72px;
+      transform-style: preserve-3d; transform: rotateX(-24deg) rotateY(38deg);
+      transition: transform .12s ease-out;
+    }
+    .viewcube-widget.dragging .viewcube-cube { transition: none; }
+    .viewcube-face {
+      position: absolute; inset: 0; width: 72px; height: 72px;
+      display: grid; place-items: center; border: 1px solid rgba(15,23,42,.38);
+      background: rgba(241,245,249,.94); color: #0f172a; font-size: 9px; font-weight: 900;
+      letter-spacing: .04em; cursor: pointer; backface-visibility: hidden;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.42);
+    }
+    .viewcube-face:hover { background: #bae6fd; color: #075985; }
+    .viewcube-face.front  { transform: rotateY(0deg) translateZ(36px); }
+    .viewcube-face.back   { transform: rotateY(180deg) translateZ(36px); }
+    .viewcube-face.right  { transform: rotateY(90deg) translateZ(36px); }
+    .viewcube-face.left   { transform: rotateY(-90deg) translateZ(36px); }
+    .viewcube-face.top    { transform: rotateX(90deg) translateZ(36px); }
+    .viewcube-face.bottom { transform: rotateX(-90deg) translateZ(36px); }
+    .viewcube-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 7px; }
+    .viewcube-action {
+      min-height: 29px; border: 1px solid rgba(148,163,184,.28); border-radius: 9px;
+      background: #1e293b; color: #e2e8f0; font-size: 9px; font-weight: 900; cursor: pointer;
+    }
+    .viewcube-action:hover { background: #0369a1; color: #fff; border-color: #7dd3fc; }
+    .viewcube-projection { grid-column: span 2; color: #7dd3fc; }
+
+    .saved-measure-layer { position: fixed; z-index: 45; inset: 0; pointer-events: none; overflow: visible; }
+    .saved-measure-label {
+      position: fixed; z-index: 48; transform: translate(-50%, -50%); pointer-events: none;
+      padding: 5px 9px; border: 1px solid rgba(15,23,42,.22); border-radius: 8px;
+      background: rgba(248,250,252,.97); color: #2563eb; box-shadow: 0 3px 10px rgba(15,23,42,.24);
+      font-size: 12px; font-weight: 850; white-space: nowrap;
+    }
+    .saved-measure-label.xyz { color: #0f172a; line-height: 1.45; }
+    .saved-measure-label .x { color: #ef4444; }
+    .saved-measure-label .y { color: #16a34a; }
+    .saved-measure-label .z { color: #2563eb; }
+    .saved-measure-label.area { color: #0f172a; line-height: 1.45; text-align: center; }
+
     .explode-wrap { grid-column: span 2; display: grid; grid-template-columns: 62px 1fr 42px; align-items: center; gap: 8px; padding: 0 11px; border-radius: 12px; background: #1e293b; }
     .explode-wrap label { font-size: 10px; font-weight: 900; }
     .explode-wrap output { font-size: 10px; color: #fde68a; text-align: right; }
@@ -244,10 +296,12 @@
 
     @media (max-width: 1100px) {
       .toolbar { grid-template-columns: repeat(5, minmax(78px,1fr)); }
+      .viewcube-widget { right: 14px; top: 62px; }
     }
 
     @media (max-width: 760px) {
       .topbar { top: max(8px, env(safe-area-inset-top)); left: 8px; right: 8px; }
+      .viewcube-widget { display: none; }
       .pill { min-height: 38px; padding: 0 11px; }
       .pill small, .pill.status span { display: none; }
       .panel { top: 56px; left: 8px !important; right: 8px !important; bottom: 182px; width: auto; display: none; }
@@ -256,8 +310,7 @@
       .interaction-bar { bottom: calc(max(8px, env(safe-area-inset-bottom)) + 58px); width: calc(100vw - 16px); gap: 4px; padding: 5px; }
       .mode-tool { min-height: 40px; padding: 0 4px; font-size: 9px; }
       .measure-hud { top: 54px; width: calc(100vw - 16px); max-height: 42vh; overflow-y: auto; padding: 8px 9px; }
-      .viewcube { right: 8px; top: 52px; grid-template-columns: repeat(3, 30px); grid-template-rows: repeat(4, 30px); gap: 3px; padding: 6px; }
-      .viewcube .vc { font-size: 8px; border-radius: 7px; }
+      .viewcube-widget { right: 10px; top: 58px; transform: scale(.82); transform-origin: top right; }
       .measure-hud-head strong { font-size: 9px; }
       .measure-actions { gap: 4px; }
       .measure-head-button { padding: 0 7px; font-size: 8px; }
@@ -290,7 +343,7 @@
 
   <div class="topbar">
     <button id="treeToggle" class="pill mobile-toggle panel-toggle active" type="button" aria-expanded="true">☰ Model Tree</button>
-    <div class="pill"><strong>CK-207-74-5000_VR</strong><small>MOJA XR v24</small></div>
+    <div class="pill"><strong>CK-207-74-5000_VR</strong><small>MOJA XR v25</small></div>
     <button id="propsToggle" class="pill mobile-toggle panel-toggle active" type="button" aria-expanded="true">Properties</button>
     <div id="loadStatus" class="pill status"><span>Loading model…</span></div>
   </div>
@@ -389,6 +442,8 @@
     <circle id="measureMarkerB" class="endpoint" cx="0" cy="0" r="3.2" visibility="hidden"></circle>
     <circle id="measureMarkerC" class="endpoint" cx="0" cy="0" r="3.2" visibility="hidden"></circle>
   </svg>
+  <svg id="savedMeasureSvg" class="saved-measure-layer" aria-hidden="true"></svg>
+  <div id="savedMeasureLabels" class="saved-measure-layer" aria-hidden="true"></div>
   <div id="measureMainLabel" class="measure-float measure-value-label"></div>
   <div id="measureSecondaryLabel" class="measure-float measure-value-label secondary"></div>
   <div id="measureCoordinateLabel" class="measure-float measure-coordinates"></div>
@@ -409,19 +464,22 @@
   </div>
 
 
-  <div class="viewcube" id="viewCube" aria-label="ViewCube">
-    <button class="vc blank" type="button" tabindex="-1">.</button>
-    <button class="vc" data-view="top" type="button">TOP</button>
-    <button class="vc blank" type="button" tabindex="-1">.</button>
-    <button class="vc" data-view="left" type="button">LEFT</button>
-    <button class="vc iso" data-view="iso" type="button">ISO</button>
-    <button class="vc" data-view="right" type="button">RIGHT</button>
-    <button class="vc blank" type="button" tabindex="-1">.</button>
-    <button class="vc" data-view="front" type="button">FRONT</button>
-    <button class="vc blank" type="button" tabindex="-1">.</button>
-    <button class="vc blank" type="button" tabindex="-1">.</button>
-    <button class="vc" data-view="bottom" type="button">BOTTOM</button>
-    <button class="vc" data-view="back" type="button">BACK</button>
+  <div class="viewcube-widget" id="viewCube" aria-label="ViewCube">
+    <div class="viewcube-stage" id="viewCubeStage" title="Drag to orbit. Click a face to align the view.">
+      <div class="viewcube-cube" id="viewCubeCube">
+        <button class="viewcube-face front" data-view="front" type="button">FRONT</button>
+        <button class="viewcube-face back" data-view="back" type="button">BACK</button>
+        <button class="viewcube-face right" data-view="right" type="button">RIGHT</button>
+        <button class="viewcube-face left" data-view="left" type="button">LEFT</button>
+        <button class="viewcube-face top" data-view="top" type="button">TOP</button>
+        <button class="viewcube-face bottom" data-view="bottom" type="button">BOTTOM</button>
+      </div>
+    </div>
+    <div class="viewcube-actions">
+      <button class="viewcube-action" data-view="iso" type="button">ISO</button>
+      <button class="viewcube-action" id="viewCubeFit" type="button">FIT</button>
+      <button class="viewcube-action viewcube-projection" id="projectionToggle" type="button">PERSPECTIVE</button>
+    </div>
   </div>
 
   <nav class="toolbar" aria-label="Viewing tools">
@@ -433,14 +491,14 @@
       <output id="explodeValue">0%</output>
     </div>
     <button id="arButton" class="tool cyan" type="button"><strong>AR</strong><span>phone</span></button>
-    <a id="mrButton" class="tool green" href="quest.html?mode=mr&v=24" style="text-decoration:none;color:#fff"><strong>MR</strong><span>Quest 3</span></a>
-    <a id="vrButton" class="tool blue" href="quest.html?mode=vr&v=24" style="text-decoration:none;color:#fff"><strong>VR</strong><span>Quest 3</span></a>
+    <a id="mrButton" class="tool green" href="quest.html?mode=mr&v=25" style="text-decoration:none;color:#fff"><strong>MR</strong><span>Quest 3</span></a>
+    <a id="vrButton" class="tool blue" href="quest.html?mode=vr&v=25" style="text-decoration:none;color:#fff"><strong>VR</strong><span>Quest 3</span></a>
   </nav>
 
   <model-viewer
     id="arViewer"
-    src="CK-207-74-5000_VR.glb?v=24"
-    ios-src="CK-207-74-5000_VR.usdz?v=24"
+    src="CK-207-74-5000_VR.glb?v=25"
+    ios-src="CK-207-74-5000_VR.usdz?v=25"
     ar
     ar-modes="webxr scene-viewer quick-look"
     ar-placement="floor"
@@ -463,7 +521,7 @@
     });
 
     const MODEL = 'CK-207-74-5000_VR';
-    const VERSION = '24';
+    const VERSION = '25';
     const viewport = document.getElementById('viewport');
     const loadStatus = document.getElementById('loadStatus');
     const treePanel = document.getElementById('treePanel');
@@ -506,7 +564,13 @@
     const measureSecondaryLabel = document.getElementById('measureSecondaryLabel');
     const measureCoordinateLabel = document.getElementById('measureCoordinateLabel');
     const viewCube = document.getElementById('viewCube');
+    const viewCubeStage = document.getElementById('viewCubeStage');
+    const viewCubeCube = document.getElementById('viewCubeCube');
     const viewCubeButtons = [...document.querySelectorAll('[data-view]')];
+    const viewCubeFit = document.getElementById('viewCubeFit');
+    const projectionToggle = document.getElementById('projectionToggle');
+    const savedMeasureSvg = document.getElementById('savedMeasureSvg');
+    const savedMeasureLabels = document.getElementById('savedMeasureLabels');
     const snapIndicator = document.getElementById('snapIndicator');
     const snapIndicatorText = document.getElementById('snapIndicatorText');
     const treeToggle = document.getElementById('treeToggle');
@@ -546,7 +610,8 @@
         hoverIntersection: null,
         result: null,
         busy: false,
-        computeToken: 0
+        computeToken: 0,
+        saved: []
       }
     };
 
@@ -560,8 +625,13 @@
     renderer.toneMappingExposure = 1.05;
     viewport.appendChild(renderer.domElement);
 
-    const camera = new THREE.PerspectiveCamera(44, 1, 0.01, 5000);
-    camera.position.set(4, 3, 6);
+    const perspectiveCamera = new THREE.PerspectiveCamera(44, 1, 0.01, 5000);
+    perspectiveCamera.position.set(4, 3, 6);
+    const orthographicCamera = new THREE.OrthographicCamera(-5, 5, 5, -5, 0.01, 5000);
+    orthographicCamera.position.copy(perspectiveCamera.position);
+    let camera = perspectiveCamera;
+    let projectionMode = 'perspective';
+    let orthoHalfHeight = 5;
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -573,12 +643,14 @@
     function configureNavigationControls(mode) {
       const orbit = mode === 'orbit';
       const pan = mode === 'pan';
-      controls.enableRotate = orbit;
+      const measure = mode === 'measure';
+      controls.enableRotate = orbit || measure;
       controls.enablePan = true;
-      controls.mouseButtons.LEFT = orbit ? THREE.MOUSE.ROTATE : (pan ? THREE.MOUSE.PAN : -1);
+      controls.enableZoom = true;
+      controls.mouseButtons.LEFT = (orbit || measure) ? THREE.MOUSE.ROTATE : (pan ? THREE.MOUSE.PAN : -1);
       controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
       controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
-      controls.touches.ONE = orbit ? THREE.TOUCH.ROTATE : THREE.TOUCH.PAN;
+      controls.touches.ONE = (orbit || measure) ? THREE.TOUCH.ROTATE : THREE.TOUCH.PAN;
       controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
     }
 
@@ -609,11 +681,21 @@
     const coordinateTemp = new THREE.Vector3();
     const currentPointer = { x: window.innerWidth * 0.5, y: window.innerHeight * 0.5, inside: false };
 
+    function updateOrthographicFrustum(aspect) {
+      orthographicCamera.left = -orthoHalfHeight * aspect;
+      orthographicCamera.right = orthoHalfHeight * aspect;
+      orthographicCamera.top = orthoHalfHeight;
+      orthographicCamera.bottom = -orthoHalfHeight;
+      orthographicCamera.updateProjectionMatrix();
+    }
+
     function resize() {
       const rect = viewport.getBoundingClientRect();
       renderer.setSize(rect.width, rect.height, false);
-      camera.aspect = rect.width / Math.max(1, rect.height);
-      camera.updateProjectionMatrix();
+      const aspect = rect.width / Math.max(1, rect.height);
+      perspectiveCamera.aspect = aspect;
+      perspectiveCamera.updateProjectionMatrix();
+      updateOrthographicFrustum(aspect);
     }
     window.addEventListener('resize', resize);
     resize();
@@ -1026,21 +1108,57 @@
       invalidateMinimumDistance();
     }
 
-    function fitView() {
-      if (!state.modelRoot) return;
-      const box = new THREE.Box3().setFromObject(state.modelRoot);
-      if (box.isEmpty()) return;
+    function activeCameraDirection() {
+      const direction = camera.position.clone().sub(controls.target);
+      if (direction.lengthSq() < 1e-8) direction.set(1, 0.7, 1);
+      return direction.normalize();
+    }
+
+    function viewSpec(name) {
+      switch (String(name || '').toLowerCase()) {
+        case 'front': return { direction: new THREE.Vector3(0, 0, 1), up: new THREE.Vector3(0, 1, 0) };
+        case 'back': return { direction: new THREE.Vector3(0, 0, -1), up: new THREE.Vector3(0, 1, 0) };
+        case 'left': return { direction: new THREE.Vector3(-1, 0, 0), up: new THREE.Vector3(0, 1, 0) };
+        case 'right': return { direction: new THREE.Vector3(1, 0, 0), up: new THREE.Vector3(0, 1, 0) };
+        case 'top': return { direction: new THREE.Vector3(0, 1, 0), up: new THREE.Vector3(0, 0, -1) };
+        case 'bottom': return { direction: new THREE.Vector3(0, -1, 0), up: new THREE.Vector3(0, 0, 1) };
+        default: return { direction: new THREE.Vector3(1, 0.72, 1), up: new THREE.Vector3(0, 1, 0) };
+      }
+    }
+
+    function frameBox(box, direction, up, padding = 1.35) {
+      if (!box || box.isEmpty()) return;
       const size = box.getSize(new THREE.Vector3());
       const center = box.getCenter(new THREE.Vector3());
-      const maxSize = Math.max(size.x, size.y, size.z, 0.1);
-      const distance = maxSize / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5))) * 1.35;
-      const direction = new THREE.Vector3(1, 0.7, 1).normalize();
+      const maxSize = Math.max(size.x, size.y, size.z, 0.05);
+      const dir = (direction || activeCameraDirection()).clone().normalize();
+      const upVector = (up || camera.up || new THREE.Vector3(0, 1, 0)).clone();
       controls.target.copy(center);
-      camera.position.copy(center).addScaledVector(direction, distance);
-      camera.near = Math.max(0.001, distance / 1000);
-      camera.far = Math.max(1000, distance * 30);
-      camera.updateProjectionMatrix();
+      camera.up.copy(upVector);
+
+      if (camera.isPerspectiveCamera) {
+        const distance = maxSize / (2 * Math.tan(THREE.MathUtils.degToRad(perspectiveCamera.fov * 0.5))) * padding;
+        camera.position.copy(center).addScaledVector(dir, distance);
+        camera.near = Math.max(0.001, distance / 1000);
+        camera.far = Math.max(1000, distance * 30);
+        camera.updateProjectionMatrix();
+      } else {
+        orthoHalfHeight = Math.max(0.02, maxSize * 0.72 * padding);
+        const distance = Math.max(maxSize * 2.8, 1);
+        camera.position.copy(center).addScaledVector(dir, distance);
+        camera.near = Math.max(0.001, distance / 1000);
+        camera.far = Math.max(1000, distance * 30);
+        camera.zoom = 1;
+        const rect = viewport.getBoundingClientRect();
+        updateOrthographicFrustum(rect.width / Math.max(1, rect.height));
+      }
+      camera.lookAt(center);
       controls.update();
+    }
+
+    function fitView() {
+      if (!state.modelRoot) return;
+      frameBox(new THREE.Box3().setFromObject(state.modelRoot), viewSpec('iso').direction, viewSpec('iso').up, 1.35);
     }
 
     function focusSelected() {
@@ -1049,45 +1167,104 @@
       const box = new THREE.Box3();
       node.meshes.forEach(mesh => { if (mesh.visible) box.expandByObject(mesh); });
       if (box.isEmpty()) return;
-      const size = box.getSize(new THREE.Vector3());
-      const center = box.getCenter(new THREE.Vector3());
-      const maxSize = Math.max(size.x, size.y, size.z, 0.05);
-      const distance = maxSize / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5))) * 1.65;
-      const direction = camera.position.clone().sub(controls.target).normalize();
-      if (direction.lengthSq() < 0.001) direction.set(1, 0.7, 1).normalize();
-      controls.target.copy(center);
-      camera.position.copy(center).addScaledVector(direction, distance);
-      controls.update();
-    }
-
-    function viewDirectionByName(name) {
-      switch (String(name || '').toLowerCase()) {
-        case 'front': return new THREE.Vector3(0, 0, 1);
-        case 'back': return new THREE.Vector3(0, 0, -1);
-        case 'left': return new THREE.Vector3(-1, 0, 0);
-        case 'right': return new THREE.Vector3(1, 0, 0);
-        case 'top': return new THREE.Vector3(0, 1, 0.001);
-        case 'bottom': return new THREE.Vector3(0, -1, 0.001);
-        default: return new THREE.Vector3(1, 0.7, 1);
-      }
+      frameBox(box, activeCameraDirection(), camera.up, 1.65);
     }
 
     function setView(name) {
       if (!state.modelRoot) return;
-      const box = new THREE.Box3().setFromObject(state.modelRoot);
-      if (box.isEmpty()) return;
-      const size = box.getSize(new THREE.Vector3());
-      const center = box.getCenter(new THREE.Vector3());
-      const maxSize = Math.max(size.x, size.y, size.z, 0.1);
-      const distance = maxSize / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5))) * 1.35;
-      const direction = viewDirectionByName(name).normalize();
-      controls.target.copy(center);
-      camera.position.copy(center).addScaledVector(direction, distance);
-      camera.up.set(0, 1, 0);
-      camera.near = Math.max(0.001, distance / 1000);
-      camera.far = Math.max(1000, distance * 30);
-      camera.updateProjectionMatrix();
+      const spec = viewSpec(name);
+      frameBox(new THREE.Box3().setFromObject(state.modelRoot), spec.direction, spec.up, 1.35);
+    }
+
+    function setProjectionMode(mode) {
+      const next = mode === 'orthographic' ? 'orthographic' : 'perspective';
+      if (next === projectionMode) return;
+      const previous = camera;
+      const direction = previous.position.clone().sub(controls.target);
+      let distance = direction.length();
+      if (distance < 1e-6) { direction.set(1, 0.7, 1); distance = 5; }
+      direction.normalize();
+
+      if (next === 'orthographic') {
+        orthoHalfHeight = Math.max(0.02, distance * Math.tan(THREE.MathUtils.degToRad(perspectiveCamera.fov * 0.5)));
+        orthographicCamera.position.copy(previous.position);
+        orthographicCamera.quaternion.copy(previous.quaternion);
+        orthographicCamera.up.copy(previous.up);
+        orthographicCamera.zoom = 1;
+        camera = orthographicCamera;
+      } else {
+        const perspectiveDistance = Math.max(0.05, orthoHalfHeight / Math.tan(THREE.MathUtils.degToRad(perspectiveCamera.fov * 0.5)));
+        perspectiveCamera.position.copy(controls.target).addScaledVector(direction, perspectiveDistance);
+        perspectiveCamera.up.copy(previous.up);
+        perspectiveCamera.lookAt(controls.target);
+        camera = perspectiveCamera;
+      }
+
+      projectionMode = next;
+      controls.object = camera;
+      const rect = viewport.getBoundingClientRect();
+      updateOrthographicFrustum(rect.width / Math.max(1, rect.height));
       controls.update();
+      projectionToggle.textContent = projectionMode === 'perspective' ? 'PERSPECTIVE' : 'ORTHOGRAPHIC';
+    }
+
+    function toggleProjection() {
+      setProjectionMode(projectionMode === 'perspective' ? 'orthographic' : 'perspective');
+    }
+
+    function updateViewCubeOrientation() {
+      if (!viewCubeCube) return;
+      const offset = camera.position.clone().sub(controls.target);
+      const horizontal = Math.hypot(offset.x, offset.z);
+      const yaw = Math.atan2(offset.x, offset.z);
+      const pitch = Math.atan2(offset.y, Math.max(horizontal, 1e-8));
+      viewCubeCube.style.transform = `rotateX(${THREE.MathUtils.radToDeg(pitch)}deg) rotateY(${-THREE.MathUtils.radToDeg(yaw)}deg)`;
+    }
+
+    let viewCubeDrag = null;
+    if (viewCubeStage) {
+      viewCubeStage.addEventListener('pointerdown', event => {
+        if (event.button !== 0) return;
+        viewCubeDrag = {
+          x: event.clientX,
+          y: event.clientY,
+          startX: event.clientX,
+          startY: event.clientY,
+          spherical: new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target))
+        };
+        viewCube.classList.add('dragging');
+        viewCubeStage.setPointerCapture(event.pointerId);
+      });
+      viewCubeStage.addEventListener('pointermove', event => {
+        if (!viewCubeDrag) return;
+        const dx = event.clientX - viewCubeDrag.x;
+        const dy = event.clientY - viewCubeDrag.y;
+        viewCubeDrag.x = event.clientX;
+        viewCubeDrag.y = event.clientY;
+        viewCubeDrag.spherical.theta -= dx * 0.012;
+        viewCubeDrag.spherical.phi -= dy * 0.012;
+        viewCubeDrag.spherical.makeSafe();
+        const offset = new THREE.Vector3().setFromSpherical(viewCubeDrag.spherical);
+        camera.position.copy(controls.target).add(offset);
+        camera.up.set(0, 1, 0);
+        camera.lookAt(controls.target);
+        controls.update();
+        event.preventDefault();
+      });
+      const stopViewCubeDrag = event => {
+        if (!viewCubeDrag) return;
+        const moved = Math.hypot(event.clientX - viewCubeDrag.startX, event.clientY - viewCubeDrag.startY);
+        viewCubeDrag = null;
+        viewCube.classList.remove('dragging');
+        try { viewCubeStage.releasePointerCapture(event.pointerId); } catch (error) {}
+        if (moved > 4) {
+          suppressViewCubeClick = true;
+          window.setTimeout(() => { suppressViewCubeClick = false; }, 80);
+          event.preventDefault();
+        }
+      };
+      viewCubeStage.addEventListener('pointerup', stopViewCubeDrag);
+      viewCubeStage.addEventListener('pointercancel', stopViewCubeDrag);
     }
 
     function prepareExplode() {
@@ -1310,6 +1487,233 @@
       updateMeasurementControls();
     }
 
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+
+    function cloneMeasuredPoint(stored) {
+      if (!stored) return null;
+      return {
+        object: stored.object,
+        local: stored.local?.clone ? stored.local.clone() : stored.local,
+        snapKind: stored.snapKind || 'surface',
+        snapLabel: stored.snapLabel || 'FACE POINT',
+        sourceIntersection: null
+      };
+    }
+
+    function createSavedSvgElement(tag, className) {
+      const element = document.createElementNS(SVG_NS, tag);
+      if (className) element.setAttribute('class', className);
+      element.setAttribute('visibility', 'hidden');
+      savedMeasureSvg.appendChild(element);
+      return element;
+    }
+
+    function createSavedMeasurementVisual(type) {
+      const visual = { type };
+      if (['distance','xyz','min-distance'].includes(type)) {
+        visual.lineMain = createSavedSvgElement('line', 'direct');
+        visual.markerA = createSavedSvgElement('circle', 'endpoint');
+        visual.markerA.setAttribute('r', '3.2');
+        visual.markerB = createSavedSvgElement('circle', 'endpoint');
+        visual.markerB.setAttribute('r', '3.2');
+      }
+      if (type === 'xyz') {
+        visual.lineX = createSavedSvgElement('line', 'axis-x');
+        visual.lineY = createSavedSvgElement('line', 'axis-y');
+        visual.lineZ = createSavedSvgElement('line', 'axis-z');
+      }
+      if (type === 'angle') {
+        visual.lineMain = createSavedSvgElement('line', 'direct');
+        visual.lineSecond = createSavedSvgElement('line', 'direct');
+        visual.angleArc = createSavedSvgElement('path', 'angle-arc');
+        visual.markerA = createSavedSvgElement('circle', 'endpoint'); visual.markerA.setAttribute('r','3.2');
+        visual.markerB = createSavedSvgElement('circle', 'endpoint'); visual.markerB.setAttribute('r','3.2');
+        visual.markerC = createSavedSvgElement('circle', 'endpoint'); visual.markerC.setAttribute('r','3.2');
+      }
+      if (type === 'point' || type === 'area') {
+        visual.markerA = createSavedSvgElement('circle', 'endpoint'); visual.markerA.setAttribute('r','3.2');
+      }
+      visual.label = document.createElement('div');
+      visual.label.className = 'saved-measure-label' + (type === 'xyz' ? ' xyz' : '') + (type === 'area' ? ' area' : '');
+      visual.label.hidden = true;
+      savedMeasureLabels.appendChild(visual.label);
+      return visual;
+    }
+
+    function disposeSavedMeasurementVisual(visual) {
+      if (!visual) return;
+      Object.values(visual).forEach(value => {
+        if (value instanceof Element && value.parentNode) value.parentNode.removeChild(value);
+      });
+    }
+
+    function storeMeasurement(record) {
+      if (!record?.type) return;
+      record.visual = createSavedMeasurementVisual(record.type);
+      state.measurement.saved.push(record);
+      resetMeasureReadout();
+    }
+
+    function clearSavedMeasurements() {
+      state.measurement.saved.forEach(record => disposeSavedMeasurementVisual(record.visual));
+      state.measurement.saved = [];
+    }
+
+    function clearAllMeasurements() {
+      clearSavedMeasurements();
+      clearMeasurement();
+    }
+
+    function setSavedSvgLine(element, a, b) {
+      if (!element || !a || !b) return;
+      element.setAttribute('x1', a.x); element.setAttribute('y1', a.y);
+      element.setAttribute('x2', b.x); element.setAttribute('y2', b.y);
+      element.setAttribute('visibility', 'visible');
+    }
+
+    function setSavedSvgMarker(element, point) {
+      if (!element || !point) return;
+      element.setAttribute('cx', point.x); element.setAttribute('cy', point.y);
+      element.setAttribute('visibility', 'visible');
+    }
+
+    function setSavedLabel(visual, x, y, html) {
+      if (!visual?.label) return;
+      visual.label.style.left = x + 'px';
+      visual.label.style.top = y + 'px';
+      visual.label.innerHTML = html;
+      visual.label.hidden = false;
+    }
+
+    function hideSavedVisual(visual) {
+      if (!visual) return;
+      Object.entries(visual).forEach(([key, value]) => {
+        if (!(value instanceof Element)) return;
+        if (key === 'label') value.hidden = true;
+        else value.setAttribute('visibility', 'hidden');
+      });
+    }
+
+    function setSavedAngleArc(pathElement, vertex, first, second) {
+      if (!pathElement) return;
+      const v1 = {x:first.x-vertex.x, y:first.y-vertex.y};
+      const v2 = {x:second.x-vertex.x, y:second.y-vertex.y};
+      const l1 = Math.hypot(v1.x,v1.y); const l2 = Math.hypot(v2.x,v2.y);
+      if (l1 < 2 || l2 < 2) { pathElement.setAttribute('visibility','hidden'); return; }
+      const r = Math.min(48, Math.max(22, Math.min(l1,l2)*0.24));
+      const a1 = Math.atan2(v1.y,v1.x); const a2 = Math.atan2(v2.y,v2.x);
+      let delta = a2-a1;
+      while (delta <= -Math.PI) delta += Math.PI*2;
+      while (delta > Math.PI) delta -= Math.PI*2;
+      const endAngle = a1 + delta;
+      const p1 = {x:vertex.x+Math.cos(a1)*r, y:vertex.y+Math.sin(a1)*r};
+      const p2 = {x:vertex.x+Math.cos(endAngle)*r, y:vertex.y+Math.sin(endAngle)*r};
+      pathElement.setAttribute('d', `M ${p1.x} ${p1.y} A ${r} ${r} 0 0 ${delta >= 0 ? 1 : 0} ${p2.x} ${p2.y}`);
+      pathElement.setAttribute('visibility','visible');
+    }
+
+    function renderSavedMeasurement(record) {
+      const visual = record?.visual;
+      if (!visual) return;
+      hideSavedVisual(visual);
+
+      if (record.type === 'distance' || record.type === 'xyz') {
+        if (!resolveMeasuredPoint(record.pointA, measureWorldA) || !resolveMeasuredPoint(record.pointB, measureWorldB)) return;
+        if (!projectWorld(measureWorldA, screenA) || !projectWorld(measureWorldB, screenB)) return;
+        setSavedSvgLine(visual.lineMain, screenA, screenB);
+        setSavedSvgMarker(visual.markerA, screenA); setSavedSvgMarker(visual.markerB, screenB);
+        const length = measureWorldA.distanceTo(measureWorldB);
+        const components = measurementComponents(measureWorldA, measureWorldB);
+        midpoint2D(screenA, screenB, screenD);
+        if (record.type === 'xyz' && projectWorld(measurePathXWorld, screenC) && projectWorld(measurePathXYWorld, screenD)) {
+          setSavedSvgLine(visual.lineX, screenA, screenC);
+          setSavedSvgLine(visual.lineY, screenC, screenD);
+          setSavedSvgLine(visual.lineZ, screenD, screenB);
+          midpoint2D(screenA, screenB, screenC);
+          setSavedLabel(visual, screenC.x, screenC.y - 28,
+            '<b>L</b> ' + formatMm(length,true) + '<br>' +
+            '<b class="x">X</b> ' + formatMm(components.dx) + ' &nbsp; ' +
+            '<b class="y">Y</b> ' + formatMm(components.dy) + ' &nbsp; ' +
+            '<b class="z">Z</b> ' + formatMm(components.dz));
+        } else {
+          setSavedLabel(visual, screenD.x, screenD.y - 15, formatMm(length,true));
+        }
+        return;
+      }
+
+      if (record.type === 'angle') {
+        if (!resolveMeasuredPoint(record.first, measureWorldA) || !resolveMeasuredPoint(record.vertex, measureWorldB) || !resolveMeasuredPoint(record.third, measureWorldC)) return;
+        if (!projectWorld(measureWorldA, screenA) || !projectWorld(measureWorldB, screenB) || !projectWorld(measureWorldC, screenC)) return;
+        setSavedSvgLine(visual.lineMain, screenA, screenB);
+        setSavedSvgLine(visual.lineSecond, screenB, screenC);
+        setSavedSvgMarker(visual.markerA, screenA); setSavedSvgMarker(visual.markerB, screenB); setSavedSvgMarker(visual.markerC, screenC);
+        setSavedAngleArc(visual.angleArc, screenB, screenA, screenC);
+        const angle = measureEngine.angleDegrees(measureWorldA, measureWorldB, measureWorldC);
+        setSavedLabel(visual, screenB.x + 45, screenB.y - 32, '≈ ' + angle.toLocaleString('en-US',{maximumFractionDigits:2}) + '°');
+        return;
+      }
+
+      if (record.type === 'point') {
+        if (!resolveMeasuredPoint(record.point, measureWorldA) || !projectWorld(measureWorldA, screenA)) return;
+        setSavedSvgMarker(visual.markerA, screenA);
+        measureEngine.modelCoordinates(measureWorldA, state.modelRoot, coordinateTemp);
+        setSavedLabel(visual, Math.min(window.innerWidth-100, screenA.x+90), Math.max(75, screenA.y-10),
+          '<b class="x">X</b> ' + formatMm(coordinateTemp.x) + '<br><b class="y">Y</b> ' + formatMm(coordinateTemp.y) + '<br><b class="z">Z</b> ' + formatMm(coordinateTemp.z));
+        return;
+      }
+
+      if (record.type === 'area') {
+        if (!resolveMeasuredPoint(record.centroid, measureWorldA) || !projectWorld(measureWorldA, screenA)) return;
+        setSavedSvgMarker(visual.markerA, screenA);
+        const dims = Number.isFinite(record.width) && Number.isFinite(record.height)
+          ? formatMm(record.width) + ' × ' + formatMm(record.height) + '<br>'
+          : '';
+        setSavedLabel(visual, screenA.x, screenA.y - 34, dims + '<b>AREA</b> ' + formatArea(record.area, record.approximate));
+        return;
+      }
+
+      if (record.type === 'min-distance') {
+        if (!resolveMeasuredPoint(record.pointA, measureWorldA) || !resolveMeasuredPoint(record.pointB, measureWorldB)) return;
+        if (!projectWorld(measureWorldA, screenA) || !projectWorld(measureWorldB, screenB)) return;
+        setSavedSvgLine(visual.lineMain, screenA, screenB);
+        setSavedSvgMarker(visual.markerA, screenA); setSavedSvgMarker(visual.markerB, screenB);
+        midpoint2D(screenA, screenB, screenC);
+        setSavedLabel(visual, screenC.x, screenC.y - 15, formatMm(record.distance,record.approximate));
+      }
+    }
+
+    function renderSavedMeasurements() {
+      state.measurement.saved.forEach(renderSavedMeasurement);
+    }
+
+    function commitCurrentMeasurement() {
+      const measurement = state.measurement;
+      if (measurement.type === 'distance' || measurement.type === 'xyz') {
+        if (measurement.points.length < 2) return false;
+        storeMeasurement({type: measurement.type, pointA: cloneMeasuredPoint(measurement.points[0]), pointB: cloneMeasuredPoint(measurement.points[1])});
+      } else if (measurement.type === 'angle') {
+        if (measurement.points.length < 3) return false;
+        storeMeasurement({type:'angle', first:cloneMeasuredPoint(measurement.points[0]), vertex:cloneMeasuredPoint(measurement.points[1]), third:cloneMeasuredPoint(measurement.points[2])});
+      } else if (measurement.type === 'point') {
+        if (measurement.points.length < 1) return false;
+        storeMeasurement({type:'point', point:cloneMeasuredPoint(measurement.points[0])});
+      } else if (measurement.type === 'area' && measurement.result) {
+        storeMeasurement({
+          type:'area', area:measurement.result.area, approximate:measurement.result.approximate,
+          width:measurement.result.width, height:measurement.result.height,
+          centroid:cloneMeasuredPoint(measurement.result.storedCentroid)
+        });
+      } else {
+        return false;
+      }
+      measurement.points = [];
+      measurement.result = null;
+      measurement.hover = null;
+      measurement.hoverIntersection = null;
+      clearOverlay();
+      return true;
+    }
+
     function projectWorld(point, output) {
       if (!point) return false;
       const projected = point.clone().project(camera);
@@ -1404,6 +1808,7 @@
 
     function updateMeasurementOverlay() {
       clearOverlay();
+      renderSavedMeasurements();
       updateSnapIndicator();
       if (state.interactionMode !== 'measure' || !state.modelRoot) return;
       const measurement = state.measurement;
@@ -1532,11 +1937,14 @@
       if (measurement.type === 'distance' || measurement.type === 'xyz') {
         if (measurement.points.length >= 2) measurement.points = [];
         measurement.points.push(stored);
+        if (measurement.points.length === 2) commitCurrentMeasurement();
       } else if (measurement.type === 'angle') {
         if (measurement.points.length >= 3) measurement.points = [];
         measurement.points.push(stored);
+        if (measurement.points.length === 3) commitCurrentMeasurement();
       } else if (measurement.type === 'point') {
         measurement.points = [stored];
+        commitCurrentMeasurement();
       } else if (measurement.type === 'area') {
         const surface = measureEngine.surfacePatchFromIntersection(measurement.hoverIntersection, {smoothAngleDeg: 14});
         if (!surface) {
@@ -1545,11 +1953,14 @@
         }
         measurement.result = {
           area: surface.area,
+          width: surface.width,
+          height: surface.height,
           triangleCount: surface.triangleCount,
           patch: surface.patch,
           approximate: surface.approximate,
           storedCentroid: createMeasuredWorldPoint(surface.centroid, surface.object, 'surface', 'SURFACE CENTROID')
         };
+        commitCurrentMeasurement();
       }
       resetMeasureReadout();
       updateMeasurementOverlay();
@@ -1570,7 +1981,7 @@
       const meshesA = selectedNodeMeshes(indexes[0]);
       const meshesB = selectedNodeMeshes(indexes[1]);
       if (!meshesA.length || !meshesB.length) {
-        measurePrompt.textContent = 'Jedna z zaznaczonych pozycji nie ma widocznej geometrii.';
+        measurePrompt.textContent = 'One of the selected entries has no visible geometry.';
         return;
       }
       const computeToken = ++state.measurement.computeToken;
@@ -1595,6 +2006,12 @@
           nameA: nodeA?.label || 'A',
           nameB: nodeB?.label || 'B'
         };
+        storeMeasurement({
+          type:'min-distance', distance:result.distance, approximate:result.approximate,
+          pointA:cloneMeasuredPoint(state.measurement.result.storedA), pointB:cloneMeasuredPoint(state.measurement.result.storedB),
+          nameA:state.measurement.result.nameA, nameB:state.measurement.result.nameB
+        });
+        state.measurement.result = null;
         measurePrompt.textContent = result.approximate
           ? 'Approximate result: a large mesh was sampled. Smaller parts use full calculation.'
           : 'Minimum distance calculated on full triangulation of the selected parts.';
@@ -1623,7 +2040,7 @@
 
     function clearInteraction() {
       clearSelection();
-      clearMeasurement();
+      clearAllMeasurements();
     }
 
     function findPointerHits(event) {
@@ -1651,6 +2068,7 @@
     let pointerDown = null;
     let lastHoverAt = 0;
 
+    renderer.domElement.addEventListener('contextmenu', event => event.preventDefault());
     renderer.domElement.addEventListener('pointerdown', event => {
       pointerDown = { x: event.clientX, y: event.clientY };
       currentPointer.x = event.clientX; currentPointer.y = event.clientY; currentPointer.inside = true;
@@ -1686,7 +2104,7 @@
     selectModeButton.addEventListener('click', () => setInteractionMode('select'));
     measureModeButton.addEventListener('click', () => setInteractionMode('measure'));
     clearInteractionButton.addEventListener('click', clearInteraction);
-    document.getElementById('measureClear').addEventListener('click', () => clearMeasurement());
+    document.getElementById('measureClear').addEventListener('click', clearAllMeasurements);
     measureCompute.addEventListener('click', computeMinimumDistance);
     snapToggle.addEventListener('click', () => {
       state.measurement.snapEnabled = !state.measurement.snapEnabled;
@@ -1721,7 +2139,13 @@
     document.getElementById('showAll').addEventListener('click', showAll);
     document.getElementById('showAllBottom').addEventListener('click', showAll);
     document.getElementById('fitView').addEventListener('click', fitView);
-    viewCubeButtons.forEach(button => button.addEventListener('click', () => setView(button.dataset.view)));
+    let suppressViewCubeClick = false;
+    viewCubeButtons.forEach(button => button.addEventListener('click', event => {
+      if (suppressViewCubeClick) { event.preventDefault(); event.stopPropagation(); return; }
+      setView(button.dataset.view);
+    }));
+    if (viewCubeFit) viewCubeFit.addEventListener('click', fitView);
+    if (projectionToggle) projectionToggle.addEventListener('click', toggleProjection);
     function setExplodeValue(value) {
       const percent = Math.round(THREE.MathUtils.clamp(Number(value) || 0, 0, 100));
       explodeRange.value = String(percent);
@@ -1813,6 +2237,7 @@
     function animate() {
       requestAnimationFrame(animate);
       controls.update();
+      updateViewCubeOrientation();
       state.helpers.forEach(helper => helper.updateMatrixWorld(true));
       updateMeasurementOverlay();
       renderer.render(scene, camera);
