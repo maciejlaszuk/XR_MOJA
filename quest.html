@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — Meta Quest Viewer v23</title>
+  <title>CK-207-74-5000_VR — Meta Quest Viewer v24</title>
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
@@ -25,8 +25,8 @@
     })();
   </script>
   <script src="https://aframe.io/releases/1.8.0/aframe.min.js"></script>
-  <script src="moja-snap.js?v=20"></script>
-  <script src="moja-measure.js?v=20"></script>
+  <script src="moja-snap.js?v=24"></script>
+  <script src="moja-measure.js?v=24"></script>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
@@ -182,7 +182,7 @@
       },
       formatNumber: function (value, decimals) {
         if (!Number.isFinite(value)) return '—';
-        return value.toFixed(decimals).replace('.', ',');
+        return value.toFixed(decimals);
       },
       formatMetres: function (value) {
         if (!Number.isFinite(value)) return '—';
@@ -424,7 +424,7 @@
         this.el.addEventListener('controllerconnected', this.configure);
 
         // laser-controls dostarcza poprawny target-ray kontrolera Meta Quest.
-        // Drugi timeout zabezpiecza konfigurację po inicjalizacji kontrolera.
+        // The second timeout safeguards configuration after controller initialization.
         window.setTimeout(this.configure, 0);
         window.setTimeout(this.configure, 120);
       },
@@ -552,7 +552,7 @@
           }
         }
 
-        // Stała czytelność kątowa reticle na małym i dużym modelu.
+        // Keep the reticle visually readable at both short and long distances.
         var scale = MOJA.clamp(0.78 + distance * 0.022, 0.78, 2.25);
         if (this.active) scale *= 1.12;
         this.data.marker.object3D.scale.setScalar(scale);
@@ -590,8 +590,8 @@
         this.panelVisible = false;
         this.mode = 'distance';
 
-        // SNAP BASIC jest stabilny w VR/MR. OFF daje punkt powierzchni,
-        // FULL dodaje środki okręgów i rzut prostopadły.
+        // AUTO SNAP jest stabilny w VR/MR. OFF daje punkt powierzchni,
+        // while the legacy full profile adds circle centers and perpendicular projection.
         this.snapMode = 'basic';
         this.snapEnabled = true;
         this.snapAngleRad = 0.0038;
@@ -779,8 +779,8 @@
 
       getModeLabel: function () {
         return ({
-          distance: 'DYSTANS', xyz: 'XYZ', angle: 'KĄT', point: 'PUNKT XYZ', area: 'POWIERZCHNIA', 'min-distance': 'MIN. PART–PART'
-        })[this.mode] || 'POMIAR';
+          distance: 'DISTANCE', xyz: 'XYZ', angle: 'ANGLE', point: 'POINT XYZ', area: 'AREA', 'min-distance': 'MIN. PART–PART'
+        })[this.mode] || 'MEASURE';
       },
 
       getSnapModeLabel: function () {
@@ -819,7 +819,7 @@
 
       formatArea: function (squareMetres, approximate) {
         if (!Number.isFinite(squareMetres)) return '—';
-        return (approximate ? '≈ ' : '') + squareMetres.toFixed(3).replace('.', ',') + ' m²';
+        return (approximate ? '≈ ' : '') + squareMetres.toFixed(3) + ' m²';
       },
 
       setEnabled: function (enabled) {
@@ -867,11 +867,11 @@
         if (this.data.status) {
           var line1 = this.getModeLabel() + '  •  SNAP ' + this.getSnapModeLabel();
           var line2 = '';
-          if (this.mode === 'distance' || this.mode === 'xyz') line2 = this.points.length === 0 ? 'TRIGGER: A' : (this.points.length === 1 ? 'CELUJ: B — PODGLĄD LIVE • TRIGGER: ZAPISZ' : 'GOTOWE');
-          else if (this.mode === 'angle') line2 = ['TRIGGER: A', 'TRIGGER: WIERZCHOŁEK', 'CELUJ: B — PODGLĄD LIVE • TRIGGER: ZAPISZ', 'GOTOWE'][Math.min(this.points.length, 3)];
-          else if (this.mode === 'point') line2 = 'TRIGGER: WSPÓŁRZĘDNE PUNKTU';
-          else if (this.mode === 'area') line2 = 'TRIGGER: POWIERZCHNIA SIATKI';
-          else if (this.mode === 'min-distance') line2 = this.busy ? 'OBLICZANIE…' : 'ZAZNACZ 2 CZĘŚCI → OBLICZ';
+          if (this.mode === 'distance' || this.mode === 'xyz') line2 = this.points.length === 0 ? 'TRIGGER: A' : (this.points.length === 1 ? 'POINT TO B — LIVE PREVIEW • TRIGGER: CAPTURE' : 'COMPLETE');
+          else if (this.mode === 'angle') line2 = ['TRIGGER: A', 'TRIGGER: VERTEX', 'POINT TO B — LIVE PREVIEW • TRIGGER: CAPTURE', 'COMPLETE'][Math.min(this.points.length, 3)];
+          else if (this.mode === 'point') line2 = 'TRIGGER: POINT COORDINATES';
+          else if (this.mode === 'area') line2 = 'TRIGGER: MESH SURFACE';
+          else if (this.mode === 'min-distance') line2 = this.busy ? 'CALCULATING…' : 'SELECT 2 PARTS → CALCULATE';
           this.data.status.setAttribute('value', line1 + '\n' + line2);
         }
 
@@ -1110,7 +1110,7 @@
           this.setSavedLine(visual.line2, this.worldB, this.worldC, '#38BDF8');
           var angle = THREE.MathUtils.radToDeg(new THREE.Vector3().subVectors(this.worldA, this.worldB).angleTo(new THREE.Vector3().subVectors(this.worldC, this.worldB)));
           this.midpoint.copy(this.worldA).sub(this.worldB).normalize().add(this.worldC.clone().sub(this.worldB).normalize()).normalize().multiplyScalar(0.20).add(this.worldB);
-          this.setSavedLabel(visual, this.midpoint, '≈ ' + angle.toFixed(1).replace('.', ',') + '°', '#F8FAFC');
+          this.setSavedLabel(visual, this.midpoint, '≈ ' + angle.toFixed(1) + '°', '#F8FAFC');
           return;
         }
         if (record.type === 'point') {
@@ -1189,7 +1189,7 @@
         var stored = {
           space: 'world', value: worldPoint,
           snapKind: snap && snap.kind ? snap.kind : 'surface',
-          snapLabel: snap && snap.label ? snap.label : 'PUNKT POWIERZCHNI',
+          snapLabel: snap && snap.label ? snap.label : 'FACE POINT',
           sourceIntersection: snap && snap.sourceIntersection ? snap.sourceIntersection : intersection
         };
         if (targetObject && sourceObject && MOJA.isObjectInside(sourceObject, targetObject)) {
@@ -1258,7 +1258,7 @@
           if (!surface) return false;
           this.result = {
             type:'area', area:surface.area, approximate:surface.approximate, triangleCount:surface.triangleCount,
-            storedCentroid:this.createWorldStoredPoint(surface.centroid, surface.object, 'surface', 'ŚRODEK POWIERZCHNI')
+            storedCentroid:this.createWorldStoredPoint(surface.centroid, surface.object, 'surface', 'SURFACE CENTROID')
           };
           this.commitCompletedMeasurement();
         }
@@ -1276,7 +1276,7 @@
         if (this.mode !== 'min-distance' || this.busy || !this.measureEngine) return;
         var entries = this.getSelectedEntries();
         if (entries.length !== 2) {
-          if (this.data.status) this.data.status.setAttribute('value', 'MIN. PART–PART\nZAZNACZ DOKŁADNIE 2 CZĘŚCI');
+          if (this.data.status) this.data.status.setAttribute('value', 'MIN. PART–PART\nSELECT EXACTLY 2 PARTS');
           return;
         }
         var computeToken = ++this.computeToken;
@@ -1289,7 +1289,7 @@
             yieldEvery: 700
           });
           if (computeToken !== this.computeToken) return;
-          if (!result) throw new Error('Brak rozłącznych siatek.');
+          if (!result) throw new Error('No separate meshes were found.');
           this.result = {
             type:'min-distance', distance:result.distance, approximate:result.approximate,
             nameA:entries[0].node.label, nameB:entries[1].node.label,
@@ -1298,7 +1298,7 @@
           };
         } catch (error) {
           if (computeToken !== this.computeToken) return;
-          if (this.data.status) this.data.status.setAttribute('value', 'BŁĄD MIN. DYSTANSU\n' + error.message);
+          if (this.data.status) this.data.status.setAttribute('value', 'MINIMUM-DISTANCE ERROR\n' + error.message);
         } finally {
           if (computeToken === this.computeToken) {
             this.busy = false;
@@ -1481,7 +1481,7 @@
           this.setLine(this.data.line2,this.worldB,this.worldC,'#2563EB');
           var angle=this.updateAngleArc(this.worldA,this.worldB,this.worldC);
           this.midpoint.copy(this.worldA).sub(this.worldB).normalize().add(this.worldC.clone().sub(this.worldB).normalize()).normalize().multiplyScalar(0.18).add(this.worldB);
-          this.setMainLabel(this.midpoint,'≈ '+angle.toFixed(1).replace('.',',')+'°','#2563EB');
+          this.setMainLabel(this.midpoint,'≈ '+angle.toFixed(1)+'°','#2563EB');
           return;
         }
 
@@ -1674,9 +1674,9 @@
         var factor = this.percent / 100;
 
         /*
-          Oświetlenie 360° pod CAD.
-          Nie używamy map cieni.
-          Wszystkie kierunki są sterowane jednym procentem.
+          Balanced 360° lighting for CAD.
+          Shadow maps are intentionally disabled.
+          One percentage controls all light directions.
         */
         this.setIntensity(this.data.ambient, 0.12 * factor);
 
@@ -1713,13 +1713,13 @@
 
       updatePanel: function () {
         if (this.data.valueText) {
-          this.data.valueText.setAttribute('value', 'NATĘŻENIE  ' + this.percent + '%');
+          this.data.valueText.setAttribute('value', 'INTENSITY  ' + this.percent + '%');
         }
 
         if (this.data.detailText) {
           this.data.detailText.setAttribute(
             'value',
-            'ŚWIATŁO 360°  •  PRZÓD / TYŁ / LEWO / PRAWO / GÓRA / DÓŁ'
+            '360° LIGHTING  •  FRONT / BACK / LEFT / RIGHT / TOP / BOTTOM'
           );
         }
       },
@@ -1791,7 +1791,7 @@
         this.color = '#FF3B30';
         this.thicknessMm = 10;
         this.textSizeMm = 140;
-        this.textBuffer = 'UWAGA';
+        this.textBuffer = 'NOTE';
         this.lastKeyInputAt = 0;
         this.keyDebounceMs = 220;
         this.pendingTextPlacement = false;
@@ -1898,10 +1898,10 @@
 
       updatePanel: function () {
         if (!this.data.status) return;
-        var toolText = this.tool === 'draw' ? 'RYSOWANIE 3D' : 'TEKST 3D';
+        var toolText = this.tool === 'draw' ? 'DRAW 3D' : 'TEXT 3D';
         this.data.status.setAttribute(
           'value',
-          toolText + '  •  LINIA ' + this.thicknessMm + ' mm  •  TEKST ' + this.textSizeMm + ' mm'
+          toolText + '  •  LINE ' + this.thicknessMm + ' mm  •  TEXT ' + this.textSizeMm + ' mm'
         );
         this.data.status.setAttribute('color', this.color);
       },
@@ -2033,7 +2033,7 @@
         var context = canvas.getContext('2d');
         context.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Ciemne tło z jasną ramką - dużo czytelniejsze na modelu i passthrough.
+        // Dark background with a bright border improves readability over the model and passthrough.
         context.fillStyle = 'rgba(7,17,31,0.92)';
         context.strokeStyle = this.color;
         context.lineWidth = 8;
@@ -2061,7 +2061,7 @@
         context.textAlign = 'center';
         context.textBaseline = 'middle';
 
-        // Cienki czarny obrys liter poprawia czytelność na jasnym tle.
+        // A subtle dark outline improves text readability on bright backgrounds.
         context.lineWidth = 10;
         context.strokeStyle = 'rgba(0,0,0,0.92)';
         context.strokeText(value, canvas.width / 2, canvas.height / 2 + 2);
@@ -2087,7 +2087,7 @@
         sprite.name = '__MOJA_ANNOTATION_TEXT__';
         sprite.renderOrder = 18;
 
-        // textSizeMm steruje wysokością etykiety w świecie.
+        // textSizeMm controls the world-space label height.
         var worldHeight = Math.max(0.055, this.textSizeMm / 1000);
         var aspect = canvas.width / canvas.height;
         sprite.scale.set(worldHeight * aspect, worldHeight, 1);
@@ -2100,9 +2100,9 @@
         if (!this.data.root) return;
 
         var value = String(this.textBuffer || '').trim();
-        if (!value) value = 'UWAGA';
+        if (!value) value = 'NOTE';
 
-        // Punkt bierze się z AKTUALNEGO wskaźnika w chwili puszczenia Triggera.
+        // The point is taken from the current pointer position when Trigger is released.
         this.resolveTextPlacementWorld(this.worldPoint);
         this.worldToAnnotationLocal(this.worldPoint, this.currentPoint);
 
@@ -2159,7 +2159,7 @@
         if (this.tool === 'draw') {
           this.beginStroke();
         } else if (this.tool === 'text') {
-          // Tekstu nie stawiamy na DOWN. Użytkownik może jeszcze skorygować wskaźnik.
+          // Text is not placed on Trigger Down, so the user can still adjust the pointer.
           this.pendingTextPlacement = true;
         }
       },
@@ -2175,7 +2175,7 @@
         if (this.tool === 'text' && this.pendingTextPlacement) {
           this.pendingTextPlacement = false;
 
-          // Jeżeli puszczamy Trigger nad panelem/klawiaturą, nie stawiamy tekstu.
+          // Do not place text when Trigger is released over a panel or keyboard.
           if (!this.keyboardVisible && !this.isPointingAtAnnotationUI()) {
             this.placeText();
           }
@@ -2185,8 +2185,8 @@
       acceptKeyInput: function (callback) {
         var now = performance.now();
 
-        // Quest/A-Frame potrafi wygenerować dwa zdarzenia click dla jednego Triggera.
-        // Przyjmujemy tylko pierwsze w krótkim oknie czasowym.
+        // Quest/A-Frame can emit two click events for a single Trigger action.
+        // Accept only the first event within a short time window.
         if ((now - this.lastKeyInputAt) < this.keyDebounceMs) return false;
 
         this.lastKeyInputAt = now;
@@ -2200,7 +2200,7 @@
 
         var self = this;
 
-        // Pełny alfabet PL + cyfry. Większe klawisze niż wcześniej.
+        // Polish alphabet plus digits; larger keys improve usability.
         var rows = [
           '1234567890',
           'QWERTYUIOP',
@@ -2272,15 +2272,15 @@
           self.data.keyboard.appendChild(key);
         }
 
-        specialButton(-0.34, -0.315, 0.28, '#334155', 'SPACJA', function () {
+        specialButton(-0.34, -0.315, 0.28, '#334155', 'SPACE', function () {
           if (self.textBuffer.length < 42) self.textBuffer += ' ';
         });
 
-        specialButton(0, -0.315, 0.24, '#7C2D12', 'USUŃ', function () {
+        specialButton(0, -0.315, 0.24, '#7C2D12', 'DELETE', function () {
           self.textBuffer = self.textBuffer.slice(0, -1);
         });
 
-        specialButton(0.34, -0.315, 0.28, '#166534', 'GOTOWE', function () {
+        specialButton(0.34, -0.315, 0.28, '#166534', 'COMPLETE', function () {
           self.setKeyboardVisible(false);
           self.panelVisible = true;
           self.setPanelVisible(true);
@@ -2442,8 +2442,8 @@
       },
 
       setLoadingText: function (value) {
-        if (this.header) this.header.setAttribute('value', 'STRUKTURA / PART NUMBER');
-        if (this.summary) this.summary.setAttribute('value', value || 'WCZYTYWANIE DRZEWA…');
+        if (this.header) this.header.setAttribute('value', 'MODEL TREE / PART NUMBER');
+        if (this.summary) this.summary.setAttribute('value', value || 'LOADING MODEL TREE…');
       },
 
       loadStructure: function () {
@@ -2793,7 +2793,7 @@
         var token = ++this.buildToken;
         var self = this;
         this.built = false;
-        this.setLoadingText('WCZYTYWANIE DRZEWA…');
+        this.setLoadingText('LOADING MODEL TREE…');
         this.clearSelection(false);
         this.treeNodes = [];
         this.rootIndexes = [];
@@ -3150,7 +3150,7 @@
         while (this.list.firstChild) this.list.removeChild(this.list.firstChild);
 
         if (!this.built) {
-          this.setLoadingText('WCZYTYWANIE DRZEWA…');
+          this.setLoadingText('LOADING MODEL TREE…');
           this.updateScrollBar(0);
           return;
         }
@@ -3163,10 +3163,10 @@
         var visibleMeshCount = this.meshes.filter(function (mesh) { return mesh.visible; }).length;
         var sourceLabel = this.structureSource === 'IAM' ? 'IAM' : 'GLB';
 
-        this.header.setAttribute('value', 'STRUKTURA / PART NUMBER');
+        this.header.setAttribute('value', 'MODEL TREE / PART NUMBER');
         this.summary.setAttribute(
           'value',
-          this.selected.size + ' zazn.  •  ' + visibleMeshCount + '/' + this.meshes.length + ' wid.  •  ' +
+          this.selected.size + ' selected  •  ' + visibleMeshCount + '/' + this.meshes.length + ' visible  •  ' +
           (rows.length === 0 ? '0' : (start + 1) + '-' + end) + '/' + rows.length + '  •  ' + sourceLabel
         );
 
@@ -3657,7 +3657,7 @@
         var x = this.baseSize.x * scale;
         var z = this.baseSize.z * scale;
         var y = this.baseSize.y * scale;
-        var text = 'SKALA ' + Math.round(scale * 100) + '%  •  ' + MOJA.formatScaleRatio(scale) + '  •  ' +
+        var text = 'SCALE ' + Math.round(scale * 100) + '%  •  ' + MOJA.formatScaleRatio(scale) + '  •  ' +
           MOJA.formatMetres(x) + ' × ' + MOJA.formatMetres(z) + ' × ' + MOJA.formatMetres(y) + ' m';
         this.infoText.setAttribute('value', text);
         this.pivot.object3D.getWorldPosition(this.worldPosition);
@@ -3728,32 +3728,32 @@
       updateModeUI: function () {
         if (!this.modeText) return;
         if (this.modeType === 'mr' && !this.placed) {
-          this.modeText.setAttribute('value', 'USTAWIANIE  •  TRIGGER: POSTAW MODEL');
+          this.modeText.setAttribute('value', 'PLACEMENT  •  TRIGGER: PLACE MODEL');
           this.modeText.setAttribute('color', '#D1FAE5');
           return;
         }
         if (this.interactionMode === 'measure') {
           var measurement = this.getMeasurement();
-          var measureName = measurement && measurement.getModeLabel ? measurement.getModeLabel() : 'POMIAR';
-          var snapState = measurement && measurement.getSnapModeLabel ? 'SNAP ' + measurement.getSnapModeLabel() : 'SNAP BASIC';
-          this.modeText.setAttribute('value', measureName + '  •  ' + snapState + '  •  CELOWNIK AKTYWNY  •  TRIGGER: ZAPISZ  •  Y: PANEL / WYCZYŚĆ');
+          var measureName = measurement && measurement.getModeLabel ? measurement.getModeLabel() : 'MEASURE';
+          var snapState = measurement && measurement.getSnapModeLabel ? 'SNAP ' + measurement.getSnapModeLabel() : 'AUTO SNAP';
+          this.modeText.setAttribute('value', measureName + '  •  ' + snapState + '  •  POINTER ACTIVE  •  TRIGGER: CAPTURE  •  Y: PANEL / CLEAR');
           this.modeText.setAttribute('color', '#FBBF24');
         } else if (this.interactionMode === 'select') {
-          this.modeText.setAttribute('value', 'DRZEWO  •  CELOWNIK AKTYWNY  •  TRIGGER: WYBIERZ  •  Y: PANEL  •  PRAWY JOYSTICK: PRZEWIJAJ');
+          this.modeText.setAttribute('value', 'MODEL TREE  •  POINTER ACTIVE  •  TRIGGER: SELECT  •  Y: PANEL  •  RIGHT STICK: SCROLL');
           this.modeText.setAttribute('color', '#C4B5FD');
         } else if (this.interactionMode === 'annotate') {
-          this.modeText.setAttribute('value', 'ADNOTACJE 3D  •  CELOWNIK AKTYWNY  •  RYSUJ: TRZYMAJ TRIGGER  •  Y: PANEL');
+          this.modeText.setAttribute('value', '3D MARKUP  •  POINTER ACTIVE  •  DRAW: HOLD TRIGGER  •  Y: PANEL');
           this.modeText.setAttribute('color', '#F9A8D4');
         } else if (this.modeType === 'mr') {
           this.modeText.setAttribute(
             'value',
             this.freeGrab3D
-              ? 'MR FREE GRAB 3D  •  1 GRIP: PRZESUŃ + OBRÓĆ  •  2 GRIPY: OBRÓT Y  •  Y: SKALA'
-              : 'MR  •  L: PRZESUŃ  •  PRAWY GRIP: PRZESUŃ  •  2 GRIPY: OBRÓT Y  •  Y: SKALA'
+              ? 'MR FREE GRAB 3D  •  1 GRIP: MOVE + ROTATE  •  2 GRIPS: Y ROTATION  •  Y: SCALE'
+              : 'MR  •  LEFT STICK: MOVE  •  RIGHT GRIP: MOVE  •  2 GRIPS: Y ROTATION  •  Y: SCALE'
           );
           this.modeText.setAttribute('color', '#D1FAE5');
         } else {
-          this.modeText.setAttribute('value', 'NAWIGACJA  •  L: RUCH  •  R: OBRÓT  •  B: GÓRA  •  A: DÓŁ  •  CELOWNIK: TELEPORT  •  TRIGGER: JUMP');
+          this.modeText.setAttribute('value', 'NAVIGATION  •  L: MOVE  •  R: TURN  •  B: UP  •  A: DOWN  •  POINTER: TELEPORT  •  TRIGGER: JUMP');
           this.modeText.setAttribute('color', '#E0F2FE');
         }
       },
@@ -3782,7 +3782,7 @@
           return;
         }
 
-        // Przycisk panelu ma pierwszeństwo, ale tylko gdy jest pierwszym trafieniem promienia.
+        // Panel controls take priority only when they are the first ray hit.
         var targetEl = MOJA.getInteractiveEl(intersection);
         if (targetEl && targetEl.classList && targetEl.classList.contains('ui-click')) {
           targetEl.emit('click', {intersection: intersection}, false);
@@ -3812,7 +3812,7 @@
 
         if (this.interactionMode === 'annotate') return;
 
-        // Prosty jump: najbliższe trafienie poprawnego target-raya.
+        // Simple jump: use the nearest valid target-ray hit.
         if (this.modeType === 'vr' && this.isValidTeleport(intersection)) {
           this.teleportTo(intersection.point);
         }
@@ -3851,7 +3851,7 @@
           return;
         }
 
-        // Cel teleportu widać jeszcze przed wciśnięciem Triggera.
+        // Show the teleport target before Trigger is pressed.
         triggerRay.setColor('#38BDF8');
         this.teleportMarker.object3D.position.copy(intersection.point);
         this.teleportMarker.object3D.position.y += 0.018;
@@ -4075,8 +4075,8 @@
         var intersections = rayComponent && rayComponent.intersections ? rayComponent.intersections.slice(0, 20) : [];
         var ray = rayComponent && rayComponent.raycaster && rayComponent.raycaster.ray ? rayComponent.raycaster.ray : null;
 
-        // Nie mierzemy modelu "przez" panel. Jeżeli pierwszy trafiony element to UI,
-        // kursor pomiarowy i badge snapa znikają do chwili zejścia z panelu.
+        // Do not measure through a panel. When UI is the first ray hit,
+        // hide the measurement cursor and snap badge until the pointer leaves the panel.
         var firstInteractive = null;
         for (var i = 0; i < intersections.length; i += 1) {
           firstInteractive = MOJA.getInteractiveEl(intersections[i]);
@@ -4133,8 +4133,8 @@
 </head>
 <body>
   <div class="topbar">
-    <a class="pill" href="index.html?v=20">← Viewer</a>
-    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v23</div>
+    <a class="pill" href="index.html?v=24">← Viewer</a>
+    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v24</div>
     <button id="enterXR" class="pill enter" type="button">ENTER VR</button>
   </div>
 
@@ -4142,16 +4142,16 @@
 
   <div id="landing" class="landing">
     <div class="card">
-      <div id="landingVersion" class="version">META QUEST 3 • v23</div>
+      <div id="landingVersion" class="version">META QUEST 3 • v24</div>
       <h1 id="landingTitle">CK-207-74-5000_VR — Virtual Reality</h1>
-      <p id="landingDescription">Model jest zakotwiczony w skali 1:1. Poruszasz się użytkownikiem, stawiasz trwałe wymiary i zarządzasz widocznością komponentów.</p>
+      <p id="landingDescription">The model is anchored at 1:1 scale. Move around, place persistent measurements, and control component visibility.</p>
 
       <div id="mrScaleBox" class="scale-box" hidden>
-        <label for="scaleNumber">Skala modelu</label>
+        <label for="scaleNumber">Model scale</label>
         <div>
           <div class="scale-input">
-            <input id="scaleNumber" type="number" min="10" max="500" step="5" value="100" inputmode="numeric" aria-label="Skala modelu w procentach">
-            <input id="scaleRange" type="range" min="10" max="300" step="5" value="100" aria-label="Suwak skali modelu">
+            <input id="scaleNumber" type="number" min="10" max="500" step="5" value="100" inputmode="numeric" aria-label="Model scale in percent">
+            <input id="scaleRange" type="range" min="10" max="300" step="5" value="100" aria-label="Model scale slider">
           </div>
           <div class="presets">
             <button class="preset" type="button" data-scale="50">50%</button>
@@ -4166,31 +4166,31 @@
 
       <div id="landingControls" class="controls"></div>
       <div class="actions">
-        <a class="button" href="index.html?v=20">← Wróć</a>
+        <a class="button" href="index.html?v=24">← Back</a>
         <button id="landingEnter" class="button primary" type="button">ENTER VR — QUEST 3</button>
       </div>
-      <div id="landingNote" class="note">Subtelne krawędzie, oświetlenie modelu 360° i brak ciężkich map cieni.</div>
+      <div id="landingNote" class="note">Subtle edges, balanced 360° lighting, and no heavy shadow maps.</div>
     </div>
   </div>
 
   <a-scene
     id="scene"
     quest-viewer="pivot: #modelPivot; asset: #modelAsset; rig: #rig; camera: #camera; left: #leftHand; right: #rightHand; floor: #floor; grid: #metricGrid; reticle: #placementReticle; info: #modelInfo; infoText: #modelInfoText; modeText: #modeText; teleportMarker: #teleportMarker; scalePanel: #scalePanel; scaleValueText: #scaleValueText; scaleKnob: #scaleKnob; componentPanel: #componentPanel; freeGrabButton: #freeGrabButton; freeGrabButtonText: #freeGrabButtonText"
-    component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; scrollTrack: #componentScrollTrack; scrollThumb: #componentScrollThumb; structureUrl: CK-207-74-5000_VR.structure.json?v=19; rows: 8"
+    component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; scrollTrack: #componentScrollTrack; scrollThumb: #componentScrollThumb; structureUrl: CK-207-74-5000_VR.structure.json?v=24; rows: 8"
     lighting-control="ambient: #ambientLight; front: #lightFront; back: #lightBack; left: #lightLeft; right: #lightRight; top: #lightTop; bottom: #lightBottom; panel: #lightingPanel; valueText: #lightingValueText; detailText: #lightingDetailText; storageKey: moja-ck-207-74-5000_vr-mr-scale-lighting360"
     annotation-control="pivot: #modelPivot; root: #annotationRoot; camera: #camera; right: #rightHand; panel: #annotationPanel; keyboard: #annotationKeyboard; preview: #annotationTextPreview; status: #annotationStatus"
     measurement-tool="target: #modelPivot; camera: #camera; right: #rightHand; pointA: #measurePointA; pointB: #measurePointB; pointC: #measurePointC; line: #measureLine; line2: #measureLine2; label: #measureLabel; labelText: #measureLabelText; snapLabel: #measureSnapLabel; snapLabelText: #measureSnapLabelText; panel: #measurePanel; status: #measurePanelStatus; color: #2563EB"
     loading-screen="backgroundColor: #0B1220; dotsColor: #60A5FA">
 
     <a-assets timeout="120000">
-      <a-asset-item id="modelSource" src="CK-207-74-5000_VR.glb?v=19"></a-asset-item>
+      <a-asset-item id="modelSource" src="CK-207-74-5000_VR.glb?v=24"></a-asset-item>
     </a-assets>
-    <!-- OŚWIETLENIE MODELU 360° — bez map cieni -->
+    <!-- MODEL LIGHTING 360° — bez map cieni -->
     <a-entity id="ambientLight"
       light="type: ambient; color: #EAF2FA; intensity: 0.12">
     </a-entity>
 
-    <!-- Każde światło kierunkowe celuje w środek sceny/modelu. -->
+    <!-- Every directional light points toward the scene/model center. -->
     <a-entity id="lightFront"
       light="type: directional; color: #FFFFFF; intensity: 0.18"
       position="0 4 8">
@@ -4254,7 +4254,7 @@
 
     <a-entity id="modelInfo" look-at-camera="camera: #camera; yawOnly: true" visible="false">
       <a-plane width="1.72" height="0.15" color="#0F172A" opacity="0.82" material="shader: flat; transparent: true"></a-plane>
-      <a-text id="modelInfoText" value="SKALA 100% • 1:1" align="center" anchor="center" baseline="center" width="1.58" color="#F8FAFC" position="0 0 0.006"></a-text>
+      <a-text id="modelInfoText" value="SCALE 100% • 1:1" align="center" anchor="center" baseline="center" width="1.58" color="#F8FAFC" position="0 0 0.006"></a-text>
     </a-entity>
 
     <a-entity id="pointerDot" look-at-camera="camera: #camera; yawOnly: false" visible="false">
@@ -4284,31 +4284,31 @@
       <a-camera id="camera" position="0 1.65 0" look-controls wasd-controls="enabled: false">
         <a-entity position="0 -0.46 -1.05" scale="0.68 0.68 0.68">
           <a-plane width="1.55" height="0.105" color="#0F172A" opacity="0.66" material="shader: flat; transparent: true"></a-plane>
-          <a-text id="modeText" value="ŁADOWANIE" align="center" anchor="center" baseline="center" width="1.44" color="#E0F2FE" position="0 0 0.006"></a-text>
+          <a-text id="modeText" value="LOADING" align="center" anchor="center" baseline="center" width="1.44" color="#E0F2FE" position="0 0 0.006"></a-text>
         </a-entity>
       </a-camera>
 
       <a-entity id="leftHand" meta-touch-controls="hand: left">
         <a-entity id="measurePanel" position="0.07 0.13 -0.31" rotation="-35 0 0" scale="0.56 0.56 0.56" visible="false">
           <a-plane width="0.94" height="1.18" color="#0F172A" opacity="0.96" material="shader: flat; transparent: true; depthWrite: false"></a-plane>
-          <a-text value="POMIARY GLB" align="center" width="0.84" color="#BAE6FD" position="0 0.51 0.008"></a-text>
-          <a-text id="measurePanelStatus" value="DYSTANS • SNAP AUTO" align="center" width="0.82" wrap-count="34" color="#E2E8F0" position="0 0.405 0.008"></a-text>
+          <a-text value="GLB MEASUREMENTS" align="center" width="0.84" color="#BAE6FD" position="0 0.51 0.008"></a-text>
+          <a-text id="measurePanelStatus" value="DISTANCE • AUTO SNAP" align="center" width="0.82" wrap-count="34" color="#E2E8F0" position="0 0.405 0.008"></a-text>
 
-          <a-plane id="measureBtnDistance" class="measure-ui ui-click" width="0.40" height="0.105" color="#0284C7" position="-0.22 0.25 0.012" material="shader: flat" viewer-button="action: measure-distance"><a-text value="DYSTANS" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane id="measureBtnDistance" class="measure-ui ui-click" width="0.40" height="0.105" color="#0284C7" position="-0.22 0.25 0.012" material="shader: flat" viewer-button="action: measure-distance"><a-text value="DISTANCE" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane id="measureBtnXYZ" class="measure-ui ui-click" width="0.40" height="0.105" color="#075985" position="0.22 0.25 0.012" material="shader: flat" viewer-button="action: measure-xyz"><a-text value="XYZ" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
-          <a-plane id="measureBtnAngle" class="measure-ui ui-click" width="0.40" height="0.105" color="#075985" position="-0.22 0.125 0.012" material="shader: flat" viewer-button="action: measure-angle"><a-text value="KĄT" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
-          <a-plane id="measureBtnPoint" class="measure-ui ui-click" width="0.40" height="0.105" color="#075985" position="0.22 0.125 0.012" material="shader: flat" viewer-button="action: measure-point"><a-text value="PUNKT XYZ" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
-          <a-plane id="measureBtnArea" class="measure-ui ui-click" width="0.84" height="0.105" color="#075985" position="0 0.0 0.012" material="shader: flat" viewer-button="action: measure-area"><a-text value="POWIERZCHNIA" align="center" width="0.76" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
-          <a-plane id="measureBtnMin" class="measure-ui ui-click" width="0.84" height="0.105" color="#075985" position="0 -0.125 0.012" material="shader: flat" viewer-button="action: measure-min"><a-text value="MIN. DYSTANS PART–PART" align="center" width="0.76" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane id="measureBtnAngle" class="measure-ui ui-click" width="0.40" height="0.105" color="#075985" position="-0.22 0.125 0.012" material="shader: flat" viewer-button="action: measure-angle"><a-text value="ANGLE" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane id="measureBtnPoint" class="measure-ui ui-click" width="0.40" height="0.105" color="#075985" position="0.22 0.125 0.012" material="shader: flat" viewer-button="action: measure-point"><a-text value="POINT XYZ" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane id="measureBtnArea" class="measure-ui ui-click" width="0.84" height="0.105" color="#075985" position="0 0.0 0.012" material="shader: flat" viewer-button="action: measure-area"><a-text value="AREA" align="center" width="0.76" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane id="measureBtnMin" class="measure-ui ui-click" width="0.84" height="0.105" color="#075985" position="0 -0.125 0.012" material="shader: flat" viewer-button="action: measure-min"><a-text value="MIN. PART–PART" align="center" width="0.76" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
           <a-plane id="measureBtnSnap" class="measure-ui ui-click" width="0.40" height="0.105" color="#0F766E" position="-0.22 -0.25 0.012" material="shader: flat" viewer-button="action: measure-snap" visible="false"><a-text id="measureBtnSnapText" value="SNAP: AUTO" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
-          <a-plane id="measureBtnCompute" class="measure-ui ui-click" width="0.40" height="0.105" color="#334155" position="0.22 -0.25 0.012" material="shader: flat" viewer-button="action: measure-calc"><a-text value="OBLICZ MIN." align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
-          <a-plane class="measure-ui ui-click" width="0.40" height="0.105" color="#7C2D12" position="-0.22 -0.375 0.012" material="shader: flat" viewer-button="action: measure-clear"><a-text value="WYCZYŚĆ" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
-          <a-plane class="measure-ui ui-click" width="0.40" height="0.105" color="#334155" position="0.22 -0.375 0.012" material="shader: flat" viewer-button="action: measure-close"><a-text value="ZAMKNIJ" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane id="measureBtnCompute" class="measure-ui ui-click" width="0.40" height="0.105" color="#334155" position="0.22 -0.25 0.012" material="shader: flat" viewer-button="action: measure-calc"><a-text value="CALCULATE" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane class="measure-ui ui-click" width="0.40" height="0.105" color="#7C2D12" position="-0.22 -0.375 0.012" material="shader: flat" viewer-button="action: measure-clear"><a-text value="CLEAR" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
+          <a-plane class="measure-ui ui-click" width="0.40" height="0.105" color="#334155" position="0.22 -0.375 0.012" material="shader: flat" viewer-button="action: measure-close"><a-text value="CLOSE" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
         </a-entity>
 
         <a-entity id="scalePanel" position="0.07 0.12 -0.29" rotation="-35 0 0" scale="0.54 0.54 0.54" visible="false">
           <a-plane width="0.72" height="0.68" color="#0F172A" opacity="0.94" material="shader: flat; transparent: true"></a-plane>
-          <a-text value="SKALA MODELU" align="center" width="0.66" color="#E2E8F0" position="0 0.205 0.006"></a-text>
+          <a-text value="MODEL SCALE" align="center" width="0.66" color="#E2E8F0" position="0 0.205 0.006"></a-text>
           <a-text id="scaleValueText" value="100% • 1:1" align="center" width="0.62" color="#86EFAC" position="0 0.145 0.006"></a-text>
 
           <a-plane class="scale-ui ui-click" width="0.18" height="0.068" color="#334155" position="-0.22 0.065 0.008" viewer-button="action: scale-delta; value: -10">
@@ -4346,17 +4346,17 @@
           </a-plane>
 
           <a-plane class="scale-ui ui-click" width="0.27" height="0.060" color="#7C2D12" position="-0.155 -0.275 0.008" viewer-button="action: replace">
-            <a-text value="USTAW PONOWNIE" align="center" width="0.38" color="#FFFFFF" position="0 0 0.006"></a-text>
+            <a-text value="REPOSITION" align="center" width="0.38" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
           <a-plane class="scale-ui ui-click" width="0.18" height="0.060" color="#475569" position="0.215 -0.275 0.008" viewer-button="action: close-scale">
-            <a-text value="ZAMKNIJ" align="center" width="0.27" color="#FFFFFF" position="0 0 0.006"></a-text>
+            <a-text value="CLOSE" align="center" width="0.27" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
         </a-entity>
 
         <a-entity id="componentPanel" position="0.11 0.17 -0.40" rotation="-35 0 0" scale="0.52 0.52 0.52" visible="false">
           <a-plane width="0.94" height="1.12" color="#0F172A" opacity="0.97" material="shader: flat; transparent: true"></a-plane>
-          <a-text id="componentHeader" value="STRUKTURA / PART NUMBER" align="center" width="0.84" color="#EDE9FE" position="-0.01 0.505 0.008"></a-text>
-          <a-text id="componentSummary" value="WCZYTYWANIE DRZEWA…" align="center" width="0.82" color="#C4B5FD" position="-0.01 0.450 0.008"></a-text>
+          <a-text id="componentHeader" value="MODEL TREE / PART NUMBER" align="center" width="0.84" color="#EDE9FE" position="-0.01 0.505 0.008"></a-text>
+          <a-text id="componentSummary" value="LOADING MODEL TREE…" align="center" width="0.82" color="#C4B5FD" position="-0.01 0.450 0.008"></a-text>
           <a-entity id="componentList" position="-0.025 0.365 0.012"></a-entity>
 
           <a-plane id="componentScrollTrack" width="0.020" height="0.49" color="#1E293B" opacity="0.88" position="0.435 0.140 0.014" material="shader: flat; transparent: true">
@@ -4364,43 +4364,43 @@
           </a-plane>
 
           <a-plane class="component-ui ui-click" width="0.225" height="0.060" color="#7F1D1D" position="-0.250 -0.155 0.012" viewer-button="action: component-hide">
-            <a-text value="UKRYJ" align="center" width="0.31" color="#FFFFFF" position="0 0 0.006"></a-text>
+            <a-text value="HIDE" align="center" width="0.31" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
           <a-plane class="component-ui ui-click" width="0.225" height="0.060" color="#166534" position="0 -0.155 0.012" viewer-button="action: component-show">
-            <a-text value="POKAŻ" align="center" width="0.31" color="#FFFFFF" position="0 0 0.006"></a-text>
+            <a-text value="SHOW" align="center" width="0.31" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
           <a-plane class="component-ui ui-click" width="0.225" height="0.060" color="#5B21B6" position="0.250 -0.155 0.012" viewer-button="action: component-isolate">
-            <a-text value="IZOLUJ" align="center" width="0.31" color="#FFFFFF" position="0 0 0.006"></a-text>
+            <a-text value="ISOLATE" align="center" width="0.31" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
 
           <a-plane class="component-ui ui-click" width="0.36" height="0.060" color="#1D4ED8" position="-0.195 -0.235 0.012" viewer-button="action: component-show-all">
-            <a-text value="WŁĄCZ WSZYSTKIE" align="center" width="0.48" color="#FFFFFF" position="0 0 0.006"></a-text>
+            <a-text value="SHOW ALL" align="center" width="0.48" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
           <a-plane class="component-ui ui-click" width="0.36" height="0.060" color="#334155" position="0.195 -0.235 0.012" viewer-button="action: component-clear">
-            <a-text value="WYCZYŚĆ WYBÓR" align="center" width="0.48" color="#FFFFFF" position="0 0 0.006"></a-text>
+            <a-text value="CLEAR SELECTION" align="center" width="0.48" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
 
           <a-plane class="component-ui ui-click" width="0.11" height="0.060" color="#334155" position="-0.390 -0.315 0.012" viewer-button="action: component-scroll-up">
             <a-text value="▲" align="center" width="0.23" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
           <a-plane class="component-ui ui-click" width="0.22" height="0.060" color="#0F766E" position="-0.210 -0.315 0.012" viewer-button="action: component-expand-all">
-            <a-text value="ROZWIŃ" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
+            <a-text value="EXPAND" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
           <a-plane class="component-ui ui-click" width="0.22" height="0.060" color="#475569" position="0.070 -0.315 0.012" viewer-button="action: component-collapse-all">
-            <a-text value="ZWIŃ" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
+            <a-text value="COLLAPSE" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
           <a-plane class="component-ui ui-click" width="0.11" height="0.060" color="#334155" position="0.390 -0.315 0.012" viewer-button="action: component-scroll-down">
             <a-text value="▼" align="center" width="0.23" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
 
           <a-plane class="component-ui ui-click" width="0.24" height="0.060" color="#4338CA" position="-0.290 -0.430 0.012" viewer-button="action: component-edges">
-            <a-text value="KRAWĘDZIE" align="center" width="0.33" color="#FFFFFF" position="0 0 0.006"></a-text>
+            <a-text value="EDGES" align="center" width="0.33" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
           <a-plane class="component-ui ui-click" width="0.26" height="0.060" color="#075985" position="0 -0.430 0.012" viewer-button="action: lighting-open">
-            <a-text value="ŚWIATŁO" align="center" width="0.34" color="#BAE6FD" position="0 0 0.006"></a-text>
+            <a-text value="LIGHTING" align="center" width="0.34" color="#BAE6FD" position="0 0 0.006"></a-text>
           </a-plane>
           <a-plane class="component-ui ui-click" width="0.24" height="0.060" color="#475569" position="0.290 -0.430 0.012" viewer-button="action: component-close">
-            <a-text value="ZAMKNIJ" align="center" width="0.33" color="#FFFFFF" position="0 0 0.006"></a-text>
+            <a-text value="CLOSE" align="center" width="0.33" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
         </a-entity>
 
@@ -4408,7 +4408,7 @@
           <a-plane width="0.84" height="0.52" color="#071827" opacity="0.97" material="shader: flat; transparent: true"></a-plane>
 
           <a-text
-            value="OŚWIETLENIE MODELU"
+            value="MODEL LIGHTING"
             align="center"
             width="0.76"
             color="#BAE6FD"
@@ -4417,7 +4417,7 @@
 
           <a-text
             id="lightingValueText"
-            value="NATĘŻENIE  100%"
+            value="INTENSITY  100%"
             align="center"
             width="0.68"
             color="#FFFFFF"
@@ -4426,7 +4426,7 @@
 
           <a-text
             id="lightingDetailText"
-            value="ŚWIATŁO 360°  •  PRZÓD / TYŁ / LEWO / PRAWO / GÓRA / DÓŁ"
+            value="360° LIGHTING  •  FRONT / BACK / LEFT / RIGHT / TOP / BOTTOM"
             align="center"
             width="0.76"
             color="#94A3B8"
@@ -4458,7 +4458,7 @@
           </a-plane>
 
           <a-text
-            value="ZAKRES 25% — 1000%   •   KROK 50%"
+            value="RANGE 25% — 1000%   •   STEP 50%"
             align="center"
             width="0.72"
             color="#67E8F9"
@@ -4470,7 +4470,7 @@
             color="#475569"
             position="0 -0.165 0.012"
             viewer-button="action: lighting-close">
-            <a-text value="← WRÓĆ DO KOMPONENTÓW" align="center" width="0.72" color="#FFFFFF" position="0 0 0.006"></a-text>
+            <a-text value="← BACK TO COMPONENTS" align="center" width="0.72" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
 
         
@@ -4482,17 +4482,17 @@
         <a-entity id="annotationPanel" position="0.10 0.16 -0.37" rotation="-35 0 0" scale="0.52 0.52 0.52" visible="false">
           <a-plane width="0.92" height="0.82" color="#101522" opacity="0.97" material="shader: flat; transparent: true"></a-plane>
 
-          <a-text value="ADNOTACJE 3D" align="center" width="0.82" color="#F9A8D4" position="0 0.350 0.008"></a-text>
-          <a-text id="annotationStatus" value="RYSOWANIE 3D • LINIA 10 mm • TEKST 140 mm" align="center" width="0.82" color="#FF3B30" position="0 0.295 0.008"></a-text>
+          <a-text value="3D MARKUP" align="center" width="0.82" color="#F9A8D4" position="0 0.350 0.008"></a-text>
+          <a-text id="annotationStatus" value="DRAW 3D • LINE 10 mm • TEXT 140 mm" align="center" width="0.82" color="#FF3B30" position="0 0.295 0.008"></a-text>
 
           <a-plane class="annotation-ui ui-click" width="0.34" height="0.064" color="#BE123C" position="-0.18 0.215 0.012" viewer-button="action: annotation-tool-draw">
-            <a-text value="RYSUJ 3D" align="center" width="0.44" color="#FFFFFF" position="0 0 0.006"></a-text>
+            <a-text value="DRAW 3D" align="center" width="0.44" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
           <a-plane class="annotation-ui ui-click" width="0.34" height="0.064" color="#7C3AED" position="0.18 0.215 0.012" viewer-button="action: annotation-tool-text">
-            <a-text value="TEKST 3D" align="center" width="0.44" color="#FFFFFF" position="0 0 0.006"></a-text>
+            <a-text value="TEXT 3D" align="center" width="0.44" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
 
-          <a-text value="KOLOR" align="left" anchor="left" width="0.60" color="#CBD5E1" position="-0.41 0.135 0.008"></a-text>
+          <a-text value="COLOR" align="left" anchor="left" width="0.60" color="#CBD5E1" position="-0.41 0.135 0.008"></a-text>
 
           <a-plane class="annotation-ui ui-click" width="0.105" height="0.060" color="#FF3B30" position="-0.30 0.090 0.012" viewer-button="action: annotation-color; value: 1"></a-plane>
           <a-plane class="annotation-ui ui-click" width="0.105" height="0.060" color="#FFD60A" position="-0.18 0.090 0.012" viewer-button="action: annotation-color; value: 2"></a-plane>
@@ -4501,7 +4501,7 @@
           <a-plane class="annotation-ui ui-click" width="0.105" height="0.060" color="#FFFFFF" position="0.18 0.090 0.012" viewer-button="action: annotation-color; value: 5"></a-plane>
           <a-plane class="annotation-ui ui-click" width="0.105" height="0.060" color="#FF2DFF" position="0.30 0.090 0.012" viewer-button="action: annotation-color; value: 6"></a-plane>
 
-          <a-text value="GRUBOŚĆ LINII" align="left" anchor="left" width="0.60" color="#CBD5E1" position="-0.41 0.020 0.008"></a-text>
+          <a-text value="LINE THICKNESS" align="left" anchor="left" width="0.60" color="#CBD5E1" position="-0.41 0.020 0.008"></a-text>
           <a-plane class="annotation-ui ui-click" width="0.20" height="0.060" color="#334155" position="-0.24 -0.030 0.012" viewer-button="action: annotation-thickness; value: 3">
             <a-text value="3 mm" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
@@ -4512,7 +4512,7 @@
             <a-text value="25 mm" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
 
-          <a-text value="WIELKOŚĆ TEKSTU" align="left" anchor="left" width="0.60" color="#CBD5E1" position="-0.41 -0.105 0.008"></a-text>
+          <a-text value="TEXT SIZE" align="left" anchor="left" width="0.60" color="#CBD5E1" position="-0.41 -0.105 0.008"></a-text>
           <a-plane class="annotation-ui ui-click" width="0.20" height="0.060" color="#334155" position="-0.24 -0.155 0.012" viewer-button="action: annotation-text-size; value: 80">
             <a-text value="80 mm" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
@@ -4524,28 +4524,28 @@
           </a-plane>
 
           <a-plane class="annotation-ui ui-click" width="0.42" height="0.064" color="#7C3AED" position="0 -0.240 0.012" viewer-button="action: annotation-keyboard">
-            <a-text value="WPISZ TEKST" align="center" width="0.52" color="#FFFFFF" position="0 0 0.006"></a-text>
+            <a-text value="ENTER TEXT" align="center" width="0.52" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
 
           <a-plane class="annotation-ui ui-click" width="0.24" height="0.060" color="#475569" position="-0.27 -0.325 0.012" viewer-button="action: annotation-undo">
-            <a-text value="COFNIJ" align="center" width="0.32" color="#FFFFFF" position="0 0 0.006"></a-text>
+            <a-text value="UNDO" align="center" width="0.32" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
           <a-plane class="annotation-ui ui-click" width="0.24" height="0.060" color="#7F1D1D" position="0 -0.325 0.012" viewer-button="action: annotation-clear">
-            <a-text value="WYCZYŚĆ" align="center" width="0.32" color="#FFFFFF" position="0 0 0.006"></a-text>
+            <a-text value="CLEAR" align="center" width="0.32" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
           <a-plane class="annotation-ui ui-click" width="0.24" height="0.060" color="#334155" position="0.27 -0.325 0.012" viewer-button="action: annotation-close">
-            <a-text value="ZAMKNIJ" align="center" width="0.32" color="#FFFFFF" position="0 0 0.006"></a-text>
+            <a-text value="CLOSE" align="center" width="0.32" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
         </a-entity>
 
         <a-entity id="annotationKeyboard" position="0.10 0.15 -0.38" rotation="-32 0 0" scale="0.60 0.60 0.60" visible="false">
           <a-plane width="1.30" height="1.08" color="#07111F" opacity="0.99" material="shader: flat; transparent: true"></a-plane>
-          <a-text value="KLAWIATURA 3D" align="center" anchor="center" baseline="center" width="1.16" color="#E9D5FF" position="0 0.465 0.010"></a-text>
+          <a-text value="3D KEYBOARD" align="center" anchor="center" baseline="center" width="1.16" color="#E9D5FF" position="0 0.465 0.010"></a-text>
 
           <a-plane width="1.16" height="0.120" color="#111827" position="0 0.365 0.012" material="shader: flat"></a-plane>
-          <a-text id="annotationTextPreview" value="UWAGA" align="center" anchor="center" baseline="center" width="1.06" color="#FF3B30" position="0 0.365 0.020"></a-text>
+          <a-text id="annotationTextPreview" value="NOTE" align="center" anchor="center" baseline="center" width="1.06" color="#FF3B30" position="0 0.365 0.020"></a-text>
 
-          <a-text value="Trigger: wybierz znak  •  GOTOWE: wróć do adnotacji" align="center" width="1.08" color="#94A3B8" position="0 -0.500 0.010"></a-text>
+          <a-text value="Trigger: select a character  •  DONE: return to markup" align="center" width="1.08" color="#94A3B8" position="0 -0.500 0.010"></a-text>
         </a-entity>
       </a-entity>
 
@@ -4587,57 +4587,57 @@
       }
 
       if (mode === 'mr') {
-        document.title = 'CK-207-74-5000_VR — Meta Quest MR v23';
-        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v23';
+        document.title = 'CK-207-74-5000_VR — Meta Quest MR v24';
+        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v24';
         enterXR.textContent = 'ENTER MR';
         enterXR.classList.add('mr');
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v23';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v24';
         landingVersion.classList.add('mr');
         landingTitle.textContent = 'CK-207-74-5000_VR — Mixed Reality';
-        landingDescription.textContent = 'Postaw model w pokoju, ustaw dokładną skalę, przesuń go i obróć wokół osi pionowej gestem dwóch gripów.';
+        landingDescription.textContent = 'Place the model in the room, set an exact scale, move it, and rotate it around the vertical axis using two grips.';
         landingEnter.textContent = 'ENTER MR — QUEST 3';
         landingEnter.classList.add('mr');
         mrScaleBox.hidden = false;
-        landingNote.textContent = 'Dwa gripy obracają model wokół jego geometrycznego środka — bez zmiany skali.';
+        landingNote.textContent = 'Two grips rotate the model around its geometric center without changing scale.';
         pills([
-          'L joystick: przesuń model',
-          'Prawy grip: przesunięcie / FREE GRAB 3D',
-          '2 gripy: obrót osi Y',
-          'B: góra  •  A: dół',
-          'X: ruch → pomiar → komponenty → adnotacje',
-          'Y: panel / wyczyść'
+          'Left stick: move model',
+          'Right grip: move / FREE GRAB 3D',
+          '2 grips: Y-axis rotation',
+          'B: up  •  A: down',
+          'X: move → measure → components → markup',
+          'Y: panel / clear'
         ], landingControls);
         pills([
-          'L: przesuń model',
-          '2 gripy: obrót modelu',
-          'B: góra  •  A: dół',
-          'X: tryb',
+          'L: move model',
+          '2 grips: rotate model',
+          'B: up  •  A: down',
+          'X: mode',
           'Y: panel',
-          'Trigger: przytrzymaj — widoczny celownik • puść — akcja'
+          'Trigger: hold — visible pointer • release — action'
         ], legend);
       } else {
-        document.title = 'CK-207-74-5000_VR — Meta Quest VR v23';
-        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v23';
+        document.title = 'CK-207-74-5000_VR — Meta Quest VR v24';
+        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v24';
         enterXR.textContent = 'ENTER VR';
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v23';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v24';
         landingTitle.textContent = 'CK-207-74-5000_VR — Virtual Reality';
-        landingDescription.textContent = 'Model pozostaje zakotwiczony w skali 1:1. Chodzisz, obracasz użytkownika, teleportujesz się, mierzysz i izolujesz komponenty.';
+        landingDescription.textContent = 'The model remains anchored at 1:1 scale. Walk, turn, teleport, measure, and isolate components.';
         landingEnter.textContent = 'ENTER VR — QUEST 3';
-        landingNote.textContent = 'Model jest stały: 100% / 1:1 / środek układu współrzędnych.';
+        landingNote.textContent = 'The model is fixed at 100% / 1:1 / coordinate-system origin.';
         pills([
-          'L joystick: chodzenie',
-          'R joystick: obrót użytkownika',
-          'B: góra  •  A: dół',
-          'Trigger: przytrzymaj — widoczny celownik • puść — teleport / punkt',
-          'X: nawigacja → pomiar → komponenty → adnotacje',
-          'Y: wyczyść / panel'
+          'Left stick: walk',
+          'Right stick: turn',
+          'B: up  •  A: down',
+          'Trigger: hold — visible pointer • release — teleport / point',
+          'X: navigation → measure → components → markup',
+          'Y: clear / panel'
         ], landingControls);
         pills([
-          'L: chodzenie',
-          'R: obrót użytkownika',
-          'B: góra  •  A: dół',
-          'Trigger: celownik / teleport',
-          'X: tryb',
+          'L: walk',
+          'R: turn',
+          'B: up  •  A: down',
+          'Trigger: pointer / teleport',
+          'X: mode',
           'Y: panel'
         ], legend);
       }
