@@ -6,7 +6,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — Meta Quest Viewer v25</title>
+  <title>CK-207-74-5000_VR — Meta Quest Viewer v26</title>
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
@@ -25,8 +25,8 @@
     })();
   </script>
   <script src="https://aframe.io/releases/1.8.0/aframe.min.js"></script>
-  <script src="moja-snap.js?v=25"></script>
-  <script src="moja-measure.js?v=25"></script>
+  <script src="moja-snap.js?v=26"></script>
+  <script src="moja-measure.js?v=26"></script>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
@@ -411,11 +411,12 @@
         this.currentIntersection = null;
         this.currentIntersections = [];
         this.currentColor = this.data.color;
+        this.pressedUI = null;
         this._lineVisible = null;
         this._lineOpacity = null;
         this.rayOrigin = new THREE.Vector3();
 
-        this.onTriggerDown = this.setActive.bind(this, true);
+        this.onTriggerDown = this.handleTriggerDown.bind(this);
         this.onTriggerUp = this.handleTriggerUp.bind(this);
         this.configure = this.configure.bind(this);
 
@@ -500,6 +501,14 @@
         this.forceRayOverlay();
       },
 
+      handleTriggerDown: function () {
+        this.setActive(true);
+        var targetEl = MOJA.getInteractiveEl(this.currentIntersection);
+        this.pressedUI = targetEl && targetEl.classList && targetEl.classList.contains('ui-click')
+          ? { targetEl: targetEl, intersection: this.currentIntersection }
+          : null;
+      },
+
       handleTriggerUp: function () {
         var rayComponent = this.el.components.raycaster;
         var intersections = rayComponent && rayComponent.intersections
@@ -509,13 +518,21 @@
           ? rayComponent.raycaster.ray.clone()
           : null;
 
+        var selectedIntersection = this.pressedUI && this.pressedUI.intersection
+          ? this.pressedUI.intersection
+          : this.currentIntersection;
+        var selectedTarget = this.pressedUI && this.pressedUI.targetEl
+          ? this.pressedUI.targetEl
+          : MOJA.getInteractiveEl(selectedIntersection);
+
         this.el.emit('moja-ray-select', {
-          intersection: this.currentIntersection,
+          intersection: selectedIntersection,
           intersections: intersections,
           ray: ray,
-          targetEl: MOJA.getInteractiveEl(this.currentIntersection)
+          targetEl: selectedTarget
         }, false);
 
+        this.pressedUI = null;
         this.setActive(false);
       },
 
@@ -1653,10 +1670,10 @@
     AFRAME.registerComponent('viewer-button', {
       schema: {action: {default: ''}, value: {type: 'number', default: 0}},
       init: function () {
-        this.onClick = this.onClick.bind(this);
-        this.el.addEventListener('click', this.onClick);
+        this.onActivate = this.onActivate.bind(this);
+        this.el.addEventListener('moja-ui-activate', this.onActivate);
       },
-      onClick: function () {
+      onActivate: function () {
         this.el.sceneEl.emit('viewer-ui-action', {
           action: this.data.action,
           value: this.data.value,
@@ -1664,7 +1681,7 @@
         }, false);
       },
       remove: function () {
-        this.el.removeEventListener('click', this.onClick);
+        this.el.removeEventListener('moja-ui-activate', this.onActivate);
       }
     });
 
@@ -1672,10 +1689,10 @@
       schema: {min: {type: 'number', default: 10}, max: {type: 'number', default: 300}, width: {type: 'number', default: 0.42}},
       init: function () {
         this.localPoint = new THREE.Vector3();
-        this.onClick = this.onClick.bind(this);
-        this.el.addEventListener('click', this.onClick);
+        this.onActivate = this.onActivate.bind(this);
+        this.el.addEventListener('moja-ui-activate', this.onActivate);
       },
-      onClick: function (event) {
+      onActivate: function (event) {
         var intersection = event.detail && event.detail.intersection;
         if (!intersection || !intersection.point) return;
         this.localPoint.copy(intersection.point);
@@ -1686,7 +1703,7 @@
         this.el.sceneEl.emit('viewer-ui-action', {action: 'scale', value: value, source: this.el}, false);
       },
       remove: function () {
-        this.el.removeEventListener('click', this.onClick);
+        this.el.removeEventListener('moja-ui-activate', this.onActivate);
       }
     });
 
@@ -2342,7 +2359,7 @@
             label.setAttribute('position', '0 0 0.008');
             key.appendChild(label);
 
-            key.addEventListener('click', function () {
+            key.addEventListener('moja-ui-activate', function () {
               self.acceptKeyInput(function () {
                 if (self.textBuffer.length < 42) self.textBuffer += character;
               });
@@ -2371,7 +2388,7 @@
           text.setAttribute('position', '0 0 0.008');
           key.appendChild(text);
 
-          key.addEventListener('click', function () {
+          key.addEventListener('moja-ui-activate', function () {
             self.acceptKeyInput(handler);
           });
 
@@ -3521,6 +3538,7 @@
         this.freeGrab3D = false;
         this.freeGrabMoving = false;
         this.freeGrabHand = null;
+        this.lastFreeGrabToggleAt = -10000;
 
         this.cameraQuaternion = new THREE.Quaternion();
         this.forward = new THREE.Vector3();
@@ -3918,9 +3936,13 @@
         }
 
         // Panel controls take priority only when they are the first ray hit.
-        var targetEl = MOJA.getInteractiveEl(intersection);
+        var targetEl = detail.targetEl || MOJA.getInteractiveEl(intersection);
+        if (targetEl && targetEl.id === 'freeGrabButton') {
+          this.toggleFreeGrab3D();
+          return;
+        }
         if (targetEl && targetEl.classList && targetEl.classList.contains('ui-click')) {
-          targetEl.emit('click', {intersection: intersection}, false);
+          targetEl.emit('moja-ui-activate', {intersection: intersection}, false);
           return;
         }
 
@@ -4078,6 +4100,9 @@
 
       toggleFreeGrab3D: function () {
         if (this.modeType !== 'mr') return;
+        var now = performance.now();
+        if (now - (this.lastFreeGrabToggleAt || 0) < 250) return;
+        this.lastFreeGrabToggleAt = now;
         this.freeGrab3D = !this.freeGrab3D;
         this.freeGrabMoving = false;
         this.freeGrabHand = null;
@@ -4274,8 +4299,8 @@
 </head>
 <body>
   <div class="topbar">
-    <a class="pill" href="index.html?v=25">← Viewer</a>
-    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v25</div>
+    <a class="pill" href="index.html?v=26">← Viewer</a>
+    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v26</div>
     <button id="enterXR" class="pill enter" type="button">ENTER VR</button>
   </div>
 
@@ -4283,7 +4308,7 @@
 
   <div id="landing" class="landing">
     <div class="card">
-      <div id="landingVersion" class="version">META QUEST 3 • v25</div>
+      <div id="landingVersion" class="version">META QUEST 3 • v26</div>
       <h1 id="landingTitle">CK-207-74-5000_VR — Virtual Reality</h1>
       <p id="landingDescription">The model is anchored at 1:1 scale. Move around, place persistent measurements, and control component visibility.</p>
 
@@ -4307,7 +4332,7 @@
 
       <div id="landingControls" class="controls"></div>
       <div class="actions">
-        <a class="button" href="index.html?v=25">← Back</a>
+        <a class="button" href="index.html?v=26">← Back</a>
         <button id="landingEnter" class="button primary" type="button">ENTER VR — QUEST 3</button>
       </div>
       <div id="landingNote" class="note">Subtle edges, balanced 360° lighting, and no heavy shadow maps.</div>
@@ -4317,14 +4342,14 @@
   <a-scene
     id="scene"
     quest-viewer="pivot: #modelPivot; asset: #modelAsset; rig: #rig; camera: #camera; left: #leftHand; right: #rightHand; floor: #floor; grid: #metricGrid; reticle: #placementReticle; info: #modelInfo; infoText: #modelInfoText; modeText: #modeText; teleportMarker: #teleportMarker; scalePanel: #scalePanel; scaleValueText: #scaleValueText; scaleKnob: #scaleKnob; componentPanel: #componentPanel; freeGrabButton: #freeGrabButton; freeGrabButtonText: #freeGrabButtonText"
-    component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; scrollTrack: #componentScrollTrack; scrollThumb: #componentScrollThumb; structureUrl: CK-207-74-5000_VR.structure.json?v=25; rows: 8"
+    component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; scrollTrack: #componentScrollTrack; scrollThumb: #componentScrollThumb; structureUrl: CK-207-74-5000_VR.structure.json?v=26; rows: 8"
     lighting-control="ambient: #ambientLight; front: #lightFront; back: #lightBack; left: #lightLeft; right: #lightRight; top: #lightTop; bottom: #lightBottom; panel: #lightingPanel; valueText: #lightingValueText; detailText: #lightingDetailText; storageKey: moja-ck-207-74-5000_vr-mr-scale-lighting360"
     annotation-control="pivot: #modelPivot; root: #annotationRoot; camera: #camera; right: #rightHand; panel: #annotationPanel; keyboard: #annotationKeyboard; preview: #annotationTextPreview; status: #annotationStatus"
     measurement-tool="target: #modelPivot; camera: #camera; right: #rightHand; pointA: #measurePointA; pointB: #measurePointB; pointC: #measurePointC; line: #measureLine; line2: #measureLine2; label: #measureLabel; labelText: #measureLabelText; snapLabel: #measureSnapLabel; snapLabelText: #measureSnapLabelText; panel: #measurePanel; status: #measurePanelStatus; color: #2563EB"
     loading-screen="backgroundColor: #0B1220; dotsColor: #60A5FA">
 
     <a-assets timeout="120000">
-      <a-asset-item id="modelSource" src="CK-207-74-5000_VR.glb?v=25"></a-asset-item>
+      <a-asset-item id="modelSource" src="CK-207-74-5000_VR.glb?v=26"></a-asset-item>
     </a-assets>
     <!-- MODEL LIGHTING 360° — bez map cieni -->
     <a-entity id="ambientLight"
@@ -4482,7 +4507,7 @@
             <a-plane id="scaleKnob" width="0.020" height="0.070" color="#4ADE80" position="0 0 0.008"></a-plane>
           </a-plane>
 
-          <a-plane id="freeGrabButton" class="scale-ui ui-click" width="0.50" height="0.060" color="#334155" position="0 -0.185 0.008" viewer-button="action: free-grab-toggle">
+          <a-plane id="freeGrabButton" class="scale-ui ui-click" width="0.50" height="0.060" color="#334155" position="0 -0.185 0.008">
             <a-text id="freeGrabButtonText" value="FREE GRAB 3D: OFF" align="center" width="0.62" color="#E2E8F0" position="0 0 0.006"></a-text>
           </a-plane>
 
@@ -4728,11 +4753,11 @@
       }
 
       if (mode === 'mr') {
-        document.title = 'CK-207-74-5000_VR — Meta Quest MR v25';
-        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v25';
+        document.title = 'CK-207-74-5000_VR — Meta Quest MR v26';
+        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v26';
         enterXR.textContent = 'ENTER MR';
         enterXR.classList.add('mr');
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v25';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v26';
         landingVersion.classList.add('mr');
         landingTitle.textContent = 'CK-207-74-5000_VR — Mixed Reality';
         landingDescription.textContent = 'Place the model in the room, set an exact scale, move it, and rotate it around the vertical axis using two grips.';
@@ -4757,10 +4782,10 @@
           'Trigger: hold — visible pointer • release — action'
         ], legend);
       } else {
-        document.title = 'CK-207-74-5000_VR — Meta Quest VR v25';
-        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v25';
+        document.title = 'CK-207-74-5000_VR — Meta Quest VR v26';
+        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v26';
         enterXR.textContent = 'ENTER VR';
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v25';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v26';
         landingTitle.textContent = 'CK-207-74-5000_VR — Virtual Reality';
         landingDescription.textContent = 'The model remains anchored at 1:1 scale. Walk, turn, teleport, measure, and isolate components.';
         landingEnter.textContent = 'ENTER VR — QUEST 3';
