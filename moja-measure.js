@@ -1,7 +1,7 @@
 (function (global) {
   'use strict';
 
-  var VERSION = '24';
+  var VERSION = '25';
 
   function createEngine(THREE, userOptions) {
     if (!THREE) throw new Error('MOJA MEASURE: THREE library is not available.');
@@ -175,6 +175,38 @@
       return cached;
     }
 
+    function planarDimensionsForTriangles(object, geometry, triangleIndices, centroid, normal) {
+      if (!object || !geometry || !triangleIndices || !triangleIndices.length || !centroid || !normal) {
+        return {width: NaN, height: NaN, axisU: null, axisV: null};
+      }
+
+      var reference = Math.abs(normal.y) < 0.88
+        ? new THREE.Vector3(0, 1, 0)
+        : new THREE.Vector3(1, 0, 0);
+      var axisU = new THREE.Vector3().crossVectors(reference, normal).normalize();
+      if (axisU.lengthSq() < 1e-12) axisU.set(1, 0, 0);
+      var axisV = new THREE.Vector3().crossVectors(normal, axisU).normalize();
+      var minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+
+      triangleIndices.forEach(function (triangleIndex) {
+        triangleWorldData(object, geometry, triangleIndex, temp.a, temp.b, temp.c);
+        [temp.a, temp.b, temp.c].forEach(function (point) {
+          temp.d.copy(point).sub(centroid);
+          var u = temp.d.dot(axisU);
+          var v = temp.d.dot(axisV);
+          minU = Math.min(minU, u); maxU = Math.max(maxU, u);
+          minV = Math.min(minV, v); maxV = Math.max(maxV, v);
+        });
+      });
+
+      return {
+        width: Number.isFinite(minU) && Number.isFinite(maxU) ? maxU - minU : NaN,
+        height: Number.isFinite(minV) && Number.isFinite(maxV) ? maxV - minV : NaN,
+        axisU: axisU,
+        axisV: axisV
+      };
+    }
+
     function surfacePatchFromIntersection(intersection, callOptions) {
       callOptions = callOptions || {};
       if (!intersection || !intersection.object || !intersection.object.geometry) return null;
@@ -237,10 +269,17 @@
       if (weightedNormal.lengthSq() > 1e-20) weightedNormal.normalize();
       else weightedNormal.set(0, 1, 0);
 
+      var dimensions = planarDimensionsForTriangles(object, geometry, selected, weightedCentroid, weightedNormal);
+
       return {
         area: area,
         centroid: weightedCentroid,
         normal: weightedNormal,
+        width: dimensions.width,
+        height: dimensions.height,
+        axisU: dimensions.axisU,
+        axisV: dimensions.axisV,
+        triangleIndices: selected.slice(),
         triangleCount: selected.length,
         totalTriangleCount: data.triangleCount,
         object: object,
@@ -277,10 +316,20 @@
       weightedCentroid.multiplyScalar(1 / totalArea);
       if (weightedNormal.lengthSq() > 1e-20) weightedNormal.normalize();
       else weightedNormal.set(0, 1, 0);
+      var firstGeometry = meshes[0].geometry;
+      var firstCount = triangleCount(firstGeometry);
+      var firstIndices = [];
+      for (var fallbackIndex = 0; fallbackIndex < firstCount; fallbackIndex += 1) firstIndices.push(fallbackIndex);
+      var fallbackDimensions = planarDimensionsForTriangles(meshes[0], firstGeometry, firstIndices, weightedCentroid, weightedNormal);
       return {
         area: totalArea,
         centroid: weightedCentroid,
         normal: weightedNormal,
+        width: fallbackDimensions.width,
+        height: fallbackDimensions.height,
+        axisU: fallbackDimensions.axisU,
+        axisV: fallbackDimensions.axisV,
+        triangleIndices: meshes.length === 1 ? firstIndices : null,
         triangleCount: totalTriangles,
         totalTriangleCount: totalTriangles,
         object: meshes[0],
