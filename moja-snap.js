@@ -1,10 +1,10 @@
 (function (global) {
   'use strict';
 
-  var VERSION = '19';
+  var VERSION = '24';
 
   function createEngine(THREE, userOptions) {
-    if (!THREE) throw new Error('MOJA SNAP: brak biblioteki THREE.');
+    if (!THREE) throw new Error('MOJA SNAP: THREE library is not available.');
 
     var options = Object.assign({
       featureAngleDeg: 18,
@@ -233,10 +233,9 @@
           nodeB.neighbours.add(segment.keyA);
         });
 
-        // W modelach CAD okrąg bywa połączony z drugim okręgiem jedną
-        // krawędzią szwu cylindra. Taka krawędź łączy zwykle dwa węzły o
-        // stopniu > 2. Pomijamy ją wyłącznie podczas wykrywania pętli; nadal
-        // pozostaje dostępna jako zwykła krawędź do snapowania.
+        // In CAD meshes, one circle can be connected to another by a single
+        // cylindrical seam edge. Such an edge usually joins two nodes with degree > 2.
+        // Ignore it only during loop detection; keep it available as a regular snap edge.
         nodes.forEach(function (node) { node.circleNeighbours = new Set(); });
         segments.forEach(function (segment) {
           var nodeA = nodes.get(segment.keyA);
@@ -347,7 +346,7 @@
           point: hits[0].point.clone(),
           object: hits[0].object,
           kind: 'surface',
-          label: snappingEnabled ? 'PUNKT POWIERZCHNI' : 'SNAP WYŁĄCZONY / PUNKT DOWOLNY',
+          label: snappingEnabled ? 'FACE POINT' : 'SNAP OFF / FREE POINT',
           snapped: false,
           angle: 0,
           sourceIntersection: hits[0]
@@ -445,16 +444,16 @@
         ];
 
         vertices.forEach(function (vertex) {
-          consider(vertex, object, 'vertex', 'WIERZCHOŁEK / NODE', hit, penalties.meshVertex, 1.05);
+          consider(vertex, object, 'vertex', 'VERTEX / NODE', hit, penalties.meshVertex, 1.05);
         });
 
         [[0,1], [1,2], [2,0]].forEach(function (pair) {
           var a = vertices[pair[0]];
           var b = vertices[pair[1]];
           ray.distanceSqToSegment(a, b, temp.pointOnRay, temp.pointOnSegment);
-          consider(temp.pointOnSegment, object, 'edge', 'KRAWĘDŹ', hit, penalties.meshEdge, 1.0);
+          consider(temp.pointOnSegment, object, 'edge', 'EDGE', hit, penalties.meshEdge, 1.0);
           temp.midpoint.copy(a).add(b).multiplyScalar(0.5);
-          consider(temp.midpoint, object, 'midpoint', 'ŚRODEK KRAWĘDZI', hit, penalties.meshMidpoint, 1.0);
+          consider(temp.midpoint, object, 'midpoint', 'EDGE MIDPOINT', hit, penalties.meshMidpoint, 1.0);
           considerPerpendicular(a, b, object, hit, penalties.perpendicular + 0.10);
         });
       });
@@ -466,7 +465,7 @@
 
         data.circles.forEach(function (circle) {
           temp.a.copy(circle.center).applyMatrix4(object.matrixWorld);
-          consider(temp.a, object, 'center', 'ŚRODEK OTWORU / OKRĘGU', hit, penalties.center, 1.25);
+          consider(temp.a, object, 'center', 'HOLE / CIRCLE CENTER', hit, penalties.center, 1.25);
         });
 
         var segments = data.segments;
@@ -479,18 +478,18 @@
           var edgeMetric = rayMetric(ray, temp.pointOnSegment);
           if (!edgeMetric || edgeMetric.angle > maxAngle * 1.12) continue;
 
-          consider(temp.pointOnSegment, object, 'edge', 'KRAWĘDŹ', hit, penalties.edge, 1.12);
+          consider(temp.pointOnSegment, object, 'edge', 'EDGE', hit, penalties.edge, 1.12);
           temp.midpoint.copy(temp.a).add(temp.b).multiplyScalar(0.5);
-          consider(temp.midpoint, object, 'midpoint', 'ŚRODEK KRAWĘDZI', hit, penalties.midpoint, 1.0);
-          consider(temp.a, object, 'vertex', 'WIERZCHOŁEK / NODE', hit, penalties.vertex, 1.0);
-          consider(temp.b, object, 'vertex', 'WIERZCHOŁEK / NODE', hit, penalties.vertex, 1.0);
+          consider(temp.midpoint, object, 'midpoint', 'EDGE MIDPOINT', hit, penalties.midpoint, 1.0);
+          consider(temp.a, object, 'vertex', 'VERTEX / NODE', hit, penalties.vertex, 1.0);
+          consider(temp.b, object, 'vertex', 'VERTEX / NODE', hit, penalties.vertex, 1.0);
           considerPerpendicular(temp.a, temp.b, object, hit, penalties.perpendicular);
         }
       });
 
-      // Środek otworu musi być możliwy także wtedy, gdy promień przechodzi
-      // przez pusty otwór i nie trafia powierzchni części. Dlatego sprawdzamy
-      // kołowe pętle również w pobliskich, widocznych meshach przecinanych
+      // Hole-center snapping must also work when the ray passes through an opening
+      // without hitting the part surface. Therefore, inspect circular loops in nearby
+      // visible meshes intersected by the ray as well.
       // przez korytarz promienia.
       var searchObjects = [];
       if (Array.isArray(callOptions.searchObjects)) {
@@ -530,7 +529,7 @@
           var data = buildFeatureData(object.geometry);
           data.circles.forEach(function (circle) {
             temp.a.copy(circle.center).applyMatrix4(object.matrixWorld);
-            consider(temp.a, object, 'center', 'ŚRODEK OTWORU / OKRĘGU', null, penalties.center, 1.25);
+            consider(temp.a, object, 'center', 'HOLE / CIRCLE CENTER', null, penalties.center, 1.25);
           });
         });
       }
