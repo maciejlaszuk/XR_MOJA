@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#0f172a">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — MOJA XR v25</title>
+  <title>CK-207-74-5000_VR — MOJA XR v26</title>
 
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
-  <script src="moja-snap.js?v=25"></script>
-  <script src="moja-measure.js?v=25"></script>
+  <script src="moja-snap.js?v=26"></script>
+  <script src="moja-measure.js?v=26"></script>
 
   <script type="importmap">
   {
@@ -215,6 +215,8 @@
       perspective: 420px; touch-action: none; cursor: grab;
     }
     .viewcube-stage:active { cursor: grabbing; }
+    #viewCubeCanvas { display: block; width: 112px; height: 112px; border-radius: 10px; touch-action: none; cursor: grab; }
+    #viewCubeCanvas:active { cursor: grabbing; }
     .viewcube-cube {
       position: absolute; left: 20px; top: 20px; width: 72px; height: 72px;
       transform-style: preserve-3d; transform: rotateX(-24deg) rotateY(38deg);
@@ -228,7 +230,22 @@
       letter-spacing: .04em; cursor: pointer; backface-visibility: hidden;
       box-shadow: inset 0 0 0 1px rgba(255,255,255,.42);
     }
-    .viewcube-face:hover { background: #bae6fd; color: #075985; }
+    .viewcube-face:hover, .viewcube-face:focus-visible { background: #bae6fd; color: #075985; outline: none; }
+    .viewcube-corner {
+      position: absolute; left: 36px; top: 36px; width: 15px; height: 15px; padding: 0;
+      border: 1px solid rgba(15,23,42,.58); border-radius: 4px; background: rgba(226,232,240,.98);
+      box-shadow: 0 1px 4px rgba(15,23,42,.28); cursor: pointer; backface-visibility: visible;
+      transform-style: preserve-3d; color: transparent; font-size: 0;
+    }
+    .viewcube-corner:hover, .viewcube-corner:focus-visible { background: #38bdf8; border-color: #075985; outline: none; }
+    .viewcube-corner.ftr { transform: translate3d( 36px,-36px, 36px) translate(-50%,-50%); }
+    .viewcube-corner.ftl { transform: translate3d(-36px,-36px, 36px) translate(-50%,-50%); }
+    .viewcube-corner.fbr { transform: translate3d( 36px, 36px, 36px) translate(-50%,-50%); }
+    .viewcube-corner.fbl { transform: translate3d(-36px, 36px, 36px) translate(-50%,-50%); }
+    .viewcube-corner.btr { transform: translate3d( 36px,-36px,-36px) translate(-50%,-50%); }
+    .viewcube-corner.btl { transform: translate3d(-36px,-36px,-36px) translate(-50%,-50%); }
+    .viewcube-corner.bbr { transform: translate3d( 36px, 36px,-36px) translate(-50%,-50%); }
+    .viewcube-corner.bbl { transform: translate3d(-36px, 36px,-36px) translate(-50%,-50%); }
     .viewcube-face.front  { transform: rotateY(0deg) translateZ(36px); }
     .viewcube-face.back   { transform: rotateY(180deg) translateZ(36px); }
     .viewcube-face.right  { transform: rotateY(90deg) translateZ(36px); }
@@ -243,7 +260,16 @@
     .viewcube-action:hover { background: #0369a1; color: #fff; border-color: #7dd3fc; }
     .viewcube-projection { grid-column: span 2; color: #7dd3fc; }
 
-    .saved-measure-layer { position: fixed; z-index: 45; inset: 0; pointer-events: none; overflow: visible; }
+    .saved-measure-layer { position: fixed; z-index: 45; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; overflow: visible; }
+    svg.saved-measure-layer line, svg.saved-measure-layer path {
+      vector-effect: non-scaling-stroke; fill: none; stroke-linecap: round; stroke-linejoin: round;
+    }
+    svg.saved-measure-layer .direct { stroke: #2563eb; stroke-width: 2.6; }
+    svg.saved-measure-layer .axis-x { stroke: #ef4444; stroke-width: 2.2; }
+    svg.saved-measure-layer .axis-y { stroke: #22c55e; stroke-width: 2.2; }
+    svg.saved-measure-layer .axis-z { stroke: #3b82f6; stroke-width: 2.2; }
+    svg.saved-measure-layer .angle-arc { stroke: #2563eb; stroke-width: 2.6; }
+    svg.saved-measure-layer .endpoint { fill: #fff; stroke: #2563eb; stroke-width: 2; }
     .saved-measure-label {
       position: fixed; z-index: 48; transform: translate(-50%, -50%); pointer-events: none;
       padding: 5px 9px; border: 1px solid rgba(15,23,42,.22); border-radius: 8px;
@@ -343,7 +369,7 @@
 
   <div class="topbar">
     <button id="treeToggle" class="pill mobile-toggle panel-toggle active" type="button" aria-expanded="true">☰ Model Tree</button>
-    <div class="pill"><strong>CK-207-74-5000_VR</strong><small>MOJA XR v25</small></div>
+    <div class="pill"><strong>CK-207-74-5000_VR</strong><small>MOJA XR v26</small></div>
     <button id="propsToggle" class="pill mobile-toggle panel-toggle active" type="button" aria-expanded="true">Properties</button>
     <div id="loadStatus" class="pill status"><span>Loading model…</span></div>
   </div>
@@ -442,7 +468,7 @@
     <circle id="measureMarkerB" class="endpoint" cx="0" cy="0" r="3.2" visibility="hidden"></circle>
     <circle id="measureMarkerC" class="endpoint" cx="0" cy="0" r="3.2" visibility="hidden"></circle>
   </svg>
-  <svg id="savedMeasureSvg" class="saved-measure-layer" aria-hidden="true"></svg>
+  <svg id="savedMeasureSvg" class="saved-measure-layer" width="100%" height="100%" aria-hidden="true"></svg>
   <div id="savedMeasureLabels" class="saved-measure-layer" aria-hidden="true"></div>
   <div id="measureMainLabel" class="measure-float measure-value-label"></div>
   <div id="measureSecondaryLabel" class="measure-float measure-value-label secondary"></div>
@@ -465,15 +491,8 @@
 
 
   <div class="viewcube-widget" id="viewCube" aria-label="ViewCube">
-    <div class="viewcube-stage" id="viewCubeStage" title="Drag to orbit. Click a face to align the view.">
-      <div class="viewcube-cube" id="viewCubeCube">
-        <button class="viewcube-face front" data-view="front" type="button">FRONT</button>
-        <button class="viewcube-face back" data-view="back" type="button">BACK</button>
-        <button class="viewcube-face right" data-view="right" type="button">RIGHT</button>
-        <button class="viewcube-face left" data-view="left" type="button">LEFT</button>
-        <button class="viewcube-face top" data-view="top" type="button">TOP</button>
-        <button class="viewcube-face bottom" data-view="bottom" type="button">BOTTOM</button>
-      </div>
+    <div class="viewcube-stage" id="viewCubeStage" title="Drag to orbit. Click a face or corner to align the view.">
+      <canvas id="viewCubeCanvas" width="224" height="224" aria-label="Interactive 3D ViewCube"></canvas>
     </div>
     <div class="viewcube-actions">
       <button class="viewcube-action" data-view="iso" type="button">ISO</button>
@@ -491,14 +510,14 @@
       <output id="explodeValue">0%</output>
     </div>
     <button id="arButton" class="tool cyan" type="button"><strong>AR</strong><span>phone</span></button>
-    <a id="mrButton" class="tool green" href="quest.html?mode=mr&v=25" style="text-decoration:none;color:#fff"><strong>MR</strong><span>Quest 3</span></a>
-    <a id="vrButton" class="tool blue" href="quest.html?mode=vr&v=25" style="text-decoration:none;color:#fff"><strong>VR</strong><span>Quest 3</span></a>
+    <a id="mrButton" class="tool green" href="quest.html?mode=mr&v=26" style="text-decoration:none;color:#fff"><strong>MR</strong><span>Quest 3</span></a>
+    <a id="vrButton" class="tool blue" href="quest.html?mode=vr&v=26" style="text-decoration:none;color:#fff"><strong>VR</strong><span>Quest 3</span></a>
   </nav>
 
   <model-viewer
     id="arViewer"
-    src="CK-207-74-5000_VR.glb?v=25"
-    ios-src="CK-207-74-5000_VR.usdz?v=25"
+    src="CK-207-74-5000_VR.glb?v=26"
+    ios-src="CK-207-74-5000_VR.usdz?v=26"
     ar
     ar-modes="webxr scene-viewer quick-look"
     ar-placement="floor"
@@ -521,7 +540,7 @@
     });
 
     const MODEL = 'CK-207-74-5000_VR';
-    const VERSION = '25';
+    const VERSION = '26';
     const viewport = document.getElementById('viewport');
     const loadStatus = document.getElementById('loadStatus');
     const treePanel = document.getElementById('treePanel');
@@ -565,7 +584,7 @@
     const measureCoordinateLabel = document.getElementById('measureCoordinateLabel');
     const viewCube = document.getElementById('viewCube');
     const viewCubeStage = document.getElementById('viewCubeStage');
-    const viewCubeCube = document.getElementById('viewCubeCube');
+    const viewCubeCanvas = document.getElementById('viewCubeCanvas');
     const viewCubeButtons = [...document.querySelectorAll('[data-view]')];
     const viewCubeFit = document.getElementById('viewCubeFit');
     const projectionToggle = document.getElementById('projectionToggle');
@@ -611,6 +630,8 @@
         result: null,
         busy: false,
         computeToken: 0,
+        minPartIndexes: [],
+        minPairComplete: false,
         saved: []
       }
     };
@@ -678,6 +699,8 @@
     const screenB = new THREE.Vector2();
     const screenC = new THREE.Vector2();
     const screenD = new THREE.Vector2();
+    const savedScreenX = new THREE.Vector2();
+    const savedScreenXY = new THREE.Vector2();
     const coordinateTemp = new THREE.Vector3();
     const currentPointer = { x: window.innerWidth * 0.5, y: window.innerHeight * 0.5, inside: false };
 
@@ -1122,6 +1145,14 @@
         case 'right': return { direction: new THREE.Vector3(1, 0, 0), up: new THREE.Vector3(0, 1, 0) };
         case 'top': return { direction: new THREE.Vector3(0, 1, 0), up: new THREE.Vector3(0, 0, -1) };
         case 'bottom': return { direction: new THREE.Vector3(0, -1, 0), up: new THREE.Vector3(0, 0, 1) };
+        case 'iso-ppp': return { direction: new THREE.Vector3( 1, 1, 1), up: new THREE.Vector3(0, 1, 0) };
+        case 'iso-npp': return { direction: new THREE.Vector3(-1, 1, 1), up: new THREE.Vector3(0, 1, 0) };
+        case 'iso-pnp': return { direction: new THREE.Vector3( 1,-1, 1), up: new THREE.Vector3(0, 1, 0) };
+        case 'iso-nnp': return { direction: new THREE.Vector3(-1,-1, 1), up: new THREE.Vector3(0, 1, 0) };
+        case 'iso-ppn': return { direction: new THREE.Vector3( 1, 1,-1), up: new THREE.Vector3(0, 1, 0) };
+        case 'iso-npn': return { direction: new THREE.Vector3(-1, 1,-1), up: new THREE.Vector3(0, 1, 0) };
+        case 'iso-pnn': return { direction: new THREE.Vector3( 1,-1,-1), up: new THREE.Vector3(0, 1, 0) };
+        case 'iso-nnn': return { direction: new THREE.Vector3(-1,-1,-1), up: new THREE.Vector3(0, 1, 0) };
         default: return { direction: new THREE.Vector3(1, 0.72, 1), up: new THREE.Vector3(0, 1, 0) };
       }
     }
@@ -1212,37 +1243,122 @@
       setProjectionMode(projectionMode === 'perspective' ? 'orthographic' : 'perspective');
     }
 
+    const viewCubeScene = new THREE.Scene();
+    const viewCubeCamera = new THREE.PerspectiveCamera(32, 1, 0.1, 20);
+    viewCubeCamera.position.set(0, 0, 5.2);
+    viewCubeCamera.lookAt(0, 0, 0);
+    const viewCubeRenderer = new THREE.WebGLRenderer({ canvas: viewCubeCanvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+    viewCubeRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    viewCubeRenderer.setSize(112, 112, false);
+    viewCubeRenderer.outputColorSpace = THREE.SRGBColorSpace;
+    viewCubeRenderer.setClearColor(0x000000, 0);
+
+    const viewCubeGroup = new THREE.Group();
+    viewCubeScene.add(viewCubeGroup);
+
+    function viewCubeFaceMaterial(label) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const context = canvas.getContext('2d');
+      context.fillStyle = '#f1f5f9';
+      context.fillRect(0, 0, 256, 256);
+      context.strokeStyle = '#64748b';
+      context.lineWidth = 8;
+      context.strokeRect(4, 4, 248, 248);
+      context.fillStyle = '#0f172a';
+      context.font = '900 38px Segoe UI, Arial';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.fillText(label, 128, 132);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      return new THREE.MeshBasicMaterial({ map: texture });
+    }
+
+    const viewCubeMaterials = [
+      viewCubeFaceMaterial('RIGHT'),
+      viewCubeFaceMaterial('LEFT'),
+      viewCubeFaceMaterial('TOP'),
+      viewCubeFaceMaterial('BOTTOM'),
+      viewCubeFaceMaterial('FRONT'),
+      viewCubeFaceMaterial('BACK')
+    ];
+    const viewCubeMesh = new THREE.Mesh(new THREE.BoxGeometry(1.62, 1.62, 1.62), viewCubeMaterials);
+    viewCubeGroup.add(viewCubeMesh);
+    viewCubeGroup.add(new THREE.LineSegments(
+      new THREE.EdgesGeometry(viewCubeMesh.geometry),
+      new THREE.LineBasicMaterial({ color: 0x334155, transparent: true, opacity: 0.95 })
+    ));
+
+    const viewCubePickables = [];
+    const cornerGeometry = new THREE.BoxGeometry(0.25, 0.25, 0.25);
+    const cornerMaterial = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+    [
+      [ 1, 1, 1, 'iso-ppp'], [-1, 1, 1, 'iso-npp'],
+      [ 1,-1, 1, 'iso-pnp'], [-1,-1, 1, 'iso-nnp'],
+      [ 1, 1,-1, 'iso-ppn'], [-1, 1,-1, 'iso-npn'],
+      [ 1,-1,-1, 'iso-pnn'], [-1,-1,-1, 'iso-nnn']
+    ].forEach(entry => {
+      const corner = new THREE.Mesh(cornerGeometry, cornerMaterial);
+      corner.position.set(entry[0] * 0.88, entry[1] * 0.88, entry[2] * 0.88);
+      corner.userData.view = entry[3];
+      viewCubeGroup.add(corner);
+      viewCubePickables.push(corner);
+    });
+    viewCubePickables.push(viewCubeMesh);
+
+    const viewCubeRaycaster = new THREE.Raycaster();
+    const viewCubePointer = new THREE.Vector2();
+    const viewCubeInverseCamera = new THREE.Quaternion();
+
     function updateViewCubeOrientation() {
-      if (!viewCubeCube) return;
-      const offset = camera.position.clone().sub(controls.target);
-      const horizontal = Math.hypot(offset.x, offset.z);
-      const yaw = Math.atan2(offset.x, offset.z);
-      const pitch = Math.atan2(offset.y, Math.max(horizontal, 1e-8));
-      viewCubeCube.style.transform = `rotateX(${THREE.MathUtils.radToDeg(pitch)}deg) rotateY(${-THREE.MathUtils.radToDeg(yaw)}deg)`;
+      if (!viewCubeCanvas) return;
+      viewCubeInverseCamera.copy(camera.quaternion).invert();
+      viewCubeGroup.quaternion.copy(viewCubeInverseCamera);
+      viewCubeRenderer.render(viewCubeScene, viewCubeCamera);
+    }
+
+    function pickViewCube(clientX, clientY) {
+      const rect = viewCubeCanvas.getBoundingClientRect();
+      viewCubePointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      viewCubePointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+      viewCubeRaycaster.setFromCamera(viewCubePointer, viewCubeCamera);
+      const intersections = viewCubeRaycaster.intersectObjects(viewCubePickables, false);
+      if (!intersections.length) return null;
+      const hit = intersections[0];
+      if (hit.object.userData.view) return hit.object.userData.view;
+      if (hit.object === viewCubeMesh && hit.face) {
+        return ['right', 'left', 'top', 'bottom', 'front', 'back'][hit.face.materialIndex] || null;
+      }
+      return null;
     }
 
     let viewCubeDrag = null;
-    if (viewCubeStage) {
-      viewCubeStage.addEventListener('pointerdown', event => {
+    if (viewCubeCanvas) {
+      viewCubeCanvas.addEventListener('pointerdown', event => {
         if (event.button !== 0) return;
         viewCubeDrag = {
           x: event.clientX,
           y: event.clientY,
           startX: event.clientX,
           startY: event.clientY,
+          pointerId: event.pointerId,
           spherical: new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target))
         };
         viewCube.classList.add('dragging');
-        viewCubeStage.setPointerCapture(event.pointerId);
+        viewCubeCanvas.setPointerCapture(event.pointerId);
       });
-      viewCubeStage.addEventListener('pointermove', event => {
+      viewCubeCanvas.addEventListener('pointermove', event => {
         if (!viewCubeDrag) return;
         const dx = event.clientX - viewCubeDrag.x;
         const dy = event.clientY - viewCubeDrag.y;
         viewCubeDrag.x = event.clientX;
         viewCubeDrag.y = event.clientY;
-        viewCubeDrag.spherical.theta -= dx * 0.012;
-        viewCubeDrag.spherical.phi -= dy * 0.012;
+        viewCubeDrag.spherical.theta += dx * 0.012;
+        viewCubeDrag.spherical.phi += dy * 0.012;
         viewCubeDrag.spherical.makeSafe();
         const offset = new THREE.Vector3().setFromSpherical(viewCubeDrag.spherical);
         camera.position.copy(controls.target).add(offset);
@@ -1251,20 +1367,19 @@
         controls.update();
         event.preventDefault();
       });
-      const stopViewCubeDrag = event => {
+      const finishViewCubePointer = event => {
         if (!viewCubeDrag) return;
         const moved = Math.hypot(event.clientX - viewCubeDrag.startX, event.clientY - viewCubeDrag.startY);
+        try { viewCubeCanvas.releasePointerCapture(viewCubeDrag.pointerId); } catch (error) {}
         viewCubeDrag = null;
         viewCube.classList.remove('dragging');
-        try { viewCubeStage.releasePointerCapture(event.pointerId); } catch (error) {}
-        if (moved > 4) {
-          suppressViewCubeClick = true;
-          window.setTimeout(() => { suppressViewCubeClick = false; }, 80);
-          event.preventDefault();
+        if (moved <= 5) {
+          const view = pickViewCube(event.clientX, event.clientY);
+          if (view) setView(view);
         }
       };
-      viewCubeStage.addEventListener('pointerup', stopViewCubeDrag);
-      viewCubeStage.addEventListener('pointercancel', stopViewCubeDrag);
+      viewCubeCanvas.addEventListener('pointerup', finishViewCubePointer);
+      viewCubeCanvas.addEventListener('pointercancel', finishViewCubePointer);
     }
 
     function prepareExplode() {
@@ -1422,7 +1537,7 @@
         button.classList.toggle('active', Boolean(measurement.filters[key]));
         button.disabled = !measurement.snapEnabled || measurement.type === 'min-distance';
       });
-      measureCompute.classList.toggle('show', measurement.type === 'min-distance');
+      measureCompute.classList.remove('show');
       measureCompute.disabled = measurement.busy;
       resetMeasureReadout();
     }
@@ -1431,6 +1546,9 @@
       if (!['distance', 'xyz', 'angle', 'point', 'area', 'min-distance'].includes(type)) return;
       state.measurement.type = type;
       clearMeasurement(true);
+      state.measurement.minPartIndexes = [];
+      state.measurement.minPairComplete = false;
+      if (type === 'min-distance') clearSelection();
       updateMeasurementControls();
     }
 
@@ -1455,16 +1573,18 @@
           : 'Click a surface. The viewer detects the connected mesh patch and calculates its area.';
         if (!measurement.result) setMeasureResults([['AREA','—'],['TRIANGLES','—']]);
       } else if (measurement.type === 'min-distance') {
-        const selectedCount = state.selected.size;
+        const count = measurement.minPartIndexes.length;
         if (measurement.busy) {
-          measurePrompt.textContent = 'Calculating minimum distance between GLB meshes…';
-        } else if (measurement.result) {
-          measurePrompt.textContent = measurement.result.approximate
-            ? 'Approximate result: a large mesh was sampled. Recalculate after changing model positions.'
-            : 'Minimum distance calculated on full triangulation. Recalculate after changing model positions.';
+          measurePrompt.textContent = 'Calculating the shortest distance between the two selected parts…';
+        } else if (measurement.minPairComplete) {
+          measurePrompt.textContent = 'Measurement saved. Click another part to start a new PART–PART measurement.';
+        } else if (count === 1) {
+          const nodeA = state.treeNodes[measurement.minPartIndexes[0]];
+          measurePrompt.textContent = 'PART A: ' + (nodeA?.label || 'selected') + '. Click PART B — calculation starts automatically.';
+          setMeasureResults([['MIN. DISTANCE','—'],['PART A',nodeA?.label || 'A'],['PART B','CLICK PART B']]);
         } else {
-          measurePrompt.textContent = 'Select exactly 2 parts, return to MEASURE and click CALCULATE. Currently selected: ' + selectedCount + '.';
-          setMeasureResults([['MIN. DISTANCE','—'],['PART A','—'],['PART B','—']]);
+          measurePrompt.textContent = 'Click PART A directly in the model, then click PART B. The shortest distance is calculated automatically.';
+          setMeasureResults([['MIN. DISTANCE','—'],['PART A','CLICK PART A'],['PART B','—']]);
         }
       }
     }
@@ -1479,6 +1599,8 @@
       state.measurement.points = [];
       state.measurement.result = null;
       state.measurement.busy = false;
+      state.measurement.minPartIndexes = [];
+      state.measurement.minPairComplete = false;
       if (clearHover) {
         state.measurement.hover = null;
         state.measurement.hoverIntersection = null;
@@ -1566,14 +1688,28 @@
 
     function setSavedSvgLine(element, a, b) {
       if (!element || !a || !b) return;
+      const className = element.getAttribute('class') || '';
+      let stroke = '#2563eb';
+      let width = '2.6';
+      if (className.includes('axis-x')) { stroke = '#ef4444'; width = '2.25'; }
+      else if (className.includes('axis-y')) { stroke = '#22c55e'; width = '2.25'; }
+      else if (className.includes('axis-z')) { stroke = '#3b82f6'; width = '2.25'; }
       element.setAttribute('x1', a.x); element.setAttribute('y1', a.y);
       element.setAttribute('x2', b.x); element.setAttribute('y2', b.y);
+      element.setAttribute('stroke', stroke);
+      element.setAttribute('stroke-width', width);
+      element.setAttribute('stroke-linecap', 'round');
+      element.setAttribute('stroke-linejoin', 'round');
+      element.setAttribute('vector-effect', 'non-scaling-stroke');
       element.setAttribute('visibility', 'visible');
     }
 
     function setSavedSvgMarker(element, point) {
       if (!element || !point) return;
       element.setAttribute('cx', point.x); element.setAttribute('cy', point.y);
+      element.setAttribute('fill', '#ffffff');
+      element.setAttribute('stroke', '#2563eb');
+      element.setAttribute('stroke-width', '2');
       element.setAttribute('visibility', 'visible');
     }
 
@@ -1625,10 +1761,10 @@
         const length = measureWorldA.distanceTo(measureWorldB);
         const components = measurementComponents(measureWorldA, measureWorldB);
         midpoint2D(screenA, screenB, screenD);
-        if (record.type === 'xyz' && projectWorld(measurePathXWorld, screenC) && projectWorld(measurePathXYWorld, screenD)) {
-          setSavedSvgLine(visual.lineX, screenA, screenC);
-          setSavedSvgLine(visual.lineY, screenC, screenD);
-          setSavedSvgLine(visual.lineZ, screenD, screenB);
+        if (record.type === 'xyz' && projectWorld(measurePathXWorld, savedScreenX) && projectWorld(measurePathXYWorld, savedScreenXY)) {
+          setSavedSvgLine(visual.lineX, screenA, savedScreenX);
+          setSavedSvgLine(visual.lineY, savedScreenX, savedScreenXY);
+          setSavedSvgLine(visual.lineZ, savedScreenXY, screenB);
           midpoint2D(screenA, screenB, screenC);
           setSavedLabel(visual, screenC.x, screenC.y - 28,
             '<b>L</b> ' + formatMm(length,true) + '<br>' +
@@ -1971,9 +2107,9 @@
       return node ? [...new Set(node.meshes.filter(mesh => mesh.visible))] : [];
     }
 
-    async function computeMinimumDistance() {
+    async function computeMinimumDistance(indexesOverride) {
       if (state.measurement.busy) return;
-      const indexes = [...state.selected];
+      const indexes = Array.isArray(indexesOverride) && indexesOverride.length ? indexesOverride.slice(0, 2) : state.measurement.minPartIndexes.slice(0, 2);
       if (indexes.length !== 2) {
         measurePrompt.textContent = 'Select exactly 2 parts. Currently selected: ' + indexes.length + '.';
         return;
@@ -2012,6 +2148,7 @@
           nameA:state.measurement.result.nameA, nameB:state.measurement.result.nameB
         });
         state.measurement.result = null;
+        state.measurement.minPairComplete = true;
         measurePrompt.textContent = result.approximate
           ? 'Approximate result: a large mesh was sampled. Smaller parts use full calculation.'
           : 'Minimum distance calculated on full triangulation of the selected parts.';
@@ -2051,16 +2188,54 @@
       return raycaster.intersectObjects(state.meshes.filter(mesh => mesh.visible), false).slice(0, 12);
     }
 
-    function selectHit(hit) {
-      if (!hit) return;
+    function nodeIndexFromHit(hit) {
+      if (!hit) return -1;
       let current = hit.object;
-      let index = -1;
       while (current) {
         const mapped = state.meshToNodeIndex.get(current);
-        if (Number.isInteger(mapped)) { index = mapped; break; }
+        if (Number.isInteger(mapped)) return mapped;
         current = current.parent;
       }
+      return -1;
+    }
+
+    function selectHit(hit) {
+      const index = nodeIndexFromHit(hit);
       if (index >= 0) selectNode(index, { fromModel: true });
+    }
+
+    async function addMinimumDistancePart(hit) {
+      const measurement = state.measurement;
+      if (measurement.busy) return;
+      const index = nodeIndexFromHit(hit);
+      if (index < 0 || !selectedNodeMeshes(index).length) {
+        measurePrompt.textContent = 'No measurable component was found at this point.';
+        return;
+      }
+
+      if (measurement.minPairComplete || measurement.minPartIndexes.length >= 2) {
+        clearSelection();
+        measurement.minPartIndexes = [];
+        measurement.minPairComplete = false;
+      }
+
+      if (measurement.minPartIndexes.includes(index)) {
+        measurePrompt.textContent = 'PART B must be different from PART A.';
+        return;
+      }
+
+      measurement.minPartIndexes.push(index);
+      state.selected.add(index);
+      state.activeSelectedIndex = index;
+      syncHelpers();
+      revealTreeNode(index, true);
+      renderProperties();
+      updateSelectionCard();
+      resetMeasureReadout();
+
+      if (measurement.minPartIndexes.length === 2) {
+        await computeMinimumDistance(measurement.minPartIndexes.slice());
+      }
     }
 
     const raycaster = new THREE.Raycaster();
@@ -2082,7 +2257,8 @@
     });
     renderer.domElement.addEventListener('pointermove', event => {
       currentPointer.x = event.clientX; currentPointer.y = event.clientY; currentPointer.inside = true;
-      if (!state.modelRoot || state.interactionMode !== 'measure' || state.measurement.type === 'min-distance') return;
+      if (!state.modelRoot || state.interactionMode !== 'measure') return;
+      if (state.measurement.type === 'min-distance') return;
       const now = performance.now();
       if (now - lastHoverAt < 45) return;
       lastHoverAt = now;
@@ -2093,9 +2269,10 @@
       if (!state.modelRoot || event.button !== 0 || !pointerDown) return;
       const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
       pointerDown = null;
-      if (moved > 8 || state.interactionMode === 'orbit' || state.interactionMode === 'pan') return;
+      if (moved > 12 || state.interactionMode === 'orbit' || state.interactionMode === 'pan') return;
       const hits = findPointerHits(event);
       if (state.interactionMode === 'select') selectHit(hits[0] || null);
+      else if (state.interactionMode === 'measure' && state.measurement.type === 'min-distance') addMinimumDistancePart(hits[0] || null);
       else if (state.interactionMode === 'measure') addMeasurementPoint(hits);
     });
 
@@ -2105,7 +2282,7 @@
     measureModeButton.addEventListener('click', () => setInteractionMode('measure'));
     clearInteractionButton.addEventListener('click', clearInteraction);
     document.getElementById('measureClear').addEventListener('click', clearAllMeasurements);
-    measureCompute.addEventListener('click', computeMinimumDistance);
+    measureCompute.addEventListener('click', () => computeMinimumDistance(state.measurement.minPartIndexes));
     snapToggle.addEventListener('click', () => {
       state.measurement.snapEnabled = !state.measurement.snapEnabled;
       state.measurement.hover = null;
@@ -2140,10 +2317,16 @@
     document.getElementById('showAllBottom').addEventListener('click', showAll);
     document.getElementById('fitView').addEventListener('click', fitView);
     let suppressViewCubeClick = false;
-    viewCubeButtons.forEach(button => button.addEventListener('click', event => {
-      if (suppressViewCubeClick) { event.preventDefault(); event.stopPropagation(); return; }
-      setView(button.dataset.view);
-    }));
+    viewCubeButtons.forEach(button => {
+      button.addEventListener('pointerdown', event => event.stopPropagation());
+      button.addEventListener('pointerup', event => event.stopPropagation());
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (suppressViewCubeClick) return;
+        setView(button.dataset.view);
+      });
+    });
     if (viewCubeFit) viewCubeFit.addEventListener('click', fitView);
     if (projectionToggle) projectionToggle.addEventListener('click', toggleProjection);
     function setExplodeValue(value) {
