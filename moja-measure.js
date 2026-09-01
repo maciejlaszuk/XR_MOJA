@@ -1,10 +1,10 @@
 (function (global) {
   'use strict';
 
-  var VERSION = '19';
+  var VERSION = '24';
 
   function createEngine(THREE, userOptions) {
-    if (!THREE) throw new Error('MOJA MEASURE: brak biblioteki THREE.');
+    if (!THREE) throw new Error('MOJA MEASURE: THREE library is not available.');
 
     var options = Object.assign({
       surfaceSmoothAngleDeg: 14,
@@ -192,7 +192,7 @@
         if (!fallback) return null;
         fallback.patch = false;
         fallback.approximate = true;
-        fallback.reason = 'Siatka zbyt duża do wydzielenia powierzchni; policzono cały mesh.';
+        fallback.reason = 'Mesh too large for connected-patch extraction; the full mesh area was calculated.';
         return fallback;
       }
 
