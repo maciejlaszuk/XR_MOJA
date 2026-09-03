@@ -6,7 +6,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — Meta Quest Viewer v26</title>
+  <title>CK-207-74-5000_VR — Meta Quest Viewer v27</title>
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
@@ -25,8 +25,9 @@
     })();
   </script>
   <script src="https://aframe.io/releases/1.8.0/aframe.min.js"></script>
-  <script src="moja-snap.js?v=26"></script>
-  <script src="moja-measure.js?v=26"></script>
+  <script src="moja-snap.js?v=27"></script>
+  <script src="moja-measure.js?v=27"></script>
+  <script src="moja-precision.js?v=27"></script>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
@@ -170,6 +171,10 @@
       .controls { display: none; }
       .card { padding: 18px; }
     }
+  
+    /* MOJA XR PRO XR overlays */
+    .xr-pro-note { color: #99f6e4; }
+
   </style>
   <script>
   (function () {
@@ -586,6 +591,7 @@
     AFRAME.registerComponent('measurement-tool', {
       schema: {
         target: {type: 'selector'},
+        asset: {type: 'selector'},
         camera: {type: 'selector'},
         right: {type: 'selector'},
         pointA: {type: 'selector'},
@@ -643,6 +649,24 @@
         this.snapEngine = window.MOJA_SNAP
           ? window.MOJA_SNAP.createEngine(THREE, {maxAngleRad: 0.0038, featureAngleDeg: 18})
           : null;
+        this.precisionEngine = window.MOJA_PRECISION
+          ? window.MOJA_PRECISION.createEngine(THREE, {angularTolerance: 0.009, minWorldRadius: 0.003, maxWorldRadius: 0.12})
+          : null;
+        this.precisionReady = false;
+        this.precisionError = null;
+        if (this.precisionEngine) {
+          var selfPrecision = this;
+          this.precisionEngine.load(String(window.MOJA_XR_MODEL || '') + '.snapdata.json?v=27')
+            .then(function () {
+              selfPrecision.precisionReady = selfPrecision.precisionEngine.isReady();
+              selfPrecision.updatePanel();
+            })
+            .catch(function (error) {
+              selfPrecision.precisionError = error;
+              selfPrecision.precisionReady = false;
+              selfPrecision.updatePanel();
+            });
+        }
         this.measureEngine = window.MOJA_MEASURE
           ? window.MOJA_MEASURE.createEngine(THREE, {surfaceSmoothAngleDeg: 14, minDistanceMaxTrianglesPerSet: 2800})
           : null;
@@ -802,7 +826,7 @@
 
       getSnapModeLabel: function () {
         if (this.snapMode === 'off') return 'OFF';
-        return 'AUTO';
+        return this.precisionReady ? 'CAD' : 'MESH';
       },
 
       applySnapMode: function (mode) {
@@ -822,11 +846,11 @@
       },
 
       shortSnapLabel: function (kind) {
-        return ({vertex:'NODE', midpoint:'MID', center:'CENTER', edge:'EDGE', perpendicular:'PERP ⟂', surface:'FACE'})[kind] || 'POINT';
+        return ({vertex:'VERTEX', midpoint:'MID', center:'HOLE', edge:'EDGE', perpendicular:'PERP ⟂', surface:'FACE', face:'FACE REF'})[kind] || 'POINT';
       },
 
       snapSymbol: function (kind) {
-        return ({vertex:'◇', midpoint:'△', center:'⊙', edge:'─', perpendicular:'⟂', surface:'●'})[kind] || '●';
+        return ({vertex:'◇', midpoint:'△', center:'⊙', edge:'─', perpendicular:'⟂', surface:'●', face:'▱'})[kind] || '●';
       },
 
       formatMm: function (metres, approximate) {
@@ -884,7 +908,7 @@
 
       updatePanel: function () {
         if (this.data.status) {
-          var line1 = this.getModeLabel() + '  •  SNAP ' + this.getSnapModeLabel();
+          var line1 = this.getModeLabel() + '  •  ' + (this.precisionReady ? 'CAD REFERENCES' : 'MESH REFERENCES');
           var line2 = '';
           if (this.mode === 'distance' || this.mode === 'xyz') line2 = this.points.length === 0 ? 'TRIGGER: A' : (this.points.length === 1 ? 'POINT TO B — LIVE PREVIEW • TRIGGER: CAPTURE' : 'COMPLETE');
           else if (this.mode === 'angle') line2 = ['TRIGGER: A', 'TRIGGER: VERTEX', 'POINT TO B — LIVE PREVIEW • TRIGGER: CAPTURE', 'COMPLETE'][Math.min(this.points.length, 3)];
@@ -1275,18 +1299,26 @@
           });
         }
 
-        var snap = this.snapEngine && ray
-          ? this.snapEngine.snapFromIntersections(usableIntersections, ray, {
-              enabled: this.snapEnabled,
-              filters: this.filters,
-              basePoint: this.getBasePoint(),
-              maxAngleRad: this.snapAngleRad,
-              searchRoot: targetObject
-            })
-          : null;
+        var snap = null;
+        var assetObject = this.data.asset && this.data.asset.object3D;
+        if (this.snapEnabled && this.precisionReady && this.precisionEngine && ray && intersection && intersection.point && assetObject) {
+          snap = this.precisionEngine.snap(ray, intersection.point, assetObject, {
+            angularTolerance: 0.009,
+            sourceIntersection: intersection
+          });
+        }
+        if (!snap && this.snapEngine && ray) {
+          snap = this.snapEngine.snapFromIntersections(usableIntersections, ray, {
+            enabled: this.snapEnabled,
+            filters: this.filters,
+            basePoint: this.getBasePoint(),
+            maxAngleRad: this.snapAngleRad,
+            searchRoot: targetObject
+          });
+        }
         if ((!snap || !snap.point) && (!intersection || !intersection.point)) return null;
 
-        if (snap && snap.point && intersection && intersection.point) {
+        if (snap && snap.source !== 'cad' && snap.point && intersection && intersection.point) {
           var pull = snap.point.distanceTo(intersection.point);
           var limit = this.snapPullLimit;
           if (targetObject) {
@@ -1512,7 +1544,10 @@
         if (!this.resolvePoint(this.preview, this.worldC)) return;
         this.placeOverlayInFront(this.worldC, this.data.snapLabel.object3D.position, 0.020);
         this.data.snapLabel.object3D.scale.setScalar(this.overlayScaleAt(this.worldC, 0.026, 0.12, 0.30));
-        this.data.snapLabelText.setAttribute('value', this.snapSymbol(this.preview.snapKind) + '  ' + (this.snapEnabled ? this.shortSnapLabel(this.preview.snapKind) : 'FREE'));
+        var isCad = String(this.preview.snapLabel || '').toUpperCase().indexOf('CAD ') === 0;
+        var badgeLabel = isCad ? String(this.preview.snapLabel).replace(/^CAD\s+/i, '') : this.shortSnapLabel(this.preview.snapKind);
+        this.data.snapLabelText.setAttribute('value', this.snapSymbol(this.preview.snapKind) + '  ' + (this.snapEnabled ? badgeLabel : 'FREE'));
+        this.data.snapLabelText.setAttribute('color', isCad ? '#2DD4BF' : '#F97316');
         this.data.snapLabel.object3D.visible = true;
         this.forceOverlayElement(this.data.snapLabel, 93);
       },
@@ -4299,8 +4334,8 @@
 </head>
 <body>
   <div class="topbar">
-    <a class="pill" href="index.html?v=26">← Viewer</a>
-    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v26</div>
+    <a class="pill" href="index.html?v=27">← Viewer</a>
+    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v27</div>
     <button id="enterXR" class="pill enter" type="button">ENTER VR</button>
   </div>
 
@@ -4308,7 +4343,7 @@
 
   <div id="landing" class="landing">
     <div class="card">
-      <div id="landingVersion" class="version">META QUEST 3 • v26</div>
+      <div id="landingVersion" class="version">META QUEST 3 • v27</div>
       <h1 id="landingTitle">CK-207-74-5000_VR — Virtual Reality</h1>
       <p id="landingDescription">The model is anchored at 1:1 scale. Move around, place persistent measurements, and control component visibility.</p>
 
@@ -4332,7 +4367,7 @@
 
       <div id="landingControls" class="controls"></div>
       <div class="actions">
-        <a class="button" href="index.html?v=26">← Back</a>
+        <a class="button" href="index.html?v=27">← Back</a>
         <button id="landingEnter" class="button primary" type="button">ENTER VR — QUEST 3</button>
       </div>
       <div id="landingNote" class="note">Subtle edges, balanced 360° lighting, and no heavy shadow maps.</div>
@@ -4342,14 +4377,14 @@
   <a-scene
     id="scene"
     quest-viewer="pivot: #modelPivot; asset: #modelAsset; rig: #rig; camera: #camera; left: #leftHand; right: #rightHand; floor: #floor; grid: #metricGrid; reticle: #placementReticle; info: #modelInfo; infoText: #modelInfoText; modeText: #modeText; teleportMarker: #teleportMarker; scalePanel: #scalePanel; scaleValueText: #scaleValueText; scaleKnob: #scaleKnob; componentPanel: #componentPanel; freeGrabButton: #freeGrabButton; freeGrabButtonText: #freeGrabButtonText"
-    component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; scrollTrack: #componentScrollTrack; scrollThumb: #componentScrollThumb; structureUrl: CK-207-74-5000_VR.structure.json?v=26; rows: 8"
+    component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; scrollTrack: #componentScrollTrack; scrollThumb: #componentScrollThumb; structureUrl: CK-207-74-5000_VR.structure.json?v=27; rows: 8"
     lighting-control="ambient: #ambientLight; front: #lightFront; back: #lightBack; left: #lightLeft; right: #lightRight; top: #lightTop; bottom: #lightBottom; panel: #lightingPanel; valueText: #lightingValueText; detailText: #lightingDetailText; storageKey: moja-ck-207-74-5000_vr-mr-scale-lighting360"
     annotation-control="pivot: #modelPivot; root: #annotationRoot; camera: #camera; right: #rightHand; panel: #annotationPanel; keyboard: #annotationKeyboard; preview: #annotationTextPreview; status: #annotationStatus"
-    measurement-tool="target: #modelPivot; camera: #camera; right: #rightHand; pointA: #measurePointA; pointB: #measurePointB; pointC: #measurePointC; line: #measureLine; line2: #measureLine2; label: #measureLabel; labelText: #measureLabelText; snapLabel: #measureSnapLabel; snapLabelText: #measureSnapLabelText; panel: #measurePanel; status: #measurePanelStatus; color: #2563EB"
+    measurement-tool="target: #modelPivot; asset: #modelAsset; camera: #camera; right: #rightHand; pointA: #measurePointA; pointB: #measurePointB; pointC: #measurePointC; line: #measureLine; line2: #measureLine2; label: #measureLabel; labelText: #measureLabelText; snapLabel: #measureSnapLabel; snapLabelText: #measureSnapLabelText; panel: #measurePanel; status: #measurePanelStatus; color: #2563EB"
     loading-screen="backgroundColor: #0B1220; dotsColor: #60A5FA">
 
     <a-assets timeout="120000">
-      <a-asset-item id="modelSource" src="CK-207-74-5000_VR.glb?v=26"></a-asset-item>
+      <a-asset-item id="modelSource" src="CK-207-74-5000_VR.glb?v=27"></a-asset-item>
     </a-assets>
     <!-- MODEL LIGHTING 360° — bez map cieni -->
     <a-entity id="ambientLight"
@@ -4753,11 +4788,11 @@
       }
 
       if (mode === 'mr') {
-        document.title = 'CK-207-74-5000_VR — Meta Quest MR v26';
-        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v26';
+        document.title = 'CK-207-74-5000_VR — Meta Quest MR v27';
+        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v27';
         enterXR.textContent = 'ENTER MR';
         enterXR.classList.add('mr');
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v26';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v27';
         landingVersion.classList.add('mr');
         landingTitle.textContent = 'CK-207-74-5000_VR — Mixed Reality';
         landingDescription.textContent = 'Place the model in the room, set an exact scale, move it, and rotate it around the vertical axis using two grips.';
@@ -4782,10 +4817,10 @@
           'Trigger: hold — visible pointer • release — action'
         ], legend);
       } else {
-        document.title = 'CK-207-74-5000_VR — Meta Quest VR v26';
-        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v26';
+        document.title = 'CK-207-74-5000_VR — Meta Quest VR v27';
+        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v27';
         enterXR.textContent = 'ENTER VR';
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v26';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v27';
         landingTitle.textContent = 'CK-207-74-5000_VR — Virtual Reality';
         landingDescription.textContent = 'The model remains anchored at 1:1 scale. Walk, turn, teleport, measure, and isolate components.';
         landingEnter.textContent = 'ENTER VR — QUEST 3';
