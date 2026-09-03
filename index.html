@@ -6,13 +6,14 @@
   <meta name="theme-color" content="#0f172a">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — MOJA XR v26</title>
+  <title>CK-207-74-5000_VR — MOJA XR v27</title>
 
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
-  <script src="moja-snap.js?v=26"></script>
-  <script src="moja-measure.js?v=26"></script>
+  <script src="moja-snap.js?v=27"></script>
+  <script src="moja-measure.js?v=27"></script>
+  <script src="moja-precision.js?v=27"></script>
 
   <script type="importmap">
   {
@@ -163,6 +164,7 @@
     .measure-type { flex: 0 0 auto; min-height: 31px; padding: 0 10px; border: 1px solid rgba(148,163,184,.28); border-radius: 9px; background: #1e293b; color: #cbd5e1; font-size: 9px; font-weight: 900; cursor: pointer; white-space: nowrap; }
     .measure-type.active { background: #075985; border-color: #7dd3fc; color: #fff; }
     .snap-filter-row { margin-top: 7px; }
+    .snap-filter-row.collapsed { display: none; }
     .snap-filter-label { flex: 0 0 auto; color: #94a3b8; font-size: 9px; font-weight: 900; }
     .snap-filter { flex: 0 0 auto; min-height: 25px; padding: 0 8px; border: 1px solid rgba(148,163,184,.25); border-radius: 999px; background: #111827; color: #94a3b8; font-size: 8px; font-weight: 900; cursor: pointer; }
     .snap-filter.active { background: #0f766e; border-color: #5eead4; color: #ecfeff; }
@@ -362,15 +364,80 @@
       #propsPanel.open { display: flex; }
       .desktop-only { display: none !important; }
     }
+  
+
+
+    .tool-icon, .mode-icon { width: 20px; height: 20px; display: block; color: #dbeafe; }
+    .mode-tool { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+    .mode-tool .mode-icon { width: 17px; height: 17px; }
+    .tool strong { display: flex; align-items: center; gap: 6px; }
+
+    /* MOJA XR PRO visual system */
+    :root {
+      --pro-bg-0: #dce6ef;
+      --pro-bg-1: #f7fafc;
+      --pro-ink: #0b1220;
+      --pro-panel: rgba(9, 16, 30, .92);
+      --pro-panel-soft: rgba(17, 27, 47, .90);
+      --pro-stroke: rgba(148, 163, 184, .22);
+      --pro-accent: #2aa8ff;
+      --pro-accent-2: #14b8a6;
+    }
+    html, body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif; }
+    #viewport::after {
+      content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 2;
+      background: radial-gradient(circle at 50% 28%, rgba(255,255,255,.28), transparent 48%);
+    }
+    .pill { border-radius: 12px; min-height: 40px; background: rgba(8,15,29,.88); border-color: rgba(148,163,184,.20); box-shadow: 0 8px 24px rgba(2,6,23,.18); }
+    .pill small { color: #67e8f9; }
+    .precision-status { color: #cbd5e1; gap: 7px; font-size: 10px; letter-spacing: .04em; }
+    .precision-status.ready { color: #a7f3d0; border-color: rgba(45,212,191,.36); }
+    .precision-status.mesh { color: #fde68a; border-color: rgba(245,158,11,.35); }
+    .precision-status.error { color: #fecaca; border-color: rgba(239,68,68,.35); }
+    .precision-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 12px currentColor; }
+    .panel { border-radius: 16px; background: var(--pro-panel); border-color: var(--pro-stroke); box-shadow: 0 22px 55px rgba(2,6,23,.30); }
+    .panel-head { background: linear-gradient(180deg, rgba(30,41,59,.38), transparent); }
+    .tree-row { border-radius: 8px; background: rgba(30,41,59,.54); }
+    .tree-row:hover { background: rgba(14,116,144,.30); border-color: rgba(103,232,249,.44); }
+    .tree-row.selected { background: linear-gradient(90deg, rgba(2,132,199,.80), rgba(14,116,144,.60)); box-shadow: inset 3px 0 0 #67e8f9; }
+    .toolbar, .interaction-bar { background: rgba(7,14,27,.90); border-color: rgba(148,163,184,.18); box-shadow: 0 14px 36px rgba(2,6,23,.26); }
+    .tool, .mode-tool { transition: transform .12s ease, background .12s ease, border-color .12s ease; }
+    .tool:hover, .mode-tool:hover { transform: translateY(-1px); }
+    .mode-tool.active, .mode-tool.select-active { background: linear-gradient(180deg,#0284c7,#075985); }
+    .mode-tool.measure-active { background: linear-gradient(180deg,#d97706,#92400e); }
+    .measure-hud { border-color: rgba(56,189,248,.34); background: rgba(8,15,29,.94); border-radius: 14px; }
+    .measure-value-label, .measure-coordinates, .saved-measure-label { border-radius: 8px; box-shadow: 0 6px 20px rgba(2,6,23,.22); }
+    .snap-indicator { padding: 5px 8px; border-radius: 9px; background: rgba(7,14,27,.92); color: #f8fafc; border: 1px solid rgba(255,255,255,.18); box-shadow: 0 8px 24px rgba(2,6,23,.28); font-size: 9px; }
+    .snap-indicator .snap-symbol { border-color: #38bdf8; color: #38bdf8; }
+    .snap-indicator[data-source="cad"] { border-color: rgba(45,212,191,.52); }
+    .snap-indicator[data-source="cad"] .snap-symbol { border-color: #2dd4bf; color: #2dd4bf; }
+    .viewcube-widget { background: rgba(7,14,27,.88); border-color: rgba(148,163,184,.20); }
+    .selection-card { background: rgba(7,14,27,.94); border-color: rgba(103,232,249,.25); }
+    @media (max-width: 820px) {
+      .precision-status { display: none; }
+    }
+
   </style>
 </head>
 <body>
+  <svg aria-hidden="true" width="0" height="0" style="position:absolute;overflow:hidden">
+    <symbol id="i-orbit" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 13.3-6M20 12a8 8 0 0 1-13.3 6M17 3v4h-4M7 21v-4h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-pan" viewBox="0 0 24 24"><path d="M8 11V6a1.5 1.5 0 0 1 3 0v4-6a1.5 1.5 0 0 1 3 0v6-4a1.5 1.5 0 0 1 3 0v5-2a1.5 1.5 0 0 1 3 0v5c0 4-3 7-7 7h-1c-3 0-4.5-1.5-6-3l-2.5-2.5a1.6 1.6 0 0 1 2.3-2.3L8 15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-select" viewBox="0 0 24 24"><path d="M5 3l12 9-5 1 3 6-2.7 1.3-3-6L5 18z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-measure" viewBox="0 0 24 24"><path d="M4 16L16 4l4 4L8 20zM9 15l-2-2m5-1-2-2m5-1-2-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-clear" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-fit" viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M8 21H3v-5m13 5h5v-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.8" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-ar" viewBox="0 0 24 24"><path d="M4 7l8-4 8 4-8 4zM4 7v10l8 4 8-4V7M12 11v10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-tree" viewBox="0 0 24 24"><path d="M6 4h12M6 10h12M6 16h12M3 4h.01M3 10h.01M3 16h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  </svg>
   <div id="viewport" aria-label="3D model view"></div>
 
   <div class="topbar">
-    <button id="treeToggle" class="pill mobile-toggle panel-toggle active" type="button" aria-expanded="true">☰ Model Tree</button>
-    <div class="pill"><strong>CK-207-74-5000_VR</strong><small>MOJA XR v26</small></div>
+    <button id="treeToggle" class="pill mobile-toggle panel-toggle active" type="button" aria-expanded="true"><svg class="mode-icon"><use href="#i-tree"></use></svg>Model Tree</button>
+    <div class="pill"><strong>CK-207-74-5000_VR</strong><small>MOJA XR v27</small></div>
     <button id="propsToggle" class="pill mobile-toggle panel-toggle active" type="button" aria-expanded="true">Properties</button>
+    <div id="precisionStatus" class="pill precision-status" title="Measurement reference source"><span class="precision-dot"></span><span>PRECISION: LOADING</span></div>
     <div id="loadStatus" class="pill status"><span>Loading model…</span></div>
   </div>
 
@@ -425,7 +492,8 @@
     <div class="measure-hud-head">
       <strong id="measureTitle">MEASURE • DISTANCE</strong>
       <div class="measure-actions">
-        <button id="snapToggle" class="measure-head-button snap-on" type="button">SNAP: ON</button>
+        <button id="snapToggle" class="measure-head-button snap-on" type="button" title="Automatic snapping">AUTO SNAP</button>
+        <button id="snapOptionsToggle" class="measure-head-button" type="button" aria-expanded="false">OPTIONS</button>
         <button id="measureClear" class="measure-head-button clear" type="button">CLEAR</button>
       </div>
     </div>
@@ -437,7 +505,7 @@
       <button class="measure-type" data-measure-type="area" type="button">AREA</button>
       <button class="measure-type" data-measure-type="min-distance" type="button">MIN. PART–PART</button>
     </div>
-    <div class="snap-filter-row" aria-label="Snap filters">
+    <div id="snapFilterRow" class="snap-filter-row collapsed" aria-label="Snap filters">
       <span class="snap-filter-label">SNAPS:</span>
       <button class="snap-filter active" data-snap-filter="vertex" type="button">NODE</button>
       <button class="snap-filter active" data-snap-filter="midpoint" type="button">MID</button>
@@ -476,11 +544,11 @@
   <div id="snapIndicator" class="measure-float snap-indicator" data-kind="surface"><span class="snap-symbol">●</span><span id="snapIndicatorText">FACE</span></div>
 
   <nav class="interaction-bar" aria-label="Model interaction mode">
-    <button id="orbitMode" class="mode-tool active" type="button" title="Orbit — drag to rotate">ORBIT</button>
-    <button id="panMode" class="mode-tool" type="button" title="Pan — drag to move the view">PAN</button>
-    <button id="selectMode" class="mode-tool" type="button" title="Select model components">SELECT</button>
-    <button id="measureMode" class="mode-tool" type="button" title="Measure and inspect">MEASURE</button>
-    <button id="clearInteraction" class="mode-tool clear" type="button" title="Clear selection and measurement">CLEAR</button>
+    <button id="orbitMode" class="mode-tool active" type="button" title="Orbit — drag to rotate"><svg class="mode-icon"><use href="#i-orbit"></use></svg>ORBIT</button>
+    <button id="panMode" class="mode-tool" type="button" title="Pan — drag to move the view"><svg class="mode-icon"><use href="#i-pan"></use></svg>PAN</button>
+    <button id="selectMode" class="mode-tool" type="button" title="Select model components"><svg class="mode-icon"><use href="#i-select"></use></svg>SELECT</button>
+    <button id="measureMode" class="mode-tool" type="button" title="Measure and inspect"><svg class="mode-icon"><use href="#i-measure"></use></svg>MEASURE</button>
+    <button id="clearInteraction" class="mode-tool clear" type="button" title="Clear selection and measurement"><svg class="mode-icon"><use href="#i-clear"></use></svg>CLEAR</button>
   </nav>
 
   <div id="mobileExplodeDock" class="mobile-explode-dock" aria-label="Explode model">
@@ -502,22 +570,22 @@
   </div>
 
   <nav class="toolbar" aria-label="Viewing tools">
-    <button id="fitView" class="tool" type="button"><strong>FIT</strong><span>entire model</span></button>
-    <button id="showAllBottom" class="tool" type="button"><strong>SHOW ALL</strong><span>restore visibility</span></button>
+    <button id="fitView" class="tool" type="button"><strong><svg class="tool-icon"><use href="#i-fit"></use></svg>FIT</strong><span>entire model</span></button>
+    <button id="showAllBottom" class="tool" type="button"><strong><svg class="tool-icon"><use href="#i-eye"></use></svg>SHOW ALL</strong><span>restore visibility</span></button>
     <div class="explode-wrap desktop-only">
       <label for="explodeRange">EXPLODE</label>
       <input id="explodeRange" type="range" min="0" max="100" step="1" value="0">
       <output id="explodeValue">0%</output>
     </div>
-    <button id="arButton" class="tool cyan" type="button"><strong>AR</strong><span>phone</span></button>
+    <button id="arButton" class="tool cyan" type="button"><strong><svg class="tool-icon"><use href="#i-ar"></use></svg>AR</strong><span>phone</span></button>
     <a id="mrButton" class="tool green" href="quest.html?mode=mr&v=26" style="text-decoration:none;color:#fff"><strong>MR</strong><span>Quest 3</span></a>
     <a id="vrButton" class="tool blue" href="quest.html?mode=vr&v=26" style="text-decoration:none;color:#fff"><strong>VR</strong><span>Quest 3</span></a>
   </nav>
 
   <model-viewer
     id="arViewer"
-    src="CK-207-74-5000_VR.glb?v=26"
-    ios-src="CK-207-74-5000_VR.usdz?v=26"
+    src="CK-207-74-5000_VR.glb?v=27"
+    ios-src="CK-207-74-5000_VR.usdz?v=27"
     ar
     ar-modes="webxr scene-viewer quick-look"
     ar-placement="floor"
@@ -529,6 +597,7 @@
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
     const snapEngine = window.MOJA_SNAP.createEngine(THREE, {
       maxAngleRad: ('ontouchstart' in window) ? 0.021 : 0.016,
@@ -538,11 +607,17 @@
       surfaceSmoothAngleDeg: 14,
       minDistanceMaxTrianglesPerSet: 9000
     });
+    const precisionEngine = window.MOJA_PRECISION.createEngine(THREE, {
+      angularTolerance: ('ontouchstart' in window) ? 0.008 : 0.005,
+      minWorldRadius: 0.002,
+      maxWorldRadius: 0.10
+    });
 
     const MODEL = 'CK-207-74-5000_VR';
-    const VERSION = '26';
+    const VERSION = '27';
     const viewport = document.getElementById('viewport');
     const loadStatus = document.getElementById('loadStatus');
+    const precisionStatus = document.getElementById('precisionStatus');
     const treePanel = document.getElementById('treePanel');
     const propsPanel = document.getElementById('propsPanel');
     const treeList = document.getElementById('treeList');
@@ -561,6 +636,8 @@
     const measureTitle = document.getElementById('measureTitle');
     const measurePrompt = document.getElementById('measurePrompt');
     const snapToggle = document.getElementById('snapToggle');
+    const snapOptionsToggle = document.getElementById('snapOptionsToggle');
+    const snapFilterRow = document.getElementById('snapFilterRow');
     const measureCompute = document.getElementById('measureCompute');
     const measureTypeButtons = [...document.querySelectorAll('[data-measure-type]')];
     const snapFilterButtons = [...document.querySelectorAll('[data-snap-filter]')];
@@ -618,6 +695,7 @@
       helpers: new Map(),
       explodable: [],
       explodeFactor: 0,
+      precision: { ready: false, available: false, data: null, error: null },
       query: '',
       interactionMode: 'orbit',
       measurement: {
@@ -640,11 +718,16 @@
     scene.background = new THREE.Color(0xe8eef4);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, ('ontouchstart' in window) ? 2 : 2.5));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
+    renderer.toneMappingExposure = 1.02;
     viewport.appendChild(renderer.domElement);
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    const roomEnvironment = new RoomEnvironment();
+    scene.environment = pmremGenerator.fromScene(roomEnvironment, 0.035).texture;
+    roomEnvironment.dispose();
+    pmremGenerator.dispose();
 
     const perspectiveCamera = new THREE.PerspectiveCamera(44, 1, 0.01, 5000);
     perspectiveCamera.position.set(4, 3, 6);
@@ -1414,6 +1497,13 @@
     function applyExplode(percent) {
       const factor = THREE.MathUtils.clamp(Number(percent) || 0, 0, 100) / 100;
       state.explodeFactor = factor;
+      if (precisionStatus && state.precision.available) {
+        const cadActive = factor < 0.001 && state.precision.ready;
+        precisionStatus.className = 'pill precision-status ' + (cadActive ? 'ready' : 'mesh');
+        const stats = precisionEngine.stats();
+        precisionStatus.innerHTML = '<span class="precision-dot"></span><span>' +
+          (cadActive ? ('CAD PRECISION • ' + (stats.points || 0) + ' PTS') : 'MESH SNAP • EXPLODED') + '</span>';
+      }
       state.explodable.forEach(item => {
         item.object.position.copy(item.originalLocal);
         item.object.parent.updateMatrixWorld(true);
@@ -1466,14 +1556,21 @@
 
     function snapSymbol(kind) {
       return ({
-        vertex: '◇', midpoint: '△', center: '⊙', edge: '─', perpendicular: '⟂', surface: '●'
+        vertex: '◇', midpoint: '△', center: '⊙', edge: '─', perpendicular: '⟂', surface: '●', face: '▱'
       })[kind] || '●';
     }
 
     function shortSnapLabel(kind) {
       return ({
-        vertex: 'NODE', midpoint: 'MIDPOINT', center: 'CENTER', edge: 'EDGE', perpendicular: 'PERP ⟂', surface: 'FACE'
+        vertex: 'VERTEX', midpoint: 'MIDPOINT', center: 'HOLE CENTER', edge: 'EDGE', perpendicular: 'PERP ⟂', surface: 'FACE', face: 'FACE REF'
       })[kind] || 'POINT';
+    }
+
+    function snapDisplay(stored) {
+      if (!stored) return '—';
+      const label = String(stored.snapLabel || '');
+      if (label) return label.replace(/^CAD\s+/i, 'CAD ');
+      return shortSnapLabel(stored.snapKind);
     }
 
     function createMeasuredPoint(snap) {
@@ -1530,7 +1627,7 @@
       const measurement = state.measurement;
       measureTitle.textContent = 'MEASURE • ' + measurementTypeName(measurement.type);
       measureTypeButtons.forEach(button => button.classList.toggle('active', button.dataset.measureType === measurement.type));
-      snapToggle.textContent = measurement.snapEnabled ? 'SNAP: ON' : 'SNAP: OFF';
+      snapToggle.textContent = measurement.snapEnabled ? 'AUTO SNAP' : 'SNAP OFF';
       snapToggle.className = 'measure-head-button ' + (measurement.snapEnabled ? 'snap-on' : 'snap-off');
       snapFilterButtons.forEach(button => {
         const key = button.dataset.snapFilter;
@@ -1559,7 +1656,7 @@
         measurePrompt.textContent = count === 0
           ? 'Click point A. The active snap is shown at the cursor; after the first click, the measurement previews live.'
           : (count === 1 ? 'Point A captured as ' + measurement.points[0].snapLabel + '. Point to B.' : 'Measurement complete. The next click starts a new measurement.');
-        if (count < 2 && !measurement.hover) setMeasureResults([['L','—'],['ΔX','—'],['ΔY','—'],['ΔZ','—'],['SNAP', count ? shortSnapLabel(measurement.points[0].snapKind) : '—']]);
+        if (count < 2 && !measurement.hover) setMeasureResults([['L','—'],['ΔX','—'],['ΔY','—'],['ΔZ','—'],['SNAP', count ? snapDisplay(measurement.points[0]) : '—']]);
       } else if (measurement.type === 'angle') {
         const prompts = ['Click the first point on arm A.', 'Click the angle vertex.', 'Point to the third point on arm B — the angle previews live.', 'Angle complete. The next click starts a new measurement.'];
         measurePrompt.textContent = prompts[Math.min(count, 3)];
@@ -1914,9 +2011,13 @@
         return;
       }
       const kind = measurement.hover.snapKind || 'surface';
+      const cadSource = String(measurement.hover.snapLabel || '').toUpperCase().startsWith('CAD ');
       snapIndicator.dataset.kind = kind;
+      snapIndicator.dataset.source = cadSource ? 'cad' : 'mesh';
       snapIndicator.querySelector('.snap-symbol').textContent = snapSymbol(kind);
-      snapIndicatorText.textContent = measurement.snapEnabled ? shortSnapLabel(kind) : 'FREE';
+      snapIndicatorText.textContent = measurement.snapEnabled
+        ? (cadSource ? String(measurement.hover.snapLabel).replace(/^CAD\s+/i, '') : shortSnapLabel(kind))
+        : 'FREE';
       const x = Math.min(window.innerWidth - 75, Math.max(75, screenC.x + 34));
       const y = Math.min(window.innerHeight - 35, Math.max(35, screenC.y - 24));
       snapIndicator.style.left = x + 'px'; snapIndicator.style.top = y + 'px';
@@ -1964,7 +2065,7 @@
         const components = measurementComponents(measureWorldA, measureWorldB);
         midpoint2D(screenA, screenB, screenD);
         placeFloat(measureMainLabel, screenD.x, screenD.y - 15, formatMm(length, true));
-        setMeasureResults([['L',formatLength(length,true)],['ΔX',formatMm(components.dx)],['ΔY',formatMm(components.dy)],['ΔZ',formatMm(components.dz)],['SNAP B',shortSnapLabel(pointB.snapKind)]]);
+        setMeasureResults([['L',formatLength(length,true)],['ΔX',formatMm(components.dx)],['ΔY',formatMm(components.dy)],['ΔZ',formatMm(components.dz)],['SNAP B',snapDisplay(pointB)]]);
         measurePrompt.textContent = preview ? 'LIVE PREVIEW • A: ' + pointA.snapLabel + ' • B: ' + pointB.snapLabel : 'MEASUREMENT COMPLETE • A: ' + pointA.snapLabel + ' • B: ' + pointB.snapLabel;
 
         if (measurement.type === 'xyz') {
@@ -1995,7 +2096,7 @@
         setAngleArc(screenB, screenA, screenC);
         const angle = measureEngine.angleDegrees(measureWorldA, measureWorldB, measureWorldC);
         placeFloat(measureMainLabel, screenB.x + 45, screenB.y - 32, '≈ ' + angle.toLocaleString('en-US',{maximumFractionDigits:2}) + '°');
-        setMeasureResults([['ANGLE','≈ '+angle.toLocaleString('en-US',{maximumFractionDigits:2})+'°'],['A–V',formatMm(measureWorldA.distanceTo(measureWorldB),true)],['V–B',formatMm(measureWorldB.distanceTo(measureWorldC),true)],['SNAP',shortSnapLabel(third.snapKind)]]);
+        setMeasureResults([['ANGLE','≈ '+angle.toLocaleString('en-US',{maximumFractionDigits:2})+'°'],['A–V',formatMm(measureWorldA.distanceTo(measureWorldB),true)],['V–B',formatMm(measureWorldB.distanceTo(measureWorldC),true)],['SNAP',snapDisplay(third)]]);
         measurePrompt.textContent = preview ? 'LIVE ANGLE PREVIEW • click the third point.' : 'ANGLE COMPLETE • the next click starts a new measurement.';
         return;
       }
@@ -2007,7 +2108,7 @@
         measureEngine.modelCoordinates(measureWorldA, state.modelRoot, coordinateTemp);
         placeFloat(measureCoordinateLabel, Math.min(window.innerWidth-90, screenA.x+78), Math.max(70, screenA.y-10),
           '<b class="x">X</b> ' + formatMm(coordinateTemp.x) + '<br><b class="y">Y</b> ' + formatMm(coordinateTemp.y) + '<br><b class="z">Z</b> ' + formatMm(coordinateTemp.z));
-        setMeasureResults([['X',formatMm(coordinateTemp.x)],['Y',formatMm(coordinateTemp.y)],['Z',formatMm(coordinateTemp.z)],['SNAP',shortSnapLabel(point.snapKind)]]);
+        setMeasureResults([['X',formatMm(coordinateTemp.x)],['Y',formatMm(coordinateTemp.y)],['Z',formatMm(coordinateTemp.z)],['SNAP',snapDisplay(point)]]);
         return;
       }
 
@@ -2044,11 +2145,19 @@
 
     function findSnap(hits) {
       const usableHits = Array.isArray(hits) ? hits : [];
+      const firstHit = usableHits[0] || null;
+      if (state.measurement.snapEnabled && state.precision.ready && firstHit?.point && state.modelRoot && state.explodeFactor < 0.001) {
+        const cadSnap = precisionEngine.snap(raycaster.ray, firstHit.point, state.modelRoot, {
+          angularTolerance: ('ontouchstart' in window) ? 0.008 : 0.005,
+          sourceIntersection: firstHit
+        });
+        if (cadSnap) return cadSnap;
+      }
       return snapEngine.snapFromIntersections(usableHits, raycaster.ray, {
         enabled: state.measurement.snapEnabled,
         filters: state.measurement.filters,
         basePoint: getBasePointForSnap(),
-        maxAngleRad: ('ontouchstart' in window) ? 0.021 : 0.016,
+        maxAngleRad: ('ontouchstart' in window) ? 0.018 : 0.013,
         searchObjects: state.meshes
       });
     }
@@ -2283,6 +2392,12 @@
     clearInteractionButton.addEventListener('click', clearInteraction);
     document.getElementById('measureClear').addEventListener('click', clearAllMeasurements);
     measureCompute.addEventListener('click', () => computeMinimumDistance(state.measurement.minPartIndexes));
+    snapOptionsToggle.addEventListener('click', () => {
+      const expanded = snapOptionsToggle.getAttribute('aria-expanded') === 'true';
+      snapOptionsToggle.setAttribute('aria-expanded', String(!expanded));
+      snapOptionsToggle.textContent = expanded ? 'OPTIONS' : 'HIDE OPTIONS';
+      snapFilterRow.classList.toggle('collapsed', expanded);
+    });
     snapToggle.addEventListener('click', () => {
       state.measurement.snapEnabled = !state.measurement.snapEnabled;
       state.measurement.hover = null;
@@ -2427,13 +2542,33 @@
     }
     animate();
 
+    async function loadPrecisionData() {
+      try {
+        const data = await precisionEngine.load(MODEL + '.snapdata.json?v=' + VERSION);
+        state.precision.data = data;
+        state.precision.ready = precisionEngine.isReady();
+        state.precision.available = true;
+        precisionStatus.className = 'pill precision-status ready';
+        const stats = precisionEngine.stats();
+        precisionStatus.innerHTML = '<span class="precision-dot"></span><span>CAD PRECISION • ' + (stats.points || 0) + ' PTS</span>';
+        return data;
+      } catch (error) {
+        state.precision.error = error;
+        state.precision.ready = false;
+        precisionStatus.className = 'pill precision-status mesh';
+        precisionStatus.innerHTML = '<span class="precision-dot"></span><span>MESH SNAP</span>';
+        return null;
+      }
+    }
+
     const loader = new GLTFLoader();
     Promise.all([
       new Promise((resolve, reject) => loader.load(MODEL + '.glb?v=' + VERSION, resolve, progress => {
         if (progress.total) setStatus('Model ' + Math.round(progress.loaded / progress.total * 100) + '%');
       }, reject)),
-      loadStructure()
-    ]).then(([gltf, structure]) => {
+      loadStructure(),
+      loadPrecisionData()
+    ]).then(([gltf, structure, precisionData]) => {
       state.modelRoot = gltf.scene;
       scene.add(state.modelRoot);
       state.modelRoot.updateMatrixWorld(true);
@@ -2454,7 +2589,7 @@
       else buildFallbackTree(state.modelRoot);
       finalizeTree();
       fitView();
-      setStatus((structure?.root ? 'IAM tree' : 'GLB names') + ' • ' + state.meshes.length + ' solids', 'ok');
+      setStatus((structure?.root ? 'IAM tree' : 'GLB names') + ' • ' + state.meshes.length + ' solids' + (state.precision.ready ? ' • CAD precision' : ' • mesh snap'), 'ok');
     }).catch(error => {
       console.error(error);
       setStatus('Model loading error', 'error');
