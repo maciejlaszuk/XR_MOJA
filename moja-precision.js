@@ -135,6 +135,8 @@
         addToGrid(segmentGrid, candidate.midpoint, index);
         addToGrid(segmentGrid, candidate.a, index);
         addToGrid(segmentGrid, candidate.b, index);
+        const steps = Math.ceil(candidate.a.distanceTo(candidate.b) / cellSize);
+        for (let step=1; step<steps; step++) addToGrid(segmentGrid, candidate.a.clone().lerp(candidate.b, step/steps), index);
       });
     }
 
@@ -288,6 +290,11 @@
       var hitT = rayParameter(temp.rayLocal, temp.hitLocal);
       var stickyId = lastSnap && (performance.now() - lastSnapAt <= options.stickyHoldMs) ? lastSnap.id : '';
       var best = null;
+      function allowed(candidate) {
+        const kind = candidate.kind === 'face' ? 'surface' : candidate.kind;
+        return (!snapOptions.filters || snapOptions.filters[kind] !== false) &&
+          (!snapOptions.acceptCandidate || snapOptions.acceptCandidate(candidate));
+      }
 
       var pointIndexSet = new Set(queryGrid(pointGrid, temp.hitLocal, radiusLocal * 1.8));
       var probeDepths = [radiusLocal * 3, 0.025 / rootScale, 0.06 / rootScale, 0.12 / rootScale];
@@ -297,11 +304,13 @@
         queryGrid(pointGrid, temp.queryPoint, radiusLocal * 1.4).forEach(function (index) { pointIndexSet.add(index); });
       });
       pointIndexSet.forEach(function (index) {
+        if (!allowed(pointCandidates[index])) return;
         var scored = scorePointCandidate(pointCandidates[index], temp.hitLocal, temp.rayLocal, radiusLocal, hitT, stickyId);
         if (scored && (!best || scored.score < best.score)) best = scored;
       });
 
       queryGrid(segmentGrid, temp.hitLocal, radiusLocal * 1.8).forEach(function (index) {
+        if (!allowed(segmentCandidates[index])) return;
         var scored = scoreSegmentCandidate(segmentCandidates[index], temp.hitLocal, temp.rayLocal, radiusLocal, hitT, stickyId);
         if (scored && (!best || scored.score < best.score)) best = scored;
       });
