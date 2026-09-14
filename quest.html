@@ -6,7 +6,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — Meta Quest Viewer v27.2</title>
+  <title>CK-207-74-5000_VR — Meta Quest Viewer v27.3</title>
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
@@ -25,10 +25,10 @@
     })();
   </script>
   <script src="https://aframe.io/releases/1.8.0/aframe.min.js"></script>
-  <script src="moja-runtime.js?v=27.2"></script>
-  <script src="moja-snap.js?v=27.2"></script>
-  <script src="moja-measure.js?v=27.2"></script>
-  <script src="moja-precision.js?v=27.2"></script>
+  <script src="moja-runtime.js?v=27.3"></script>
+  <script src="moja-snap.js?v=27.3"></script>
+  <script src="moja-measure.js?v=27.3"></script>
+  <script src="moja-precision.js?v=27.3"></script>
   <style>
     [hidden] { display: none !important; }
     :root { color-scheme: dark; }
@@ -4281,12 +4281,12 @@
     });
   })();
   </script>
-  <script src="moja-xr-ui.js?v=27.2"></script>
+  <script src="moja-xr-ui.js?v=27.3"></script>
 </head>
 <body>
   <div class="topbar">
     <a class="pill" href="index.html?v=27">← Viewer</a>
-    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v27.2</div>
+    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v27.3</div>
     <button id="enterXR" class="pill enter" type="button">ENTER VR</button>
   </div>
 
@@ -4294,7 +4294,7 @@
 
   <div id="landing" class="landing">
     <div class="card">
-      <div id="landingVersion" class="version">META QUEST 3 • v27.2</div>
+      <div id="landingVersion" class="version">META QUEST 3 • v27.3</div>
       <h1 id="landingTitle">CK-207-74-5000_VR — Virtual Reality</h1>
       <p id="landingDescription">The model is anchored at 1:1 scale. Move around, place persistent measurements, and control component visibility.</p>
 
@@ -4442,13 +4442,13 @@
 
       <a-entity id="leftHand" meta-touch-controls="hand: left">
         <a-entity id="workspaceDock" position="0 0.08 -0.18" rotation="-30 0 0" scale="0.7 0.7 0.7" visible="false">
-          <a-plane class="ui-click" width="0.82" height="0.17" color="#0B1424" material="shader: flat" soft-card="radius: 0.025"></a-plane>
-          <a-text value="MOJA / XR" width="0.6" color="#7DD3FC" position="-0.36 0.045 0.01"></a-text>
-          <a-text id="occlusionStatus" value="" width="0.78" align="center" wrap-count="48" color="#94A3B8" position="0 -0.105 0.01"></a-text>
-          <a-plane class="ui-click ray-target" width="0.18" height="0.06" position="-0.3 -0.025 0.01" color="#1D3048" material="shader: flat" viewer-button="action: mode-move" soft-card><a-text value="MOVE" width="0.27" align="center" position="0 0 0.006"></a-text></a-plane>
-          <a-plane class="ui-click ray-target" width="0.18" height="0.06" position="-0.09999999999999998 -0.025 0.01" color="#1D3048" material="shader: flat" viewer-button="action: mode-select" soft-card><a-text value="PARTS" width="0.27" align="center" position="0 0 0.006"></a-text></a-plane>
-          <a-plane class="ui-click ray-target" width="0.18" height="0.06" position="0.10000000000000003 -0.025 0.01" color="#1D3048" material="shader: flat" viewer-button="action: mode-measure" soft-card><a-text value="MEASURE" width="0.27" align="center" position="0 0 0.006"></a-text></a-plane>
-          <a-plane class="ui-click ray-target" width="0.18" height="0.06" position="0.3000000000000001 -0.025 0.01" color="#1D3048" material="shader: flat" viewer-button="action: mode-annotate" soft-card><a-text value="MARKUP" width="0.27" align="center" position="0 0 0.006"></a-text></a-plane>
+          <a-plane class="ui-click" width="1.10" height="0.18" color="#0B1424" material="shader: flat" soft-card="radius: 0.025"></a-plane>
+          <a-text value="MOJA / XR" width="0.6" color="#7DD3FC" position="-0.50 0.05 0.01"></a-text>
+          <a-text id="occlusionStatus" value="" width="1.04" align="center" wrap-count="56" color="#94A3B8" position="0 -0.115 0.01"></a-text>
+          <a-plane class="ui-click ray-target" width="0.24" height="0.07" position="-0.39 -0.025 0.01" color="#1D3048" material="shader: flat" viewer-button="action: mode-move" soft-card><a-text value="MOVE" width="0.2112" wrap-count="10" text="whiteSpace: nowrap" align="center" position="0 0 0.006"></a-text></a-plane>
+          <a-plane class="ui-click ray-target" width="0.24" height="0.07" position="-0.13 -0.025 0.01" color="#1D3048" material="shader: flat" viewer-button="action: mode-select" soft-card><a-text value="PARTS" width="0.2112" wrap-count="10" text="whiteSpace: nowrap" align="center" position="0 0 0.006"></a-text></a-plane>
+          <a-plane class="ui-click ray-target" width="0.24" height="0.07" position="0.13 -0.025 0.01" color="#1D3048" material="shader: flat" viewer-button="action: mode-measure" soft-card><a-text value="MEASURE" width="0.2112" wrap-count="10" text="whiteSpace: nowrap" align="center" position="0 0 0.006"></a-text></a-plane>
+          <a-plane class="ui-click ray-target" width="0.24" height="0.07" position="0.39 -0.025 0.01" color="#1D3048" material="shader: flat" viewer-button="action: mode-annotate" soft-card><a-text value="MARKUP" width="0.2112" wrap-count="10" text="whiteSpace: nowrap" align="center" position="0 0 0.006"></a-text></a-plane>
         </a-entity>
         <a-entity id="measurePanel" workspace-panel position="0.07 0.13 -0.31" rotation="-35 0 0" scale="0.56 0.56 0.56" visible="false">
           <a-plane width="0.94" height="1.18" color="#0F172A" opacity="0.96" material="shader: flat; transparent: true; depthWrite: false"></a-plane>
@@ -4751,11 +4751,11 @@
       }
 
       if (mode === 'mr') {
-        document.title = 'CK-207-74-5000_VR — Meta Quest MR v27.2';
-        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v27.2';
+        document.title = 'CK-207-74-5000_VR — Meta Quest MR v27.3';
+        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v27.3';
         enterXR.textContent = 'ENTER MR';
         enterXR.classList.add('mr');
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v27.2';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v27.3';
         landingVersion.classList.add('mr');
         landingTitle.textContent = 'CK-207-74-5000_VR — Mixed Reality';
         landingDescription.textContent = 'Point at any surface: floor, slope or wall. Preview the model bottom aligned to it, then confirm with the right trigger. Scale with two grips; rotate with the right stick.';
@@ -4780,10 +4780,10 @@
           'Trigger: hold — visible pointer • release — action'
         ], legend);
       } else {
-        document.title = 'CK-207-74-5000_VR — Meta Quest VR v27.2';
-        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v27.2';
+        document.title = 'CK-207-74-5000_VR — Meta Quest VR v27.3';
+        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v27.3';
         enterXR.textContent = 'ENTER VR';
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v27.2';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v27.3';
         landingTitle.textContent = 'CK-207-74-5000_VR — Virtual Reality';
         landingDescription.textContent = 'The model remains anchored at 1:1 scale. Walk, turn, teleport, measure, and isolate components.';
         landingEnter.textContent = 'ENTER VR — QUEST 3';
