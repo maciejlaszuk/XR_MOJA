@@ -19,6 +19,8 @@
     }, userOptions || {});
 
     var geometryCache = new WeakMap();
+    var lastFeature = null;
+    function isVisible(object) { for(var node=object;node;node=node.parent) if(!node.visible) return false; return true; }
 
     var temp = {
       a: new THREE.Vector3(),
@@ -320,7 +322,7 @@
       callOptions = callOptions || {};
       var maxAngle = Number.isFinite(callOptions.maxAngleRad) ? callOptions.maxAngleRad : options.maxAngleRad;
       var hits = (Array.isArray(intersections) ? intersections : [intersections]).filter(function (hit) {
-        return hit && hit.object && hit.object.geometry && finiteVector(hit.point);
+        return hit && hit.object && hit.object.geometry && isVisible(hit.object) && finiteVector(hit.point);
       });
       if (!ray) return null;
 
@@ -353,7 +355,7 @@
         };
       }
 
-      if (!snappingEnabled) return surfaceResult();
+      if (!snappingEnabled) { lastFeature=null; return surfaceResult(); }
 
       var best = hasSurfaceHit && filters.surface ? Object.assign(surfaceResult(), {score: 999}) : null;
 
@@ -382,13 +384,16 @@
         if (!filterAllows(kind)) return;
         var metric = rayMetric(ray, point);
         if (!metric) return;
-        var limit = maxAngle * (acceptanceMultiplier || 1);
+        var sticky = lastFeature && lastFeature.object === object && lastFeature.kind === kind &&
+          performance.now() - lastFeature.time < 260 && ['vertex','center','midpoint'].includes(kind) &&
+          lastFeature.local.clone().applyMatrix4(object.matrixWorld).distanceToSquared(point) < 1e-12;
+        var limit = maxAngle * (acceptanceMultiplier || 1) * (sticky ? 1.35 : 1);
         if (metric.angle > limit) return;
         var depthDelta = hasSurfaceHit ? Math.abs(metric.along - referenceDistance) / referenceDistance : 0;
         var nearPreference = hasSurfaceHit
           ? Math.min(metric.along / referenceDistance, 4) * 0.006
           : Math.min(metric.along, 100) * 0.0002;
-        var score = metric.angle / Math.max(maxAngle, 1e-8) + penalty + Math.min(depthDelta, 6) * 0.018 + nearPreference;
+        var score = metric.angle / Math.max(maxAngle, 1e-8) + penalty + Math.min(depthDelta, 6) * 0.018 + nearPreference - (sticky ? 0.24 : 0);
         if (!best || score < best.score) {
           best = {
             point: point.clone(),
@@ -506,7 +511,7 @@
         var searchLimit = Math.min(searchObjects.length, options.maxSearchObjects);
         for (var searchIndex = 0; searchIndex < searchLimit; searchIndex += 1) {
           var searchObject = searchObjects[searchIndex];
-          if (!searchObject || alreadyProcessed.has(searchObject) || searchObject.visible === false || !searchObject.geometry) continue;
+          if (!searchObject || alreadyProcessed.has(searchObject) || !isVisible(searchObject) || !searchObject.geometry) continue;
           var geometry = searchObject.geometry;
           if (!geometry.boundingSphere) geometry.computeBoundingSphere();
           if (!geometry.boundingSphere || !finiteVector(geometry.boundingSphere.center)) continue;
@@ -534,7 +539,9 @@
         });
       }
 
-      if (!best) return null;
+      if (!best) { lastFeature=null; return null; }
+      if (best.object && ['vertex','center','midpoint'].includes(best.kind)) lastFeature={object:best.object,kind:best.kind,local:best.object.worldToLocal(best.point.clone()),time:performance.now()};
+      else lastFeature=null;
       delete best.score;
       if (best.sourceIntersection && best.sourceIntersection.face && best.sourceIntersection.object) {
         try {
