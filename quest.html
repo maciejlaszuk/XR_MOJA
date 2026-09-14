@@ -6,7 +6,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — Meta Quest Viewer v27</title>
+  <title>CK-207-74-5000_VR — Meta Quest Viewer v27.2</title>
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
@@ -25,10 +25,10 @@
     })();
   </script>
   <script src="https://aframe.io/releases/1.8.0/aframe.min.js"></script>
-  <script src="moja-runtime.js?v=27.1"></script>
-  <script src="moja-snap.js?v=27.1"></script>
-  <script src="moja-measure.js?v=27.1"></script>
-  <script src="moja-precision.js?v=27.1"></script>
+  <script src="moja-runtime.js?v=27.2"></script>
+  <script src="moja-snap.js?v=27.2"></script>
+  <script src="moja-measure.js?v=27.2"></script>
+  <script src="moja-precision.js?v=27.2"></script>
   <style>
     [hidden] { display: none !important; }
     :root { color-scheme: dark; }
@@ -478,13 +478,19 @@
 
       handleTriggerDown: function () {
         this.setActive(true);
+        this.suppressSelect = false;
         var targetEl = MOJA.getInteractiveEl(this.currentIntersection);
         this.pressedUI = targetEl && targetEl.classList && targetEl.classList.contains('ui-click')
           ? { targetEl: targetEl, intersection: this.currentIntersection }
           : null;
+        if (this.el.sceneEl.components['xr-workspace']?.beginPanelDrag('trigger')) this.suppressSelect = true;
       },
 
       handleTriggerUp: function () {
+        this.el.sceneEl.components['xr-workspace']?.endPanelDrag('trigger');
+        if (this.suppressSelect) {
+          this.suppressSelect = false; this.pressedUI = null; this.setActive(false); return;
+        }
         var rayComponent = this.el.components.raycaster;
         if (rayComponent && rayComponent.checkIntersections) rayComponent.checkIntersections();
         var intersections = rayComponent && rayComponent.intersections
@@ -3132,7 +3138,10 @@
 
       onRightThumbstickMoved: function (event) {
         if (!this.panelVisible || !this.enabled || !this.built) return;
+        const target = MOJA.getInteractiveEl(this.right?.components['trigger-ray']?.currentIntersection);
+        if (target?.closest('[workspace-panel]') !== this.panel || this.el.components['xr-workspace']?.drag) return;
         var y = Number(event.detail && event.detail.y) || 0;
+        if (Math.abs(Number(event.detail?.x) || 0) > Math.abs(y)) return;
 
         if (Math.abs(y) < 0.45) {
           this.thumbstickArmed = true;
@@ -3563,8 +3572,9 @@
         if (this.modeType === 'mr') {
           this.el.removeAttribute('background');
           this.el.setAttribute('xr-mode-ui', 'XRMode: ar; enterARButton: #enterXR; enterVREnabled: false');
-          this.el.setAttribute('webxr', 'referenceSpaceType: local-floor; requiredFeatures: local-floor; optionalFeatures: hit-test,bounded-floor');
+          this.el.setAttribute('webxr', 'referenceSpaceType: local-floor; requiredFeatures: local-floor; optionalFeatures: hit-test,bounded-floor,depth-sensing,mesh-detection,plane-detection');
           this.el.setAttribute('surface-placement', '');
+          this.el.setAttribute('room-occlusion', '');
           if (this.floor) {
             this.floor.object3D.visible = false;
             this.floor.classList.remove('ray-target', 'teleportable', 'measure-target');
@@ -3595,11 +3605,11 @@
             self.axes.left.set(detail.x || 0, detail.y || 0);
           });
           this.left.addEventListener('thumbsticktouchend', function () { self.axes.left.set(0, 0); });
-          this.left.addEventListener('xbuttondown', function () { self.cycleMode(); });
+          this.left.addEventListener('xbuttondown', function () { self.el.components['xr-workspace']?.toggleMenu(); });
           this.left.addEventListener('ybuttondown', function () { self.handleY(); });
           this.left.addEventListener('gripdown', function () { self.setGrip('left', true); });
           this.left.addEventListener('gripup', function () { self.setGrip('left', false); });
-          this.left.addEventListener('controllerdisconnected', function () { self.cancelGrabs(); });
+          this.left.addEventListener('controllerdisconnected', function () { self.cancelGrabs(); self.el.components['xr-workspace']?.resetUI(); });
         }
         if (this.right) {
           this.right.addEventListener('thumbstickmoved', function (event) {
@@ -3614,7 +3624,7 @@
           this.right.addEventListener('bbuttonup', function () { self.verticalUp = false; });
           this.right.addEventListener('gripdown', function () { self.setGrip('right', true); });
           this.right.addEventListener('gripup', function () { self.setGrip('right', false); });
-          this.right.addEventListener('controllerdisconnected', function () { self.cancelGrabs(); });
+          this.right.addEventListener('controllerdisconnected', function () { self.cancelGrabs(); self.el.components['xr-workspace']?.endPanelDrag(); });
         }
       },
       getMeasurement: function () {
@@ -3673,7 +3683,7 @@
       placeAtReticle: function () {
         const placement = this.el.components['surface-placement'];
         if (!placement || !placement.tracker.valid(performance.now())) return;
-        const pose = runtime.surfacePose(placement.tracker.point, placement.tracker.normal, this.baseSize, this.scalePercent/100);
+        const pose = runtime.surfacePose(placement.tracker.point, placement.tracker.normal, this.baseSize, this.scalePercent/100, placement.tracker.quaternion);
         this.worldPosition.copy(pose.position);
         this.surfaceNormal = placement.tracker.normal.clone(); this.surfaceLocked = true;
         var parent = this.pivot.object3D.parent;
@@ -3863,20 +3873,20 @@
           var measurement = this.getMeasurement();
           var measureName = measurement && measurement.getModeLabel ? measurement.getModeLabel() : 'MEASURE';
           var snapState = measurement && measurement.getSnapModeLabel ? 'SNAP ' + measurement.getSnapModeLabel() : 'AUTO SNAP';
-          this.modeText.setAttribute('value', measureName + '  /  ' + snapState + '  /  Y: PANEL');
+          this.modeText.setAttribute('value', measureName + '  /  ' + snapState + '  /  X: MENU');
           this.modeText.setAttribute('color', '#FBBF24');
         } else if (this.interactionMode === 'select') {
-          this.modeText.setAttribute('value', 'COMPONENTS  /  TRIGGER: SELECT  /  Y: PANEL');
+          this.modeText.setAttribute('value', 'COMPONENTS  /  TRIGGER: SELECT  /  X: MENU');
           this.modeText.setAttribute('color', '#C4B5FD');
         } else if (this.interactionMode === 'annotate') {
-          this.modeText.setAttribute('value', 'MARKUP  /  HOLD TRIGGER: DRAW  /  Y: PANEL');
+          this.modeText.setAttribute('value', 'MARKUP  /  HOLD TRIGGER: DRAW  /  X: MENU');
           this.modeText.setAttribute('color', '#F9A8D4');
         } else if (this.modeType === 'mr') {
           this.modeText.setAttribute(
             'value',
             this.freeGrab3D
               ? 'FREE 3D  /  1 GRIP: MOVE + ROTATE  /  2 GRIPS: SCALE'
-              : 'MR  /  2 GRIPS: SCALE  /  R STICK: ROTATE  /  Y: PANEL'
+              : 'MR  /  2 GRIPS: SCALE  /  R STICK: ROTATE  /  X: MENU'
           );
           this.modeText.setAttribute('color', '#D1FAE5');
         } else {
@@ -4012,7 +4022,11 @@
         if (ray) window.setTimeout(function () { ray.refresh(); }, 0);
       },
       setGrip: function (hand, active) {
-        if (this.modeType !== 'mr' || !this.ready || !this.placed || this.interactionMode !== 'move') return;
+        const workspace = this.el.components['xr-workspace'];
+        if (hand === 'right' && !active && workspace?.endPanelDrag('grip')) return;
+        if (hand === 'right' && active && workspace?.beginPanelDrag('grip')) return;
+        if (active && workspace?.drag) return;
+        if (this.modeType !== 'mr' || !this.ready || !this.placed) return;
         // Grips over a panel must not move the model while operating controls.
         const target = MOJA.getInteractiveEl(this.right?.components['trigger-ray']?.currentIntersection);
         if (active && target?.classList.contains('ui-click') && this.right.components['trigger-ray']?.active) return;
@@ -4052,9 +4066,10 @@
         this.setScalePercent(detent.snapped ? 100 : THREE.MathUtils.lerp(this.scalePercent, detent.value, 1 - Math.exp(-18 * dt)), true);
       },
       updateMRRotation: function (dt) {
-        if (this.interactionMode !== 'move' || this.twoGripScaling || this.freeGrabMoving || this.grabMoving) return;
+        if (this.el.components['xr-workspace']?.usingPanelScroll()) return;
+        if (this.twoGripScaling || this.freeGrabMoving || this.grabMoving) return;
         const x = Math.abs(this.axes.right.x) > 0.18 ? this.axes.right.x : 0;
-        if (x) { this.pivot.object3D.rotateOnWorldAxis(this.surfaceLocked ? this.surfaceNormal : MOJA.UP, -x * THREE.MathUtils.degToRad(55) * dt); this.updateInfo(); }
+        if (x) { this.pivot.object3D.rotateOnWorldAxis(this.surfaceLocked ? this.surfaceNormal : MOJA.UP, x * THREE.MathUtils.degToRad(55) * dt); this.updateInfo(); }
       },
       controllerPositionInPivotParent: function (controller, output) {
         controller.object3D.getWorldPosition(output);
@@ -4176,6 +4191,7 @@
         this.rig.object3D.position.addScaledVector(this.moveVector, this.data.moveSpeed * dt);
       },
       updateVRTurning: function (dt) {
+        if (this.el.components['xr-workspace']?.usingPanelScroll()) return;
         var x = Math.abs(this.axes.right.x) > 0.14 ? this.axes.right.x : 0;
         if (x === 0) return;
         this.camera.object3D.getWorldPosition(this.cameraWorldBefore);
@@ -4186,23 +4202,12 @@
         this.rig.object3D.position.z += this.cameraWorldBefore.z - this.cameraWorldAfter.z;
       },
       updateMRMovement: function (dt) {
-        if (!this.placed || this.interactionMode !== 'move' || this.grabMoving || this.freeGrabMoving || this.twoGripScaling) return;
+        if (!this.placed || this.grabMoving || this.freeGrabMoving || this.twoGripScaling) return;
         var x = Math.abs(this.axes.left.x) > 0.12 ? this.axes.left.x : 0;
         var y = Math.abs(this.axes.left.y) > 0.12 ? this.axes.left.y : 0;
         if (x === 0 && y === 0) return;
         this.camera.object3D.getWorldQuaternion(this.cameraQuaternion);
-        this.forward.set(0, 0, -1).applyQuaternion(this.cameraQuaternion);
-        this.forward.y = 0;
-        if (this.forward.lengthSq() < 0.0001) return;
-        this.forward.normalize();
-        this.rightVector.crossVectors(this.forward, MOJA.UP).normalize();
-        this.moveVector.copy(this.rightVector).multiplyScalar(x).addScaledVector(this.forward, -y);
-        if (this.moveVector.lengthSq() > 1) this.moveVector.normalize();
-        if (this.surfaceLocked) {
-          const horizontal = new THREE.Vector3(1,0,0).applyQuaternion(this.pivot.object3D.quaternion);
-          const depth = new THREE.Vector3(0,0,1).applyQuaternion(this.pivot.object3D.quaternion);
-          this.moveVector.copy(horizontal).multiplyScalar(x).addScaledVector(depth,y);
-        }
+        runtime.surfaceMove(this.cameraQuaternion, this.surfaceLocked ? this.surfaceNormal : MOJA.UP, x, y, this.moveVector);
         this.pivot.object3D.position.addScaledVector(this.moveVector, this.data.modelMoveSpeed * dt);
         this.updateInfo();
       },
@@ -4240,9 +4245,9 @@
       updateVertical: function (dt) {
         var direction = (this.verticalUp ? 1 : 0) - (this.verticalDown ? 1 : 0);
         if (direction === 0) return;
-        if (this.modeType === 'vr' && this.interactionMode === 'nav') {
+        if (this.modeType === 'vr') {
           this.rig.object3D.position.y += direction * this.data.verticalSpeed * dt;
-        } else if (this.placed && this.interactionMode === 'move' && !this.twoGripScaling && !this.grabMoving && !this.freeGrabMoving) {
+        } else if (this.placed && !this.twoGripScaling && !this.grabMoving && !this.freeGrabMoving) {
           if (this.surfaceLocked) this.pivot.object3D.position.addScaledVector(this.surfaceNormal, direction * this.data.modelVerticalSpeed * dt);
           else this.pivot.object3D.position.y += direction * this.data.modelVerticalSpeed * dt;
           this.updateInfo();
@@ -4252,8 +4257,8 @@
         if (!this.ready) return;
         var dt = Math.min(delta / 1000, 0.05);
         if (this.modeType === 'vr') {
-          if (this.interactionMode === 'nav') this.updateVRMovement(dt);
-          if (this.interactionMode === 'nav') this.updateVRTurning(dt);
+          this.updateVRMovement(dt);
+          this.updateVRTurning(dt);
           this.updateTeleportMarker();
         } else if (this.placed) {
           this.updateFreeGrab();
@@ -4276,12 +4281,12 @@
     });
   })();
   </script>
-  <script src="moja-xr-ui.js?v=27.1"></script>
+  <script src="moja-xr-ui.js?v=27.2"></script>
 </head>
 <body>
   <div class="topbar">
     <a class="pill" href="index.html?v=27">← Viewer</a>
-    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v27</div>
+    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v27.2</div>
     <button id="enterXR" class="pill enter" type="button">ENTER VR</button>
   </div>
 
@@ -4289,7 +4294,7 @@
 
   <div id="landing" class="landing">
     <div class="card">
-      <div id="landingVersion" class="version">META QUEST 3 • v27</div>
+      <div id="landingVersion" class="version">META QUEST 3 • v27.2</div>
       <h1 id="landingTitle">CK-207-74-5000_VR — Virtual Reality</h1>
       <p id="landingDescription">The model is anchored at 1:1 scale. Move around, place persistent measurements, and control component visibility.</p>
 
@@ -4436,9 +4441,10 @@
       </a-camera>
 
       <a-entity id="leftHand" meta-touch-controls="hand: left">
-        <a-entity id="workspaceDock" position="0 0.08 -0.18" rotation="-30 0 0" scale="0.7 0.7 0.7">
-          <a-plane width="0.82" height="0.17" color="#0B1424" material="shader: flat" soft-card="radius: 0.025"></a-plane>
+        <a-entity id="workspaceDock" position="0 0.08 -0.18" rotation="-30 0 0" scale="0.7 0.7 0.7" visible="false">
+          <a-plane class="ui-click" width="0.82" height="0.17" color="#0B1424" material="shader: flat" soft-card="radius: 0.025"></a-plane>
           <a-text value="MOJA / XR" width="0.6" color="#7DD3FC" position="-0.36 0.045 0.01"></a-text>
+          <a-text id="occlusionStatus" value="" width="0.78" align="center" wrap-count="48" color="#94A3B8" position="0 -0.105 0.01"></a-text>
           <a-plane class="ui-click ray-target" width="0.18" height="0.06" position="-0.3 -0.025 0.01" color="#1D3048" material="shader: flat" viewer-button="action: mode-move" soft-card><a-text value="MOVE" width="0.27" align="center" position="0 0 0.006"></a-text></a-plane>
           <a-plane class="ui-click ray-target" width="0.18" height="0.06" position="-0.09999999999999998 -0.025 0.01" color="#1D3048" material="shader: flat" viewer-button="action: mode-select" soft-card><a-text value="PARTS" width="0.27" align="center" position="0 0 0.006"></a-text></a-plane>
           <a-plane class="ui-click ray-target" width="0.18" height="0.06" position="0.10000000000000003 -0.025 0.01" color="#1D3048" material="shader: flat" viewer-button="action: mode-measure" soft-card><a-text value="MEASURE" width="0.27" align="center" position="0 0 0.006"></a-text></a-plane>
@@ -4696,7 +4702,7 @@
           </a-plane>
         </a-entity>
 
-        <a-entity id="annotationKeyboard" position="0.10 0.15 -0.38" rotation="-32 0 0" scale="0.60 0.60 0.60" visible="false">
+        <a-entity id="annotationKeyboard" workspace-panel position="0.10 0.15 -0.38" rotation="-32 0 0" scale="0.60 0.60 0.60" visible="false">
           <a-plane width="1.30" height="1.08" color="#07111F" opacity="0.99" material="shader: flat; transparent: true"></a-plane>
           <a-text value="3D KEYBOARD" align="center" anchor="center" baseline="center" width="1.16" color="#E9D5FF" position="0 0.465 0.010"></a-text>
 
@@ -4745,11 +4751,11 @@
       }
 
       if (mode === 'mr') {
-        document.title = 'CK-207-74-5000_VR — Meta Quest MR v27';
-        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v27';
+        document.title = 'CK-207-74-5000_VR — Meta Quest MR v27.2';
+        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v27.2';
         enterXR.textContent = 'ENTER MR';
         enterXR.classList.add('mr');
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v27';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v27.2';
         landingVersion.classList.add('mr');
         landingTitle.textContent = 'CK-207-74-5000_VR — Mixed Reality';
         landingDescription.textContent = 'Point at any surface: floor, slope or wall. Preview the model bottom aligned to it, then confirm with the right trigger. Scale with two grips; rotate with the right stick.';
@@ -4762,22 +4768,22 @@
           'Right grip: move / FREE GRAB 3D',
           '2 grips: scale / right stick: rotate',
           'B / A: surface offset',
-          'X: move → measure → components → markup',
-          'Y: open / close panel'
+          'X: menu / back / close',
+          'Window header: hold trigger / grip'
         ], landingControls);
         pills([
           'L: move model',
           '2 grips: scale',
           'B / A: surface offset',
-          'X: mode',
-          'Y: panel',
+          'X: menu',
+          'Y: tool panel',
           'Trigger: hold — visible pointer • release — action'
         ], legend);
       } else {
-        document.title = 'CK-207-74-5000_VR — Meta Quest VR v27';
-        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v27';
+        document.title = 'CK-207-74-5000_VR — Meta Quest VR v27.2';
+        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v27.2';
         enterXR.textContent = 'ENTER VR';
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v27';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v27.2';
         landingTitle.textContent = 'CK-207-74-5000_VR — Virtual Reality';
         landingDescription.textContent = 'The model remains anchored at 1:1 scale. Walk, turn, teleport, measure, and isolate components.';
         landingEnter.textContent = 'ENTER VR — QUEST 3';
@@ -4787,16 +4793,16 @@
           'Right stick: turn',
           'B: up  •  A: down',
           'Trigger: hold — visible pointer • release — teleport / point',
-          'X: navigation → measure → components → markup',
-          'Y: open / close panel'
+          'X: menu / back / close',
+          'Window header: hold trigger / grip'
         ], landingControls);
         pills([
           'L: walk',
           'R: turn',
           'B: up  •  A: down',
           'Trigger: pointer / teleport',
-          'X: mode',
-          'Y: panel'
+          'X: menu',
+          'Y: tool panel'
         ], legend);
       }
 
