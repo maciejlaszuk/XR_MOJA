@@ -11,9 +11,10 @@
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
-  <script src="moja-snap.js?v=27"></script>
-  <script src="moja-measure.js?v=27"></script>
-  <script src="moja-precision.js?v=27"></script>
+  <script src="moja-runtime.js?v=27.1"></script>
+  <script src="moja-snap.js?v=27.1"></script>
+  <script src="moja-measure.js?v=27.1"></script>
+  <script src="moja-precision.js?v=27.1"></script>
 
   <script type="importmap">
   {
@@ -417,6 +418,13 @@
       .precision-status { display: none; }
     }
 
+    .viewcube-widget[hidden] { display:none !important; }
+    .edges-toggle { position:fixed; right:480px; top:58px; z-index:59; cursor:pointer; }
+    .cube-toggle { position:fixed; right:376px; top:58px; z-index:59; cursor:pointer; }
+    .viewcube-widget { top:106px; }
+    .viewcube-handle { display:flex; align-items:center; justify-content:space-between; font-size:8px; letter-spacing:.08em; color:#94a3b8; cursor:move; touch-action:none; padding:0 0 5px; }
+    .viewcube-handle button { background:#1e293b; border:0; border-radius:5px; color:#cbd5e1; cursor:pointer; width:24px; height:24px; font-size:18px; }
+    @media (max-width:760px) { .edges-toggle {right:120px;top:55px;} .cube-toggle {right:10px;top:55px;} .viewcube-widget {display:block;top:105px;transform:none;} }
   </style>
 </head>
 <body>
@@ -558,7 +566,10 @@
   </div>
 
 
+  <button id="edgesToggle" class="pill edges-toggle" type="button" aria-pressed="false">Edges</button>
+  <button id="cubeToggle" class="pill cube-toggle" type="button" aria-expanded="true" aria-controls="viewCube">ViewCube</button>
   <div class="viewcube-widget" id="viewCube" aria-label="ViewCube">
+    <div id="viewCubeHandle" class="viewcube-handle"><span>VIEWCUBE · MOVE</span><button id="viewCubeClose" type="button" aria-label="Close ViewCube">×</button></div>
     <div class="viewcube-stage" id="viewCubeStage" title="Drag to orbit. Click a face or corner to align the view.">
       <canvas id="viewCubeCanvas" width="224" height="224" aria-label="Interactive 3D ViewCube"></canvas>
     </div>
@@ -578,8 +589,8 @@
       <output id="explodeValue">0%</output>
     </div>
     <button id="arButton" class="tool cyan" type="button"><strong><svg class="tool-icon"><use href="#i-ar"></use></svg>AR</strong><span>phone</span></button>
-    <a id="mrButton" class="tool green" href="quest.html?mode=mr&v=26" style="text-decoration:none;color:#fff"><strong>MR</strong><span>Quest 3</span></a>
-    <a id="vrButton" class="tool blue" href="quest.html?mode=vr&v=26" style="text-decoration:none;color:#fff"><strong>VR</strong><span>Quest 3</span></a>
+    <a id="mrButton" class="tool green" href="quest.html?mode=mr&v=27.1" style="text-decoration:none;color:#fff"><strong>MR</strong><span>Quest 3</span></a>
+    <a id="vrButton" class="tool blue" href="quest.html?mode=vr&v=27.1" style="text-decoration:none;color:#fff"><strong>VR</strong><span>Quest 3</span></a>
   </nav>
 
   <model-viewer
@@ -613,6 +624,7 @@
       maxWorldRadius: 0.10
     });
 
+    const runtime = window.MOJA_RUNTIME.create(THREE);
     const MODEL = 'CK-207-74-5000_VR';
     const VERSION = '27';
     const viewport = document.getElementById('viewport');
@@ -714,7 +726,9 @@
       }
     };
 
+    let renderDirty = true;
     const scene = new THREE.Scene();
+    const hoverHighlight = runtime.highlight(); scene.add(hoverHighlight.group);
     scene.background = new THREE.Color(0xe8eef4);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
@@ -738,6 +752,7 @@
     let orthoHalfHeight = 5;
 
     const controls = new OrbitControls(camera, renderer.domElement);
+    controls.addEventListener('change', () => { renderDirty = true; });
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controls.screenSpacePanning = true;
@@ -745,6 +760,7 @@
     controls.zoomToCursor = true;
 
     function configureNavigationControls(mode) {
+      hoverHighlight.set([]);
       const orbit = mode === 'orbit';
       const pan = mode === 'pan';
       const measure = mode === 'measure';
@@ -796,6 +812,7 @@
     }
 
     function resize() {
+      renderDirty = true;
       const rect = viewport.getBoundingClientRect();
       renderer.setSize(rect.width, rect.height, false);
       const aspect = rect.width / Math.max(1, rect.height);
@@ -807,6 +824,7 @@
     resize();
 
     function setStatus(text, kind) {
+      renderDirty = true;
       loadStatus.classList.remove('ok', 'error');
       if (kind) loadStatus.classList.add(kind);
       loadStatus.innerHTML = '<span>' + escapeHtml(text) + '</span>';
@@ -1267,6 +1285,8 @@
         updateOrthographicFrustum(rect.width / Math.max(1, rect.height));
       }
       camera.lookAt(center);
+      controls._quat.setFromUnitVectors(camera.up, new THREE.Vector3(0, 1, 0));
+      controls._quatInverse.copy(controls._quat).invert();
       controls.update();
     }
 
@@ -1398,7 +1418,7 @@
     const viewCubeInverseCamera = new THREE.Quaternion();
 
     function updateViewCubeOrientation() {
-      if (!viewCubeCanvas) return;
+      if (!viewCubeCanvas || viewCube.hidden) return;
       viewCubeInverseCamera.copy(camera.quaternion).invert();
       viewCubeGroup.quaternion.copy(viewCubeInverseCamera);
       viewCubeRenderer.render(viewCubeScene, viewCubeCamera);
@@ -1420,50 +1440,68 @@
     }
 
     let viewCubeDrag = null;
-    if (viewCubeCanvas) {
-      viewCubeCanvas.addEventListener('pointerdown', event => {
-        if (event.button !== 0) return;
-        viewCubeDrag = {
-          x: event.clientX,
-          y: event.clientY,
-          startX: event.clientX,
-          startY: event.clientY,
-          pointerId: event.pointerId,
-          spherical: new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target))
-        };
-        viewCube.classList.add('dragging');
-        viewCubeCanvas.setPointerCapture(event.pointerId);
-      });
-      viewCubeCanvas.addEventListener('pointermove', event => {
-        if (!viewCubeDrag) return;
-        const dx = event.clientX - viewCubeDrag.x;
-        const dy = event.clientY - viewCubeDrag.y;
-        viewCubeDrag.x = event.clientX;
-        viewCubeDrag.y = event.clientY;
-        viewCubeDrag.spherical.theta += dx * 0.012;
-        viewCubeDrag.spherical.phi += dy * 0.012;
-        viewCubeDrag.spherical.makeSafe();
-        const offset = new THREE.Vector3().setFromSpherical(viewCubeDrag.spherical);
-        camera.position.copy(controls.target).add(offset);
-        camera.up.set(0, 1, 0);
-        camera.lookAt(controls.target);
-        controls.update();
-        event.preventDefault();
-      });
-      const finishViewCubePointer = event => {
-        if (!viewCubeDrag) return;
-        const moved = Math.hypot(event.clientX - viewCubeDrag.startX, event.clientY - viewCubeDrag.startY);
-        try { viewCubeCanvas.releasePointerCapture(viewCubeDrag.pointerId); } catch (error) {}
-        viewCubeDrag = null;
-        viewCube.classList.remove('dragging');
-        if (moved <= 5) {
-          const view = pickViewCube(event.clientX, event.clientY);
-          if (view) setView(view);
-        }
+    viewCubeCanvas.addEventListener('pointerdown', event => {
+      if (event.button !== 0 || viewCubeDrag) return;
+      controls.enableDamping = false; controls.update(); controls.enabled = false;
+      viewCubeDrag = {
+        start: runtime.arcball(event.clientX, event.clientY, viewCubeCanvas.getBoundingClientRect()),
+        quaternion: camera.quaternion.clone(), distance: camera.position.distanceTo(controls.target),
+        startX: event.clientX, startY: event.clientY, pointerId: event.pointerId, moved: false
       };
-      viewCubeCanvas.addEventListener('pointerup', finishViewCubePointer);
-      viewCubeCanvas.addEventListener('pointercancel', finishViewCubePointer);
+      viewCubeCanvas.setPointerCapture(event.pointerId); event.preventDefault();
+    });
+    viewCubeCanvas.addEventListener('pointermove', event => {
+      if (!viewCubeDrag || event.pointerId !== viewCubeDrag.pointerId) return;
+      if (Math.hypot(event.clientX-viewCubeDrag.startX,event.clientY-viewCubeDrag.startY)>4) viewCubeDrag.moved=true;
+      if (!viewCubeDrag.moved) return;
+      const end = runtime.arcball(event.clientX, event.clientY, viewCubeCanvas.getBoundingClientRect());
+      const delta = new THREE.Quaternion().setFromUnitVectors(viewCubeDrag.start, end);
+      // Cube = inverse camera orientation. Apply exactly the same screen-space rotation.
+      camera.quaternion.copy(viewCubeDrag.quaternion).multiply(delta.invert());
+      camera.position.set(0, 0, viewCubeDrag.distance).applyQuaternion(camera.quaternion).add(controls.target);
+      camera.up.set(0, 1, 0).applyQuaternion(camera.quaternion);
+      camera.updateMatrixWorld(true); renderDirty = true; event.preventDefault();
+    });
+    const finishViewCubePointer = event => {
+      if (!viewCubeDrag || event.pointerId !== viewCubeDrag.pointerId) return;
+      const wasDrag = viewCubeDrag.moved, pointerId = viewCubeDrag.pointerId; viewCubeDrag = null;
+      try { viewCubeCanvas.releasePointerCapture(pointerId); } catch {}
+      // OrbitControls caches its up-axis transform; resynchronise after a rolled arcball view.
+      controls._quat.setFromUnitVectors(camera.up, new THREE.Vector3(0, 1, 0));
+      controls._quatInverse.copy(controls._quat).invert();
+      controls.enabled = true; controls.enableDamping = true; controls.update(); renderDirty = true;
+      if (!wasDrag && event.type === 'pointerup') { const view = pickViewCube(event.clientX, event.clientY); if (view) setView(view); }
+    };
+    viewCubeCanvas.addEventListener('pointerup', finishViewCubePointer);
+    viewCubeCanvas.addEventListener('pointercancel', finishViewCubePointer);
+    viewCubeCanvas.addEventListener('lostpointercapture', finishViewCubePointer);
+
+    let edgesShown=false;
+    document.getElementById('edgesToggle').addEventListener('click',event=>{
+      if(!state.modelRoot) return;
+      edgesShown=!edgesShown;
+      if(edgesShown) runtime.addEdges(state.modelRoot);
+      state.modelRoot.traverse(o=>{if(o.userData.mojaEdgeOverlay)o.visible=edgesShown;});
+      event.currentTarget.setAttribute('aria-pressed',String(edgesShown));renderDirty=true;
+    });
+    const cubeToggle = document.getElementById('cubeToggle');
+    const cubeKey = 'moja-ck-207-74-5000_vr-mr-scale' + ':cube';
+    function persistCube() { try { localStorage.setItem(cubeKey, JSON.stringify({hidden:viewCube.hidden,left:viewCube.style.left,top:viewCube.style.top})); } catch {} }
+    function showCube(show) { viewCube.hidden=!show; cubeToggle.setAttribute('aria-expanded',String(show)); persistCube(); renderDirty=true; }
+    document.getElementById('viewCubeClose').addEventListener('click', () => showCube(false));
+    cubeToggle.addEventListener('click', () => showCube(viewCube.hidden));
+    const cubeHandle = document.getElementById('viewCubeHandle'); let widgetDrag=null;
+    function clampCube(left, top) {
+      viewCube.style.right='auto'; viewCube.style.left=Math.max(0,Math.min(innerWidth-viewCube.offsetWidth,left))+'px';
+      viewCube.style.top=Math.max(0,Math.min(innerHeight-viewCube.offsetHeight,top))+'px';
     }
+    cubeHandle.addEventListener('pointerdown', e => { if(e.button!==0 || e.target.closest('button')) return; const rect=viewCube.getBoundingClientRect(); widgetDrag={x:e.clientX-rect.left,y:e.clientY-rect.top,id:e.pointerId}; cubeHandle.setPointerCapture(e.pointerId); e.preventDefault(); });
+    cubeHandle.addEventListener('pointermove', e => { if(widgetDrag && widgetDrag.id===e.pointerId) clampCube(e.clientX-widgetDrag.x,e.clientY-widgetDrag.y); });
+    const endWidgetDrag=e=>{ if(!widgetDrag) return; widgetDrag=null; persistCube(); };
+    cubeHandle.addEventListener('pointerup',endWidgetDrag); cubeHandle.addEventListener('pointercancel',endWidgetDrag);
+    try { const saved=JSON.parse(localStorage.getItem(cubeKey)||'null'); if(saved) {viewCube.hidden=!!saved.hidden; if(saved.left) clampCube(parseFloat(saved.left),parseFloat(saved.top));} } catch {}
+    cubeToggle.setAttribute('aria-expanded',String(!viewCube.hidden));
+    window.addEventListener('resize',()=>{if(viewCube.style.left) clampCube(parseFloat(viewCube.style.left),parseFloat(viewCube.style.top));});
 
     function prepareExplode() {
       state.explodable = [];
@@ -2146,10 +2184,11 @@
     function findSnap(hits) {
       const usableHits = Array.isArray(hits) ? hits : [];
       const firstHit = usableHits[0] || null;
-      if (state.measurement.snapEnabled && state.precision.ready && firstHit?.point && state.modelRoot && state.explodeFactor < 0.001) {
+      if (state.measurement.snapEnabled && state.precision.ready && firstHit?.point && state.modelRoot && state.explodeFactor < 0.001 && state.meshes.every(mesh => runtime.visible(mesh))) {
         const cadSnap = precisionEngine.snap(raycaster.ray, firstHit.point, state.modelRoot, {
           angularTolerance: ('ontouchstart' in window) ? 0.008 : 0.005,
-          sourceIntersection: firstHit
+          sourceIntersection: firstHit,
+          filters: state.measurement.filters
         });
         if (cadSnap) return cadSnap;
       }
@@ -2294,7 +2333,7 @@
       pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
-      return raycaster.intersectObjects(state.meshes.filter(mesh => mesh.visible), false).slice(0, 12);
+      return raycaster.intersectObjects(state.meshes.filter(mesh => runtime.visible(mesh)), false).slice(0, 12);
     }
 
     function nodeIndexFromHit(hit) {
@@ -2350,6 +2389,7 @@
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     let pointerDown = null;
+    let lastHoverTime = 0;
     let lastHoverAt = 0;
 
     renderer.domElement.addEventListener('contextmenu', event => event.preventDefault());
@@ -2359,6 +2399,7 @@
     });
     renderer.domElement.addEventListener('pointercancel', () => { pointerDown = null; });
     renderer.domElement.addEventListener('pointerleave', () => {
+      hoverHighlight.set([]); renderDirty=true;
       currentPointer.inside = false;
       state.measurement.hover = null;
       state.measurement.hoverIntersection = null;
@@ -2366,7 +2407,14 @@
     });
     renderer.domElement.addEventListener('pointermove', event => {
       currentPointer.x = event.clientX; currentPointer.y = event.clientY; currentPointer.inside = true;
-      if (!state.modelRoot || state.interactionMode !== 'measure') return;
+      if (!state.modelRoot) return;
+      if (state.interactionMode === 'select') {
+        if (performance.now() - lastHoverTime < 40) return; lastHoverTime=performance.now();
+        const hit=findPointerHits(event)[0]; const index=hit ? nodeIndexFromHit(hit) : -1;
+        hoverHighlight.set(index >= 0 ? state.treeNodes[index].meshes : []); return;
+      }
+      hoverHighlight.set([]);
+      if (state.interactionMode !== 'measure') return;
       if (state.measurement.type === 'min-distance') return;
       const now = performance.now();
       if (now - lastHoverAt < 45) return;
@@ -2534,12 +2582,17 @@
 
     function animate() {
       requestAnimationFrame(animate);
-      controls.update();
+      if (!viewCubeDrag) controls.update();
+      if (!renderDirty && !state.measurement.busy) return;
+      renderDirty = false;
+      hoverHighlight.update();
       updateViewCubeOrientation();
       state.helpers.forEach(helper => helper.updateMatrixWorld(true));
       updateMeasurementOverlay();
       renderer.render(scene, camera);
     }
+    ['click','input','pointermove','pointerup'].forEach(type => document.addEventListener(type,()=>{renderDirty=true;}));
+    document.addEventListener('visibilitychange',()=>{renderDirty=true;});
     animate();
 
     async function loadPrecisionData() {
@@ -2564,12 +2617,15 @@
     const loader = new GLTFLoader();
     Promise.all([
       new Promise((resolve, reject) => loader.load(MODEL + '.glb?v=' + VERSION, resolve, progress => {
-        if (progress.total) setStatus('Model ' + Math.round(progress.loaded / progress.total * 100) + '%');
+        if (progress.lengthComputable && progress.total > 0 && progress.loaded <= progress.total) setStatus('Loading model ' + Math.min(100, Math.round(progress.loaded / progress.total * 100)) + '%');
+        else setStatus('Loading model…');
       }, reject)),
       loadStructure(),
       loadPrecisionData()
     ]).then(([gltf, structure, precisionData]) => {
+      setStatus('Preparing model…');
       state.modelRoot = gltf.scene;
+      runtime.prepare(state.modelRoot);
       scene.add(state.modelRoot);
       state.modelRoot.updateMatrixWorld(true);
       state.modelRoot.traverse(object => {
@@ -2578,7 +2634,7 @@
           state.meshes.push(object);
           if (object.material) {
             const materials = Array.isArray(object.material) ? object.material : [object.material];
-            materials.forEach(material => { material.side = THREE.DoubleSide; material.needsUpdate = true; });
+            // Preserve exported material sides, colours and PBR parameters.
           }
         }
         if (isMeaningfulName(object.name)) state.namedObjects.push(object);
