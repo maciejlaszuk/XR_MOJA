@@ -89,8 +89,11 @@
       const snapped = Math.abs(value - 100) <= (held ? 5 : 2);
       return {value: snapped ? 100 : value, snapped};
     }
-    function surfacePose(point, normal, size, scale) {
+    function surfacePose(point, normal, size, scale, previousQuaternion) {
       const x = new THREE.Vector3(), y = normal.clone().normalize(), z = new THREE.Vector3(0, 0, 1);
+      // Transport the previous heading along the surface instead of changing
+      // tangent axes whenever a nearly vertical hit crosses a threshold.
+      if (previousQuaternion) z.applyQuaternion(previousQuaternion);
       z.addScaledVector(y, -z.dot(y));
       if (z.lengthSq() < 0.01) { z.set(0, 1, 0); z.addScaledVector(y, -z.dot(y)); }
       z.normalize(); x.crossVectors(y, z).normalize(); z.crossVectors(x, y).normalize();
@@ -103,25 +106,60 @@
     function surfaceTracker() {
       const point = new THREE.Vector3();
       const normal = new THREE.Vector3(0, 1, 0);
+      const average = normal.clone(), candidate = normal.clone(), settlePoint = point.clone();
+      const quaternion = new THREE.Quaternion();
+      let classification = 'slope', heading = false;
       let started = null, previous = null, freshAt = -Infinity, ready = false;
       return {
-        point, normal,
-        reset() { started = null; previous = null; ready = false; freshAt = -Infinity; },
+        point, normal, quaternion,
+        get classification() { return classification; },
+        reset() { started = null; previous = null; ready = false; freshAt = -Infinity; heading = false; classification = 'slope'; },
         sample(position, candidateNormal, time) {
           if (!position || !candidateNormal || !Number.isFinite(position.lengthSq()) || !Number.isFinite(candidateNormal.lengthSq()) || candidateNormal.lengthSq() < 0.9) { this.reset(); return false; }
-          if (!previous || previous.distanceTo(position) > 0.035 || time - freshAt > 120 || normal.dot(candidateNormal) < 0.99) {
-            started = time; point.copy(position); normal.copy(candidateNormal);
+          candidate.copy(candidateNormal).normalize();
+          const dt = Math.max(0.001, Math.min((time - freshAt) / 1000, 0.05));
+          const changed = !previous || previous.distanceTo(position) > 0.08 || time - freshAt > 150 || average.dot(candidate) < Math.cos(12 * Math.PI / 180);
+          if (changed) {
+            started = time; settlePoint.copy(position); point.copy(position); average.copy(candidate);
+            classification = 'slope'; heading = false;
           } else {
-            point.lerp(position, 0.35); normal.lerp(candidateNormal, 0.25).normalize();
+            average.lerp(candidate, 1 - Math.exp(-8 * dt)).normalize();
+            // Ignore millimetre noise, but follow an intentionally moved pointer.
+            if (point.distanceTo(position) > 0.004) point.lerp(position, 1 - Math.exp(-12 * dt));
+            if (settlePoint.distanceTo(position) > 0.025) { started = time; settlePoint.copy(position); }
           }
+          const verticalLimit = Math.sin((classification === 'vertical' ? 5 : 3) * Math.PI / 180);
+          const horizontalLimit = Math.cos((classification === 'horizontal' ? 5 : 3) * Math.PI / 180);
+          if (Math.abs(average.y) >= horizontalLimit) {
+            classification = 'horizontal'; candidate.set(0, Math.sign(average.y), 0);
+          } else if (Math.abs(average.y) <= verticalLimit) {
+            classification = 'vertical'; candidate.copy(average).setY(0).normalize();
+          } else { classification = 'slope'; candidate.copy(average); }
+          if (changed || normal.dot(candidate) < Math.cos(0.35 * Math.PI / 180) || classification === 'horizontal') normal.copy(candidate);
+          if (classification === 'vertical') normal.setY(0).normalize();
+          quaternion.copy(surfacePose(point, normal, null, 1, heading ? quaternion : null).quaternion);
+          heading = true;
           previous = position.clone(); freshAt = time;
-          ready = time - started >= 220;
+          ready = time - started >= 320;
           return ready;
         },
-        valid(time) { return ready && time - freshAt < 120; }
+        valid(time) { return ready && time - freshAt < 150; }
       };
     }
-    return {prepare, visible, addEdges, highlight, arcball, scaleDetent, surfaceTracker, surfacePose};
+    function surfaceMove(cameraQuaternion, normal, x, y, output) {
+      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(cameraQuaternion);
+      right.addScaledVector(normal, -right.dot(normal));
+      if (right.lengthSq() < 0.001) right.crossVectors(new THREE.Vector3(0, 0, -1).applyQuaternion(cameraQuaternion), normal);
+      right.normalize();
+      const forward = new THREE.Vector3().crossVectors(normal, right).normalize();
+      // On walls, stick-up means up the wall; on floors, away from the viewer.
+      const viewForward = new THREE.Vector3(0, 0, -1).applyQuaternion(cameraQuaternion);
+      if (Math.abs(normal.y) < 0.7 ? forward.y < 0 : forward.dot(viewForward) < 0) forward.negate();
+      output.copy(right).multiplyScalar(x).addScaledVector(forward, -y);
+      if (output.lengthSq() > 1) output.normalize();
+      return output;
+    }
+    return {prepare, visible, addEdges, highlight, arcball, scaleDetent, surfaceTracker, surfacePose, surfaceMove};
   }
   global.MOJA_RUNTIME = {create};
 })(typeof window !== 'undefined' ? window : globalThis);
