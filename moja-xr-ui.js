@@ -3,22 +3,135 @@
   const THREE = AFRAME.THREE;
   const runtime = window.MOJA_RUNTIME.create(THREE);
 
-  // Three bundled with A-Frame 1.8 renders matched GPU depth before the scene.
-  // Request it optionally; scanned room geometry is the fallback on other devices.
+  function createSoftOcclusion() {
+    const placeholder = new THREE.DataArrayTexture(new Uint8Array([255, 255]), 1, 1, 2);
+    placeholder.format = THREE.RedFormat; placeholder.needsUpdate = true;
+    const uniforms = {
+      mojaOcclusionActive: {value: 0}, mojaEnvironmentDepth: {value: placeholder},
+      mojaViewportLeft: {value: new THREE.Vector4()}, mojaViewportRight: {value: new THREE.Vector4()},
+      mojaDepthRange: {value: new THREE.Vector2(0.1, 100)},
+      mojaFeatherPixels: {value: 2.5}, mojaFeatherMetres: {value: 0.02}
+    };
+    const materials = new Map();
+    const shaderFunctions = `
+uniform float mojaOcclusionActive;
+uniform highp sampler2DArray mojaEnvironmentDepth;
+uniform vec4 mojaViewportLeft;
+uniform vec4 mojaViewportRight;
+uniform vec2 mojaDepthRange;
+uniform float mojaFeatherPixels;
+uniform float mojaFeatherMetres;
+float mojaLinearDepth(float depth) {
+  return mojaDepthRange.x * mojaDepthRange.y /
+    (mojaDepthRange.y - depth * (mojaDepthRange.y - mojaDepthRange.x));
+}
+float mojaDepthVisibility(ivec2 pixel, int eye, ivec2 size, float modelDepth) {
+  float depth = texelFetch(mojaEnvironmentDepth, ivec3(clamp(pixel, ivec2(0), size - 1), eye), 0).r;
+  if (depth <= 0.0 || depth >= 1.0) return 1.0;
+  return smoothstep(-mojaFeatherMetres, mojaFeatherMetres, mojaLinearDepth(depth) - modelDepth + 0.003);
+}
+float mojaBilinearVisibility(vec2 pixel, int eye, ivec2 size, float modelDepth) {
+  ivec2 base = ivec2(floor(pixel));
+  vec2 weight = fract(pixel);
+  float a = mojaDepthVisibility(base, eye, size, modelDepth);
+  float b = mojaDepthVisibility(base + ivec2(1, 0), eye, size, modelDepth);
+  float c = mojaDepthVisibility(base + ivec2(0, 1), eye, size, modelDepth);
+  float d = mojaDepthVisibility(base + ivec2(1, 1), eye, size, modelDepth);
+  return mix(mix(a, b, weight.x), mix(c, d, weight.x), weight.y);
+}
+float mojaSoftVisibility() {
+  if (mojaOcclusionActive < 0.5) return 1.0;
+  vec2 screen = gl_FragCoord.xy;
+  bool rightEye = mojaViewportRight.z > 0.0 && all(greaterThanEqual(screen, mojaViewportRight.xy)) &&
+    all(lessThan(screen, mojaViewportRight.xy + mojaViewportRight.zw));
+  vec4 viewport = rightEye ? mojaViewportRight : mojaViewportLeft;
+  if (any(lessThan(screen, viewport.xy)) || any(greaterThanEqual(screen, viewport.xy + viewport.zw))) return 1.0;
+  int eye = rightEye ? 1 : 0;
+  ivec2 size = textureSize(mojaEnvironmentDepth, 0).xy;
+  vec2 pixel = (screen - viewport.xy) / viewport.zw * vec2(size) - 0.5;
+  vec2 radius = max(vec2(0.75), vec2(size) / viewport.zw * mojaFeatherPixels);
+  float modelDepth = mojaLinearDepth(gl_FragCoord.z);
+  // Filter visibility, not raw depth: mixing sofa and background distances
+  // would invent a surface between them and cut away valid model geometry.
+  return 0.25 * (
+    mojaBilinearVisibility(pixel + vec2(-radius.x, -radius.y), eye, size, modelDepth) +
+    mojaBilinearVisibility(pixel + vec2( radius.x, -radius.y), eye, size, modelDepth) +
+    mojaBilinearVisibility(pixel + vec2(-radius.x,  radius.y), eye, size, modelDepth) +
+    mojaBilinearVisibility(pixel + vec2( radius.x,  radius.y), eye, size, modelDepth));
+}
+`;
+    const blendKeys = ['blending', 'blendSrc', 'blendDst', 'blendEquation', 'blendSrcAlpha', 'blendDstAlpha', 'blendEquationAlpha'];
+    function attach(root) {
+      root?.traverse(object => {
+        for (const material of Array.isArray(object.material) ? object.material : object.material ? [object.material] : []) {
+          if (materials.has(material) || material.isShaderMaterial || material.isRawShaderMaterial) continue;
+          const original = {onBeforeCompile: material.onBeforeCompile, customProgramCacheKey: material.customProgramCacheKey};
+          const originallyOpaque = !material.transparent && material.blending === THREE.NormalBlending && !material.alphaToCoverage;
+          blendKeys.forEach(key => original[key] = material[key]); materials.set(material, original);
+          material.onBeforeCompile = function (shader, renderer) {
+            original.onBeforeCompile.call(this, shader, renderer);
+            if (!shader.fragmentShader.includes('#include <opaque_fragment>') || !shader.fragmentShader.includes('#include <clipping_planes_fragment>')) return;
+            Object.assign(shader.uniforms, uniforms);
+            shader.fragmentShader = shaderFunctions + shader.fragmentShader
+              .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nfloat mojaVisibility = mojaSoftVisibility();\nif (mojaVisibility < 0.001) discard;')
+              .replace('#include <opaque_fragment>', (originallyOpaque ? 'diffuseColor.a = 1.0;\n' : '') + '#include <opaque_fragment>\ngl_FragColor.a *= mojaVisibility;');
+          };
+          material.customProgramCacheKey = function () { return original.customProgramCacheKey.call(this) + '|moja-soft-occlusion-1|' + Number(originallyOpaque); };
+          // Retain the opaque render queue and depth writing for large assemblies.
+          // Custom alpha blending feathers only the occlusion boundary.
+          if (!material.transparent && material.blending === THREE.NormalBlending) {
+            material.blending = THREE.CustomBlending; material.blendEquation = THREE.AddEquation;
+            material.blendSrc = material.premultipliedAlpha ? THREE.OneFactor : THREE.SrcAlphaFactor;
+            material.blendDst = THREE.OneMinusSrcAlphaFactor;
+            material.blendEquationAlpha = THREE.AddEquation; material.blendSrcAlpha = THREE.OneFactor; material.blendDstAlpha = THREE.OneMinusSrcAlphaFactor;
+          }
+          material.needsUpdate = true;
+        }
+      });
+    }
+    return {
+      uniforms, attach,
+      enable(texture, cameras, near, far) {
+        if (!texture || !cameras?.[0]?.viewport || !(near > 0 && far > near)) { this.disable(); return false; }
+        uniforms.mojaEnvironmentDepth.value = texture;
+        uniforms.mojaViewportLeft.value.copy(cameras[0].viewport);
+        if (cameras[1]?.viewport) uniforms.mojaViewportRight.value.copy(cameras[1].viewport);
+        else uniforms.mojaViewportRight.value.set(0, 0, 0, 0);
+        uniforms.mojaDepthRange.value.set(near, far); uniforms.mojaOcclusionActive.value = 1;
+        return true;
+      },
+      disable() { uniforms.mojaOcclusionActive.value = 0; uniforms.mojaEnvironmentDepth.value = placeholder; },
+      dispose() {
+        this.disable();
+        materials.forEach((original, material) => { Object.assign(material, original); material.needsUpdate = true; });
+        materials.clear(); placeholder.dispose();
+      }
+    };
+  }
+
+  // A-Frame's hard depth prepass is replaced by soft visibility on CAD materials.
+  // Scanned room geometry remains the fallback when live depth is unavailable.
   AFRAME.registerComponent('room-occlusion', {
     init: function () {
       this.entries = new Map(); this.group = new THREE.Group(); this.el.object3D.add(this.group);
       this.material = new THREE.MeshBasicMaterial({colorWrite: false, depthWrite: true, side: THREE.DoubleSide});
+      this.soft = createSoftOcclusion();
+      this.onModel = () => this.soft.attach(document.getElementById('modelAsset')?.getObject3D('mesh'));
+      this.onAction = event => {
+        if (event.detail?.action === 'component-edges') Promise.resolve().then(() => { if (!this.removed) this.onModel(); });
+      };
       this.onConfigure = () => {
         const configuration = this.el.systems.webxr?.sessionConfiguration;
         if (configuration) configuration.depthSensing = {usagePreference: ['gpu-optimized'], dataFormatPreference: ['unsigned-short'], matchDepthView: true};
       };
       this.onChanged = event => { if (event.detail?.name === 'webxr') this.onConfigure(); };
-      this.onEnd = () => { this.clear(); this.setStatus('REAL-WORLD OCCLUSION: WAITING FOR MR'); };
+      this.onEnd = () => { this.soft.disable(); this.clear(); this.setStatus('REAL-WORLD OCCLUSION: WAITING FOR MR'); };
       this.el.addEventListener('componentchanged', this.onChanged);
       this.el.addEventListener('loaded', this.onConfigure);
       this.el.addEventListener('exit-vr', this.onEnd);
-      this.onConfigure();
+      this.el.addEventListener('model-normalized', this.onModel);
+      this.el.addEventListener('viewer-ui-action', this.onAction);
+      this.onConfigure(); this.onModel();
     },
     setStatus: function (status) {
       if (this.status === status) return;
@@ -44,8 +157,8 @@
     },
     tick: function () {
       const xr = this.el.renderer?.xr, frame = this.el.frame, session = xr?.getSession();
-      if (!session || !frame || window.QUEST_MODE !== 'mr') { this.group.visible = false; return; }
-      let freshDepth = false;
+      if (!session || !frame || window.QUEST_MODE !== 'mr') { this.soft.disable(); this.group.visible = false; return; }
+      let freshDepth = false, depthInfo = null;
       // Do not display the engine's previous depth texture after tracking is lost.
       try {
         if (session.depthUsage === 'gpu-optimized' && session.depthActive !== false) {
@@ -54,13 +167,14 @@
           const binding = xr.getBinding?.();
           freshDepth = Boolean(views?.length && binding && Array.from(views).every(view => {
             const depth = binding.getDepthInformation(view);
+            if (!depthInfo) depthInfo = depth;
             return depth && depth.isValid !== false && depth.texture && (!depth.textureType || depth.textureType === 'texture-array');
           }));
         }
       } catch (_) { freshDepth = false; }
       const depthMesh = xr.getDepthSensingMesh?.();
       if (depthMesh) {
-        depthMesh.visible = freshDepth;
+        depthMesh.visible = false;
         depthMesh.frustumCulled = false;
         depthMesh.material.colorWrite = false;
         depthMesh.material.depthWrite = true;
@@ -71,8 +185,12 @@
         }
       }
       if (freshDepth && depthMesh) {
-        this.group.visible = false; this.setStatus('REAL-WORLD OCCLUSION: LIVE'); return;
+        const near = depthInfo?.depthNear ?? session.renderState.depthNear, far = depthInfo?.depthFar ?? session.renderState.depthFar;
+        if (this.soft.enable(depthMesh.material.uniforms.depthColor.value, xr.getCamera().cameras, near, far)) {
+          this.group.visible = false; this.setStatus('REAL-WORLD OCCLUSION: LIVE / SOFT'); return;
+        }
       }
+      this.soft.disable();
       this.group.visible = true;
       const surfaces = new Map();
       try { for (const mesh of frame.detectedMeshes || []) surfaces.set(mesh, true); } catch (_) { /* Optional room permission was not granted. */ }
@@ -100,9 +218,11 @@
       this.setStatus(visible ? 'REAL-WORLD OCCLUSION: ROOM SCAN' : 'REAL-WORLD OCCLUSION: NO ROOM DATA');
     },
     remove: function () {
-      this.clear(); this.group.removeFromParent(); this.material.dispose();
+      this.removed = true;
+      this.soft.dispose(); this.clear(); this.group.removeFromParent(); this.material.dispose();
       this.el.removeEventListener('componentchanged', this.onChanged); this.el.removeEventListener('loaded', this.onConfigure);
       this.el.removeEventListener('exit-vr', this.onEnd);
+      this.el.removeEventListener('model-normalized', this.onModel); this.el.removeEventListener('viewer-ui-action', this.onAction);
     }
   });
 
@@ -339,6 +459,12 @@
           const control=label.parentElement, width=Number(control.getAttribute('width'));
           if(!width || control.closest('#componentList') || control.classList.contains('panel-close')) return;
           const value=String(label.getAttribute('value')||'');
+          if (control.closest('#workspaceDock')) {
+            label.setAttribute('width', width * 0.88);
+            label.setAttribute('wrap-count', 10);
+            label.setAttribute('text', 'whiteSpace', 'nowrap');
+            return;
+          }
           label.setAttribute('width',width*0.92);
           label.setAttribute('wrap-count',Math.max(6,Math.round(width*0.92/0.023),value.length+1));
         });
