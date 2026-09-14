@@ -3,13 +3,129 @@
   const THREE = AFRAME.THREE;
   const runtime = window.MOJA_RUNTIME.create(THREE);
 
+  // Controller-only estimate of the user's occupied volume, in XR reference
+  // metres (never in scaled CAD/locomotion coordinates). This is NOT semantic
+  // body segmentation: elbows/torso are bounded estimates, not tracked joints.
+  function createControllerExclusion() {
+    const state = {count: 0, starts: Array.from({length: 7}, () => new THREE.Vector4()),
+      ends: Array.from({length: 7}, () => new THREE.Vector4())};
+    const history = new Map(), up = new THREE.Vector3(0, 1, 0), right = new THREE.Vector3(1, 0, 0);
+    function add(a, b, radius) {
+      const i = state.count++;
+      state.starts[i].set(a.x, a.y, a.z, radius); state.ends[i].set(b.x, b.y, b.z, 0);
+    }
+    return {
+      state,
+      reset() { state.count = 0; history.clear(); },
+      update(frame, session, space, pose, time) {
+        state.count = 0;
+        if (!pose?.transform?.matrix || session.visibilityState === 'hidden') { history.clear(); return state; }
+        const headMatrix = new THREE.Matrix4().fromArray(pose.transform.matrix);
+        const head = new THREE.Vector3().setFromMatrixPosition(headMatrix);
+        const forward = new THREE.Vector3(0, 0, -1).transformDirection(headMatrix); forward.y = 0;
+        if (forward.lengthSq() > 0.05) right.crossVectors(forward.normalize(), up).normalize();
+        const seen = new Set();
+        for (const source of session.inputSources || []) {
+          if (source.hand || !source.gripSpace || !['left', 'right'].includes(source.handedness) || seen.has(source.handedness)) continue;
+          let grip;
+          try { grip = frame.getPose(source.gripSpace, space); } catch (_) { continue; }
+          if (!grip || grip.emulatedPosition) continue;
+          const hand = new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().fromArray(grip.transform.matrix));
+          if (![hand.x, hand.y, hand.z].every(Number.isFinite)) continue;
+          const side = source.handedness, old = history.get(side); seen.add(side);
+          // Sweep only a short, bounded interval: absorb depth-camera latency
+          // without leaving a persistent hole after a controller is moved away.
+          const recent = old && time > old.time && time - old.time < 80 && hand.distanceTo(old.point) < 0.18;
+          add(recent ? old.point : hand, hand, 0.115);
+          history.set(side, {point: hand.clone(), time});
+          const shoulder = head.clone().addScaledVector(right, side === 'left' ? -0.18 : 0.18);
+          shoulder.y -= 0.22;
+          const distance = shoulder.distanceTo(hand);
+          if (distance < 0.85) {
+            const axis = hand.clone().sub(shoulder).normalize();
+            const bend = up.clone().negate().addScaledVector(right, side === 'left' ? -0.35 : 0.35);
+            bend.addScaledVector(axis, -bend.dot(axis)).normalize();
+            const elbow = shoulder.clone().lerp(hand, 0.5).addScaledVector(bend, Math.sqrt(Math.max(0, 0.32 ** 2 - (distance * 0.5) ** 2)));
+            add(shoulder, elbow, 0.095); add(elbow, hand, 0.08);
+          }
+        }
+        for (const side of history.keys()) if (!seen.has(side)) history.delete(side);
+        if (state.count) {
+          const chest = head.clone(); chest.y -= 0.30;
+          const waist = head.clone(); waist.y -= 0.75;
+          add(chest, waist, 0.23);
+        }
+        return state;
+      }
+    };
+  }
+
+  AFRAME.registerComponent('controller-presentation', {
+    init: function () {
+      this.saved = [];
+      this.onMesh = event => { if (event.target === this.el && (!event.detail?.type || event.detail.type === 'mesh')) this.prepare(); };
+      this.onReady = event => { if (event.target === this.el) this.prepare(true); };
+      this.el.addEventListener('object3dset', this.onMesh); this.el.addEventListener('model-loaded', this.onMesh);
+      this.el.addEventListener('controllermodelready', this.onReady);
+      this.prepare();
+    },
+    restore: function () {
+      this.saved.forEach(({object, order, materials}) => {
+        object.renderOrder = order;
+        materials.forEach(({material, depthTest, depthWrite, transparent, onBeforeCompile, customProgramCacheKey}, i) => {
+          const properties = {depthTest, depthWrite, transparent, onBeforeCompile, customProgramCacheKey};
+          Object.assign(material, properties); material.needsUpdate = true;
+          // Meta Touch clones button materials after glTF's object3dset event.
+          const current = Array.isArray(object.material) ? object.material[i] : object.material;
+          if (current && current !== material) { Object.assign(current, properties); current.needsUpdate = true; }
+        });
+      });
+      this.saved = []; this.mesh = null;
+    },
+    prepare: function (refresh = false) {
+      const mesh = this.el.getObject3D('mesh');
+      if (!mesh || (!refresh && this.mesh === mesh)) return;
+      this.restore(); this.mesh = mesh;
+      const originals = new Map();
+      // Only the controller asset. Never traverse its entity's dock, panels,
+      // laser, or measurement UI. Authored colors/button feedback stay intact.
+      mesh.traverse(object => {
+        if (!object.material) return;
+        const materials = (Array.isArray(object.material) ? object.material : [object.material]).map(material => {
+          if (!originals.has(material)) {
+            originals.set(material, {material, depthTest: material.depthTest, depthWrite: material.depthWrite, transparent: material.transparent,
+              onBeforeCompile: material.onBeforeCompile, customProgramCacheKey: material.customProgramCacheKey});
+            const before = material.onBeforeCompile, cacheKey = material.customProgramCacheKey;
+            material.onBeforeCompile = function (shader, renderer) {
+              before.call(this, shader, renderer);
+              // Reserve the nearest 1% of depth for controller geometry only.
+              // Unlike depthTest=false, this preserves self-occlusion: buttons
+              // and the shell cannot draw through one another. CAD is untouched.
+              shader.vertexShader = shader.vertexShader.replace('#include <project_vertex>',
+                '#include <project_vertex>\ngl_Position.z = (-1.0 + 0.02 * clamp(-mvPosition.z / 10.0, 0.0, 1.0)) * gl_Position.w;');
+            };
+            material.customProgramCacheKey = function () { return cacheKey.call(this) + '|moja-controller-depth-v1'; };
+          }
+          const saved = originals.get(material);
+          material.depthTest = true; material.depthWrite = true; material.transparent = true; material.needsUpdate = true;
+          return saved;
+        });
+        this.saved.push({object, order: object.renderOrder, materials}); object.renderOrder = 80;
+      });
+    },
+    remove: function () {
+      this.el.removeEventListener('object3dset', this.onMesh); this.el.removeEventListener('model-loaded', this.onMesh);
+      this.el.removeEventListener('controllermodelready', this.onReady); this.restore();
+    }
+  });
+
   // Filter environment depth at its own resolution, before rendering the CAD
   // scene. Four MSAA depth samples approximate a soft visibility mask without
   // changing any model/UI material, alpha, sorting, or interaction behavior.
   function createDepthEdgeFilter() {
     let mesh = null, original = null, passes = [], renderer = null;
-    let targets = null, prepScene = null, prepMaterial = null, prepGeometry = null;
-    let size = new THREE.Vector2(), nextTarget = 0, lastTime = null, historyValid = false, targetsChecked = false;
+    let targets = null, roomTargets = null, prepScene = null, prepMaterial = null, prepGeometry = null;
+    let size = new THREE.Vector2(), nextTarget = 0, lastTime = null, historyValid = false, targetsChecked = false, roomTargetsChecked = false;
     const previous = [null, null], savedViewport = new THREE.Vector4(), savedScissor = new THREE.Vector4();
     const uniforms = {
       depthColor: {value: null}, depthWidth: {value: 1}, depthHeight: {value: 1},
@@ -47,7 +163,11 @@ vec4 filteredSample(sampler2D source, vec2 uv) {
     const prepUniforms = {
       depthColor: uniforms.depthColor, depthRange: uniforms.depthRange, filterSize: uniforms.filterSize,
       eye: {value: 0}, history: {value: null}, historyWeight: {value: 0},
-      historyRange: {value: new THREE.Vector2()}, currentToPrevious: {value: new THREE.Matrix4()}
+      historyRange: {value: new THREE.Vector2()}, currentToPrevious: {value: new THREE.Matrix4()},
+      referenceFromClip: {value: new THREE.Matrix4()}, selfCount: {value: 0},
+      selfStart: {value: Array.from({length: 7}, () => new THREE.Vector4())},
+      selfEnd: {value: Array.from({length: 7}, () => new THREE.Vector4())},
+      roomDepth: {value: null}, roomAvailable: {value: false}
     };
     function initialize(nextRenderer, width, height) {
       if (renderer && renderer !== nextRenderer) release();
@@ -64,7 +184,34 @@ uniform float eye;
 uniform float historyWeight;
 uniform vec2 historyRange;
 uniform mat4 currentToPrevious;
+uniform mat4 referenceFromClip;
+uniform int selfCount;
+uniform vec4 selfStart[7];
+uniform vec4 selfEnd[7];
+uniform sampler2D roomDepth;
+uniform bool roomAvailable;
 varying vec2 filterUV;
+float environmentSample(vec2 uv) {
+  float d = texture(depthColor, vec3(uv, eye)).r;
+  d = (d >= 0.0 && d <= 1.0) ? d : 1.0;
+  if (selfCount == 0 || d >= 0.999999) return d;
+  vec4 ref = referenceFromClip * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+  if (abs(ref.w) < 0.000001) return d;
+  vec3 point = ref.xyz / ref.w;
+  for (int i = 0; i < 7; i++) {
+    if (i >= selfCount) break;
+    vec3 axis = selfEnd[i].xyz - selfStart[i].xyz;
+    float t = clamp(dot(point - selfStart[i].xyz, axis) / max(dot(axis, axis), 0.000001), 0.0, 1.0);
+    vec3 delta = point - (selfStart[i].xyz + t * axis);
+    if (dot(delta, delta) < selfStart[i].w * selfStart[i].w) {
+      // Replace just the user's depth with room geometry, including furniture
+      // behind the controller. Without room data the background is unknown;
+      // reveal CAD locally, never erase an arbitrary screen-space rectangle.
+      return roomAvailable ? texture2D(roomDepth, uv).r : 1.0;
+    }
+  }
+  return d;
+}
 void main() {
   vec2 uv = filterUV, stepUV = 1.0 / filterSize;
   float depths[9]; float weights[9];
@@ -74,8 +221,7 @@ void main() {
   for (int y = 0; y < 3; y++) for (int x = 0; x < 3; x++) {
     int i = y * 3 + x;
     vec2 p = clamp(uv + vec2(float(x - 1), float(y - 1)) * stepUV, stepUV * 0.5, 1.0 - stepUV * 0.5);
-    float d = texture(depthColor, vec3(p, eye)).r;
-    d = (d >= 0.0 && d <= 1.0) ? d : 1.0;
+    float d = environmentSample(p);
     float w = (x == 1 ? 2.0 : 1.0) * (y == 1 ? 2.0 : 1.0);
     depths[i] = d; weights[i] = w; low = min(low, d); high = max(high, d); total += d * w;
   }
@@ -123,7 +269,8 @@ void main() {
       }
       if (size.x !== width || size.y !== height) {
         size.set(width, height); targets.flat().forEach(target => target.setSize(width, height));
-        historyValid = false; targetsChecked = false; previous.fill(null);
+        roomTargets?.forEach(target => target.setSize(width, height));
+        historyValid = false; targetsChecked = false; roomTargetsChecked = false; previous.fill(null);
       }
       return linear;
     }
@@ -188,10 +335,11 @@ void main() {
     function resetHistory() { historyValid = false; lastTime = null; previous.fill(null); }
     function disable() { detach(); resetHistory(); uniforms.depthColor.value = null; }
     function release() {
-      disable(); targets?.flat().forEach(target => target.dispose());
+      disable(); targets?.flat().forEach(target => target.dispose()); roomTargets?.forEach(target => target.dispose());
       prepGeometry?.dispose(); prepMaterial?.dispose();
-      targets = null; prepScene = null; prepGeometry = null; prepMaterial = null; renderer = null; size.set(0, 0);
+      targets = null; roomTargets = null; prepScene = null; prepGeometry = null; prepMaterial = null; renderer = null; size.set(0, 0);
       uniforms.filtered0.value = null; uniforms.filtered1.value = null;
+      prepUniforms.roomDepth.value = null; prepUniforms.roomAvailable.value = false; prepUniforms.selfCount.value = 0;
     }
     function viewState(view, range) {
       if (!view?.projectionMatrix || !view.transform?.matrix) return null;
@@ -202,7 +350,8 @@ void main() {
       const world = new THREE.Matrix4().fromArray(view.transform.matrix);
       return {world, projection, viewProjection: projection.clone().multiply(world.clone().invert()), range: range.clone()};
     }
-    const prepCamera = new THREE.Camera();
+    const prepCamera = new THREE.Camera(), roomCamera = new THREE.Camera();
+    roomCamera.matrixAutoUpdate = false; roomCamera.matrixWorldAutoUpdate = false;
     return {
       uniforms,
       apply(depthMesh, viewport, near, far, samples, frameData = {}) {
@@ -227,6 +376,33 @@ void main() {
           renderer.xr.enabled = false; renderer.autoClear = false; renderer.setScissorTest(false);
           for (let eye = 0; eye < 2; eye++) {
             const current = viewState(views[eye], uniforms.depthRange.value), old = previous[eye];
+            const exclusion = frameData.exclusion;
+            prepUniforms.selfCount.value = current ? exclusion?.count || 0 : 0;
+            prepUniforms.roomAvailable.value = false;
+            if (prepUniforms.selfCount.value) {
+              prepUniforms.selfStart.value = exclusion.starts; prepUniforms.selfEnd.value = exclusion.ends;
+              prepUniforms.referenceFromClip.value.copy(current.world).multiply(current.projection.clone().invert());
+              if (frameData.roomGroup) {
+                if (!roomTargets) roomTargets = [0, 1].map(() => new THREE.WebGLRenderTarget(width, height, {
+                  minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter,
+                  depthTexture: new THREE.DepthTexture(width, height, THREE.UnsignedIntType)
+                }));
+                roomCamera.projectionMatrix.copy(current.projection); roomCamera.projectionMatrixInverse.copy(current.projection).invert();
+                roomCamera.matrixWorld.copy(current.world); roomCamera.matrixWorldInverse.copy(current.world).invert();
+                const visible = frameData.roomGroup.visible;
+                try {
+                  frameData.roomGroup.visible = true;
+                  renderer.setRenderTarget(roomTargets[eye]);
+                  if (!roomTargetsChecked) {
+                    const gl = renderer.getContext();
+                    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error('Room depth target is incomplete.');
+                  }
+                  renderer.clear(false, true, false);
+                  renderer.render(frameData.roomGroup, roomCamera);
+                } finally { frameData.roomGroup.visible = visible; }
+                prepUniforms.roomDepth.value = roomTargets[eye].depthTexture; prepUniforms.roomAvailable.value = true;
+              }
+            }
             let weight = 0;
             if (historyValid && current && old && dt > 0 && dt < 120) {
               const position = new THREE.Vector3().setFromMatrixPosition(current.world);
@@ -247,6 +423,7 @@ void main() {
             renderer.render(prepScene, prepCamera); previous[eye] = current;
           }
           targetsChecked = true;
+          if (prepUniforms.roomAvailable.value) roomTargetsChecked = true;
           uniforms.filtered0.value = targets[0][nextTarget].texture; uniforms.filtered1.value = targets[1][nextTarget].texture;
           nextTarget = 1 - nextTarget; lastTime = Number.isFinite(time) ? time : null; historyValid = true;
         } finally {
@@ -268,12 +445,13 @@ void main() {
       this.entries = new Map(); this.group = new THREE.Group(); this.el.object3D.add(this.group);
       this.material = new THREE.MeshBasicMaterial({colorWrite: false, depthWrite: true, side: THREE.DoubleSide});
       this.edgeFilter = createDepthEdgeFilter();
+      this.controllerExclusion = createControllerExclusion();
       this.onConfigure = () => {
         const configuration = this.el.systems.webxr?.sessionConfiguration;
         if (configuration) configuration.depthSensing = {usagePreference: ['gpu-optimized'], dataFormatPreference: ['unsigned-short'], matchDepthView: true};
       };
       this.onChanged = event => { if (event.detail?.name === 'webxr') this.onConfigure(); };
-      this.onEnd = () => { this.edgeFilter.dispose(); this.clear(); this.setStatus('REAL-WORLD OCCLUSION: WAITING FOR MR'); };
+      this.onEnd = () => { this.edgeFilter.dispose(); this.controllerExclusion.reset(); this.clear(); this.setStatus('REAL-WORLD OCCLUSION: WAITING FOR MR'); };
       this.el.addEventListener('componentchanged', this.onChanged);
       this.el.addEventListener('loaded', this.onConfigure);
       this.el.addEventListener('exit-vr', this.onEnd);
@@ -303,13 +481,17 @@ void main() {
     },
     tick: function (time) {
       const xr = this.el.renderer?.xr, frame = this.el.frame, session = xr?.getSession();
-      if (!session || !frame || window.QUEST_MODE !== 'mr') { this.edgeFilter.disable(); this.group.visible = false; return; }
+      if (!session || !frame || window.QUEST_MODE !== 'mr') { this.edgeFilter.disable(); this.controllerExclusion.reset(); this.group.visible = false; return; }
+      const space = xr.getReferenceSpace();
+      let viewerPose = null;
+      try { viewerPose = frame.getViewerPose(space); } catch (_) { /* Lost tracking. */ }
+      const exclusion = this.controllerExclusion.update(frame, session, space, viewerPose, time);
+      const roomCount = this.updateRoom(frame, space);
       let freshDepth = false, depthInfo = null, depthViews = [];
       // Do not display the engine's previous depth texture after tracking is lost.
       try {
         if (session.depthUsage === 'gpu-optimized' && session.depthActive !== false) {
-          const pose = frame.getViewerPose(xr.getReferenceSpace());
-          const views = pose?.views;
+          const views = viewerPose?.views;
           depthViews = views ? Array.from(views) : [];
           const binding = xr.getBinding?.();
           freshDepth = Boolean(views?.length && binding && Array.from(views).every(view => {
@@ -340,16 +522,25 @@ void main() {
         let smooth = false;
         try {
           smooth = this.edgeFilter.apply(depthMesh, xr.getCamera().cameras[0]?.viewport, near, far, samples, {
-            renderer: this.el.renderer, width: depthInfo.width, height: depthInfo.height, views: depthViews, time
+            renderer: this.el.renderer, width: depthInfo.width, height: depthInfo.height, views: depthViews, time,
+            exclusion, roomGroup: roomCount ? this.group : null
           });
         } catch (error) {
           this.edgeFilter.disable();
           if (!this.filterWarning) { console.warn('Environment depth filter unavailable; using native occlusion.', error); this.filterWarning = true; }
         }
+        // A device without the soft GPU path can still exclude the user using
+        // its static room scan; avoid falling back to a hand-shaped live mask.
+        if (!smooth && exclusion.count && roomCount) {
+          depthMesh.visible = false; this.group.visible = true; this.setStatus('REAL-WORLD OCCLUSION: ROOM SCAN'); return;
+        }
         this.group.visible = false; this.setStatus(smooth ? 'REAL-WORLD OCCLUSION: LIVE / SOFT' : 'REAL-WORLD OCCLUSION: LIVE'); return;
       }
       this.edgeFilter.disable();
       this.group.visible = true;
+      this.setStatus(roomCount ? 'REAL-WORLD OCCLUSION: ROOM SCAN' : 'REAL-WORLD OCCLUSION: NO ROOM DATA');
+    },
+    updateRoom: function (frame, space) {
       const surfaces = new Map();
       try { for (const mesh of frame.detectedMeshes || []) surfaces.set(mesh, true); } catch (_) { /* Optional room permission was not granted. */ }
       // Prefer the actual room mesh; planes are only a coarse fallback.
@@ -369,15 +560,16 @@ void main() {
         } else if (entry.changed !== surface.lastChangedTime) {
           entry.mesh.geometry.dispose(); entry.mesh.geometry = this.geometry(surface, isMesh); entry.changed = surface.lastChangedTime;
         }
-        const pose = frame.getPose(isMesh ? surface.meshSpace : surface.planeSpace, xr.getReferenceSpace());
+        let pose = null;
+        try { pose = frame.getPose(isMesh ? surface.meshSpace : surface.planeSpace, space); } catch (_) { /* Tracking loss hides stale geometry. */ }
         entry.mesh.visible = Boolean(pose);
         if (pose) { entry.mesh.matrix.fromArray(pose.transform.matrix); visible++; }
       }
-      this.setStatus(visible ? 'REAL-WORLD OCCLUSION: ROOM SCAN' : 'REAL-WORLD OCCLUSION: NO ROOM DATA');
+      return visible;
     },
     remove: function () {
       this.removed = true;
-      this.edgeFilter.dispose(); this.clear(); this.group.removeFromParent(); this.material.dispose();
+      this.edgeFilter.dispose(); this.controllerExclusion.reset(); this.clear(); this.group.removeFromParent(); this.material.dispose();
       this.el.removeEventListener('componentchanged', this.onChanged); this.el.removeEventListener('loaded', this.onConfigure);
       this.el.removeEventListener('exit-vr', this.onEnd);
     }
@@ -630,12 +822,26 @@ void main() {
         if (this.environment || !this.el.renderer) return;
         const studio = new THREE.Scene();
         const geometry = new THREE.BoxGeometry(12, 12, 12);
-        const materials = [0xcbd5e1,0x8291a5,0xffffff,0x4c596b,0xe2e8f0,0x9ba9bb].map(color=>new THREE.MeshBasicMaterial({color,side:THREE.BackSide}));
+        const materials = [0x82909d,0x64717e,0xd8dce0,0x333d49,0xaeb7bf,0x71808f].map(color=>new THREE.MeshBasicMaterial({color,side:THREE.BackSide}));
         studio.add(new THREE.Mesh(geometry,materials));
+        // Broad studio reflections are baked once, not rendered as extra
+        // real-time lights. Neutral tones preserve the exported CAD colors.
+        const panelGeometry = new THREE.PlaneGeometry(1, 1), panelMaterials = [];
+        const panel = (x, y, z, width, height, brightness) => {
+          const material = new THREE.MeshBasicMaterial({color: new THREE.Color(0xffffff).multiplyScalar(brightness), side: THREE.DoubleSide});
+          panelMaterials.push(material);
+          const mesh = new THREE.Mesh(panelGeometry, material); mesh.position.set(x, y, z);
+          mesh.scale.set(width, height, 1); mesh.lookAt(0, 0, 0); studio.add(mesh);
+        };
+        panel(-5.8, 2, 0, 3, 6, 2.2); panel(5.8, 1, -2, 2, 4, 1.25); panel(0, 5.8, 1, 5, 3, 1.7);
         const pmrem = new THREE.PMREMGenerator(this.el.renderer);
-        this.environment = pmrem.fromScene(studio,0.025);
+        this.previousEnvironment = this.el.object3D.environment;
+        this.previousEnvironmentIntensity = this.el.object3D.environmentIntensity;
+        this.environment = pmrem.fromScene(studio,0.035);
         this.el.object3D.environment = this.environment.texture;
+        this.el.object3D.environmentIntensity = 0.75;
         pmrem.dispose(); geometry.dispose(); materials.forEach(material=>material.dispose());
+        panelGeometry.dispose(); panelMaterials.forEach(material=>material.dispose());
       };
       this.el.addEventListener('renderstart',this.prepareLighting);
       this.prepareLighting();
@@ -764,7 +970,14 @@ void main() {
       this.el.removeEventListener('enter-vr', this.onSessionStart);
       this.el.removeEventListener('object3dset', this.onPanelMesh, true);
       this.el.removeEventListener('viewer-ui-action', this.onAction); this.el.removeEventListener('renderstart',this.prepareLighting);
-      this.hover.dispose(); if(this.environment) this.environment.dispose();
+      this.hover.dispose();
+      if (this.environment) {
+        if (this.el.object3D.environment === this.environment.texture) {
+          this.el.object3D.environment = this.previousEnvironment;
+          this.el.object3D.environmentIntensity = this.previousEnvironmentIntensity;
+        }
+        this.environment.dispose();
+      }
     }
   });
 })();
