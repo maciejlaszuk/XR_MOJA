@@ -17,18 +17,20 @@
       var stored = 100;
       try {
         var parsed = Number(window.localStorage.getItem('moja-ck-207-74-5000_vr-mr-scale'));
-        if (Number.isFinite(parsed)) stored = parsed;
+        if (Number.isFinite(parsed) && parsed > 0) stored = parsed;
       } catch (error) {
         stored = 100;
       }
-      window.MOJA_START_SCALE = Math.max(10, Math.min(500, stored));
+      window.MOJA_START_SCALE = Math.max(1, Math.min(500, stored));
     })();
   </script>
   <script src="https://aframe.io/releases/1.8.0/aframe.min.js"></script>
-  <script src="moja-snap.js?v=27"></script>
-  <script src="moja-measure.js?v=27"></script>
-  <script src="moja-precision.js?v=27"></script>
+  <script src="moja-runtime.js?v=27.1"></script>
+  <script src="moja-snap.js?v=27.1"></script>
+  <script src="moja-measure.js?v=27.1"></script>
+  <script src="moja-precision.js?v=27.1"></script>
   <style>
+    [hidden] { display: none !important; }
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
     html, body {
@@ -249,42 +251,7 @@
           node.receiveShadow = false;
         });
       },
-      addEdges: function (root) {
-        if (!root) return;
-        var meshes = [];
-        root.traverse(function (node) {
-          if (node.isMesh && node.geometry && !node.userData.mojaEdgeOverlay) meshes.push(node);
-        });
-        meshes.forEach(function (mesh) {
-          if (mesh.userData.mojaEdgesAdded || !mesh.geometry.attributes || !mesh.geometry.attributes.position) return;
-          mesh.userData.mojaEdgesAdded = true;
-          var geometry;
-          try {
-            geometry = new THREE.EdgesGeometry(mesh.geometry, 32);
-          } catch (error) {
-            return;
-          }
-          var position = geometry.getAttribute('position');
-          if (!position || position.count === 0) {
-            geometry.dispose();
-            return;
-          }
-          var material = new THREE.LineBasicMaterial({
-            color: 0x26384c,
-            transparent: true,
-            opacity: window.QUEST_MODE === 'mr' ? 0.34 : 0.28,
-            depthTest: true,
-            depthWrite: false,
-            toneMapped: false
-          });
-          var lines = new THREE.LineSegments(geometry, material);
-          lines.name = '__MOJA_EDGES__';
-          lines.userData.mojaEdgeOverlay = true;
-          lines.renderOrder = 4;
-          lines.raycast = function () {};
-          mesh.add(lines);
-        });
-      },
+      addEdges: function (root) { if (root) runtime.addEdges(root); },
       setEdgesVisible: function (root, visible) {
         if (!root) return;
         root.traverse(function (node) {
@@ -292,6 +259,8 @@
         });
       }
     };
+
+    const runtime = window.MOJA_RUNTIME.create(THREE);
 
     AFRAME.registerComponent('model-normalizer', {
       schema: { pivot: {type: 'selector'} },
@@ -308,7 +277,7 @@
         this.done = true;
 
         MOJA.disableShadows(this.el.sceneEl, mesh);
-        MOJA.addEdges(mesh);
+        runtime.prepare(mesh);
 
         var pivotObject = this.data.pivot.object3D;
         var assetObject = this.el.object3D;
@@ -442,7 +411,7 @@
           showLine: false,
           lineColor: this.currentColor,
           lineOpacity: this.data.idleOpacity,
-          interval: 0
+          interval: 25
         });
         this.refresh();
         this.updateVisualState(true);
@@ -459,6 +428,7 @@
       },
 
       setColor: function (color) {
+        if (this.currentColor === (color || this.data.color)) return;
         this.currentColor = color || this.data.color;
         this.el.setAttribute('raycaster', 'lineColor', this.currentColor);
 
@@ -483,7 +453,7 @@
             material.depthTest = false;
             material.depthWrite = false;
             material.transparent = true;
-            material.needsUpdate = true;
+            if (!material.userData.mojaRayOverlay) { material.needsUpdate = true; material.userData.mojaRayOverlay = true; }
           });
         });
       },
@@ -516,8 +486,9 @@
 
       handleTriggerUp: function () {
         var rayComponent = this.el.components.raycaster;
+        if (rayComponent && rayComponent.checkIntersections) rayComponent.checkIntersections();
         var intersections = rayComponent && rayComponent.intersections
-          ? rayComponent.intersections.slice(0, 16)
+          ? rayComponent.intersections.filter(hit=>runtime.visible(hit.object)).slice(0, 16)
           : (this.currentIntersection ? [this.currentIntersection] : []);
         var ray = rayComponent && rayComponent.raycaster && rayComponent.raycaster.ray
           ? rayComponent.raycaster.ray.clone()
@@ -525,7 +496,7 @@
 
         var selectedIntersection = this.pressedUI && this.pressedUI.intersection
           ? this.pressedUI.intersection
-          : this.currentIntersection;
+          : (intersections[0] || null);
         var selectedTarget = this.pressedUI && this.pressedUI.targetEl
           ? this.pressedUI.targetEl
           : MOJA.getInteractiveEl(selectedIntersection);
@@ -546,7 +517,7 @@
         var intersections = raycaster && raycaster.intersections;
 
         this.currentIntersections = intersections && intersections.length
-          ? intersections.slice(0, 32)
+          ? intersections.filter(hit => runtime.visible(hit.object)).slice(0, 32)
           : [];
         this.currentIntersection = this.currentIntersections.length
           ? this.currentIntersections[0]
@@ -1216,9 +1187,9 @@
             this.setSavedAxisLine(visual.axisX, this.worldA, this.pathX, '#EF4444');
             this.setSavedAxisLine(visual.axisY, this.pathX, this.pathXY, '#22C55E');
             this.setSavedAxisLine(visual.axisZ, this.pathXY, this.worldB, '#3B82F6');
-            this.setXYZLabel(visual.label, 'L  ' + this.formatMm(distance, true), 'X  ' + this.formatMm(components.dx, false), 'Y  ' + this.formatMm(components.dy, false), 'Z  ' + this.formatMm(components.dz, false), this.midpoint, {labelText: visual.labelText, labelX: visual.labelX, labelY: visual.labelY, labelZ: visual.labelZ});
+            this.setXYZLabel(visual.label, 'L  ' + this.formatMm(distance / this.modelScale(), true), 'X  ' + this.formatMm(components.dx, false), 'Y  ' + this.formatMm(components.dy, false), 'Z  ' + this.formatMm(components.dz, false), this.midpoint, {labelText: visual.labelText, labelX: visual.labelX, labelY: visual.labelY, labelZ: visual.labelZ});
           } else {
-            this.setSavedLabel(visual, this.midpoint, this.formatMm(distance, true), '#F8FAFC');
+            this.setSavedLabel(visual, this.midpoint, this.formatMm(distance / this.modelScale(), true), '#F8FAFC');
           }
           return;
         }
@@ -1301,10 +1272,11 @@
 
         var snap = null;
         var assetObject = this.data.asset && this.data.asset.object3D;
-        if (this.snapEnabled && this.precisionReady && this.precisionEngine && ray && intersection && intersection.point && assetObject) {
+        if (this.snapEnabled && this.precisionReady && this.precisionEngine && ray && intersection && intersection.point && assetObject && this.el.components['component-selection']?.meshes.every(mesh => runtime.visible(mesh))) {
           snap = this.precisionEngine.snap(ray, intersection.point, assetObject, {
             angularTolerance: 0.009,
-            sourceIntersection: intersection
+            sourceIntersection: intersection,
+            filters: this.filters
           });
         }
         if (!snap && this.snapEngine && ray) {
@@ -1320,15 +1292,9 @@
 
         if (snap && snap.source !== 'cad' && snap.point && intersection && intersection.point) {
           var pull = snap.point.distanceTo(intersection.point);
+          var viewer = this.el.components['quest-viewer'];
           var limit = this.snapPullLimit;
-          if (targetObject) {
-            try {
-              var box = new THREE.Box3().setFromObject(targetObject);
-              if (!box.isEmpty()) {
-                limit = Math.min(0.05, Math.max(0.008, box.getSize(new THREE.Vector3()).length() * 0.0012));
-              }
-            } catch (error) {}
-          }
+          if (viewer && viewer.ready) limit = Math.min(0.05, Math.max(0.008, viewer.baseSize.length() * (viewer.scalePercent / 100) * 0.0012));
           if (pull > limit) snap = null;
         }
 
@@ -1405,7 +1371,7 @@
           var surface = this.measureEngine && this.measureEngine.surfacePatchFromIntersection(point.sourceIntersection, {smoothAngleDeg:14});
           if (!surface) return false;
           this.result = {
-            type:'area', area:surface.area, width:surface.width, height:surface.height,
+            type:'area', area:surface.area/(this.modelScale()*this.modelScale()), width:surface.width/this.modelScale(), height:surface.height/this.modelScale(),
             approximate:surface.approximate, triangleCount:surface.triangleCount, surface:surface,
             storedCentroid:this.createWorldStoredPoint(surface.centroid, surface.object, 'surface', 'SURFACE CENTROID')
           };
@@ -1440,7 +1406,7 @@
           if (computeToken !== this.computeToken) return;
           if (!result) throw new Error('No separate meshes were found.');
           this.result = {
-            type:'min-distance', distance:result.distance, approximate:result.approximate,
+            type:'min-distance', distance:result.distance/this.modelScale(), approximate:result.approximate,
             nameA:entries[0].node.label, nameB:entries[1].node.label,
             storedA:this.createWorldStoredPoint(result.pointA, result.objectA, 'calculated', 'MINIMUM A'),
             storedB:this.createWorldStoredPoint(result.pointB, result.objectB, 'calculated', 'MINIMUM B')
@@ -1515,6 +1481,10 @@
         this.forceOverlayElement(visual.label, 91);
       },
 
+      modelScale: function () {
+        const viewer=this.el.components['quest-viewer'];
+        return viewer && viewer.modeType==='mr' ? Math.max(0.01,viewer.scalePercent/100) : 1;
+      },
       calculateComponents: function (first, second) {
         var targetObject = this.data.target && this.data.target.object3D;
         var localMode = first && second && first.space === 'target' && second.space === 'target' && targetObject;
@@ -1527,9 +1497,9 @@
           targetObject.updateMatrixWorld(true);
           targetObject.localToWorld(this.worldA); targetObject.localToWorld(this.pathX); targetObject.localToWorld(this.pathXY); targetObject.localToWorld(this.worldB);
           targetObject.getWorldScale(this.targetScale);
-          dx = Math.abs(this.localB.x-this.localA.x)*Math.abs(this.targetScale.x);
-          dy = Math.abs(this.localB.y-this.localA.y)*Math.abs(this.targetScale.y);
-          dz = Math.abs(this.localB.z-this.localA.z)*Math.abs(this.targetScale.z);
+          dx = Math.abs(this.localB.x-this.localA.x)*Math.abs(this.targetScale.x)/this.modelScale();
+          dy = Math.abs(this.localB.y-this.localA.y)*Math.abs(this.targetScale.y)/this.modelScale();
+          dz = Math.abs(this.localB.z-this.localA.z)*Math.abs(this.targetScale.z)/this.modelScale();
         } else {
           this.resolvePoint(first,this.worldA); this.resolvePoint(second,this.worldB);
           this.pathX.set(this.worldB.x,this.worldA.y,this.worldA.z);
@@ -1620,9 +1590,9 @@
             this.setAxisLineOnly(this.axisVisuals.x,this.worldA,this.pathX);
             this.setAxisLineOnly(this.axisVisuals.y,this.pathX,this.pathXY);
             this.setAxisLineOnly(this.axisVisuals.z,this.pathXY,this.worldB);
-            this.setXYZLabel(this.data.label, 'L  ' + this.formatMm(distance,true), 'X  ' + this.formatMm(components.dx,false), 'Y  ' + this.formatMm(components.dy,false), 'Z  ' + this.formatMm(components.dz,false), this.midpoint, {labelText: this.data.labelText, labelX: this.data.label.querySelector('#measureLabelX'), labelY: this.data.label.querySelector('#measureLabelY'), labelZ: this.data.label.querySelector('#measureLabelZ')});
+            this.setXYZLabel(this.data.label, 'L  ' + this.formatMm(distance / this.modelScale(),true), 'X  ' + this.formatMm(components.dx,false), 'Y  ' + this.formatMm(components.dy,false), 'Z  ' + this.formatMm(components.dz,false), this.midpoint, {labelText: this.data.labelText, labelX: this.data.label.querySelector('#measureLabelX'), labelY: this.data.label.querySelector('#measureLabelY'), labelZ: this.data.label.querySelector('#measureLabelZ')});
           } else {
-            this.setMainLabel(this.midpoint,this.formatMm(distance,true),'#F8FAFC');
+            this.setMainLabel(this.midpoint,this.formatMm(distance / this.modelScale(),true),'#F8FAFC');
           }
           return;
         }
@@ -1721,7 +1691,7 @@
     });
 
     AFRAME.registerComponent('scale-slider', {
-      schema: {min: {type: 'number', default: 10}, max: {type: 'number', default: 300}, width: {type: 'number', default: 0.42}},
+      schema: {min: {type: 'number', default: 1}, max: {type: 'number', default: 500}, width: {type: 'number', default: 0.42}},
       init: function () {
         this.localPoint = new THREE.Vector3();
         this.onActivate = this.onActivate.bind(this);
@@ -1733,13 +1703,20 @@
         this.localPoint.copy(intersection.point);
         this.el.object3D.worldToLocal(this.localPoint);
         var normalized = MOJA.clamp((this.localPoint.x / this.data.width) + 0.5, 0, 1);
-        var value = this.data.min + normalized * (this.data.max - this.data.min);
-        value = Math.round(value / 5) * 5;
+        var value = this.data.min * Math.pow(this.data.max / this.data.min, normalized);
+        const detent = runtime.scaleDetent(value, this.snapped); this.snapped = detent.snapped; value = detent.value;
         this.el.sceneEl.emit('viewer-ui-action', {action: 'scale', value: value, source: this.el}, false);
       },
-      remove: function () {
-        this.el.removeEventListener('moja-ui-activate', this.onActivate);
-      }
+      tick: function () {
+        const ray = document.getElementById('rightHand')?.components['trigger-ray'];
+        if (!ray?.active || !ray.pressedUI || ray.pressedUI.targetEl !== this.el) return;
+        const sourceRay = document.getElementById('rightHand').components.raycaster?.raycaster?.ray;
+        if (!sourceRay) return;
+        const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0).applyMatrix4(this.el.object3D.matrixWorld);
+        const point = sourceRay.intersectPlane(plane, new THREE.Vector3());
+        if (point) { ray.pressedUI.intersection = {point}; this.onActivate({detail: {intersection: {point}}}); }
+      },
+      remove: function () { this.el.removeEventListener('moja-ui-activate', this.onActivate); }
     });
 
     function createElement(tag, attrs, parent) {
@@ -2576,7 +2553,7 @@
 
         this.selected = new Set();
         this.helpers = new Map();
-        this.edgesVisible = true;
+        this.edgesVisible = false;
         this.tempBox = new THREE.Box3();
         this.lastScrollAt = 0;
         this.thumbstickArmed = true;
@@ -2601,7 +2578,7 @@
       },
 
       setLoadingText: function (value) {
-        if (this.header) this.header.setAttribute('value', 'MODEL TREE / PART NUMBER');
+        if (this.header) this.header.setAttribute('value', 'COMPONENTS');
         if (this.summary) this.summary.setAttribute('value', value || 'LOADING MODEL TREE…');
       },
 
@@ -3247,6 +3224,7 @@
       toggleEdges: function () {
         this.edgesVisible = !this.edgesVisible;
         var root = this.asset && this.asset.getObject3D('mesh');
+        if (this.edgesVisible) MOJA.addEdges(root);
         MOJA.setEdgesVisible(root, this.edgesVisible);
         this.renderPanel();
       },
@@ -3334,7 +3312,8 @@
 
       renderPanel: function () {
         if (!this.list || !this.header || !this.summary) return;
-        while (this.list.firstChild) this.list.removeChild(this.list.firstChild);
+        if (!this.rowPool) this.rowPool = [];
+        this.rowPool.forEach(entry => { entry.row.object3D.visible=false; });
 
         if (!this.built) {
           this.setLoadingText('LOADING MODEL TREE…');
@@ -3342,6 +3321,9 @@
           return;
         }
 
+        const detailNode = this.treeNodes[Array.from(this.selected).pop()];
+        const detailText = document.getElementById('componentDetails');
+        if (detailText) detailText.setAttribute('value', detailNode ? [detailNode.partNumber || detailNode.label, detailNode.description, detailNode.material].filter(Boolean).join(' / ').slice(0, 120) : 'Select a component to inspect its properties');
         var rows = this.flattenTree();
         var maximum = Math.max(0, rows.length - this.data.rows);
         this.scrollOffset = MOJA.clamp(this.scrollOffset, 0, maximum);
@@ -3350,7 +3332,7 @@
         var visibleMeshCount = this.meshes.filter(function (mesh) { return mesh.visible; }).length;
         var sourceLabel = this.structureSource === 'IAM' ? 'IAM' : 'GLB';
 
-        this.header.setAttribute('value', 'MODEL TREE / PART NUMBER');
+        this.header.setAttribute('value', 'COMPONENTS');
         this.summary.setAttribute(
           'value',
           this.selected.size + ' selected  •  ' + visibleMeshCount + '/' + this.meshes.length + ' visible  •  ' +
@@ -3368,7 +3350,7 @@
           var color = '#1E293B';
           var status = '●';
 
-          if (selected) color = '#6D28D9';
+          if (selected) color = '#075985';
           else if (visibility === 'hidden') color = '#3F3F46';
           else if (visibility === 'mixed') color = '#854D0E';
           else if (visibility === 'suppressed') color = '#4C0519';
@@ -3380,50 +3362,30 @@
           else if (visibility === 'empty') status = '·';
           if (selected) status = '✓';
 
-          var row = createElement('a-plane', {
-            class: node.meshes.length > 0 ? 'component-ui ui-click' : '',
-            width: 0.78,
-            height: 0.057,
-            color: color,
-            position: '-0.025 ' + y + ' 0.012',
-            material: 'shader: flat',
-            'viewer-button': node.meshes.length > 0 ? ('action: component-toggle; value: ' + nodeIndex) : ''
-          }, this.list);
-
-          var indentation = Math.min(node.depth, 7) * 0.040;
-          var hasChildren = node.children.length > 0;
-          var textX = -0.355 + indentation + (hasChildren ? 0.052 : 0.020);
-
-          if (hasChildren) {
-            var expander = createElement('a-plane', {
-              class: 'component-ui ui-click',
-              width: 0.038,
-              height: 0.044,
-              color: node.expanded ? '#0F766E' : '#334155',
-              position: (-0.365 + indentation) + ' ' + y + ' 0.020',
-              material: 'shader: flat',
-              'viewer-button': 'action: component-expand; value: ' + nodeIndex
-            }, this.list);
-
-            createElement('a-text', {
-              value: node.expanded ? '−' : '+',
-              align: 'center',
-              anchor: 'center',
-              width: 0.16,
-              color: '#FFFFFF',
-              position: '0 0 0.006'
-            }, expander);
+          const poolIndex = rowIndex - start;
+          let entry = this.rowPool[poolIndex];
+          if (!entry) {
+            const row = createElement('a-plane', {class:'component-ui ui-click',width:0.78,height:0.057,material:'shader: flat','soft-card':'radius: 0.009'},this.list);
+            const text = createElement('a-text',{align:'left',anchor:'left','wrap-count':34,color:'#F8FAFC'},row);
+            const expander = createElement('a-plane',{class:'component-ui ui-click',width:0.038,height:0.044,material:'shader: flat','soft-card':'radius: 0.006'},row);
+            const symbol = createElement('a-text',{align:'center',width:0.16,color:'#FFFFFF',position:'0 0 0.006'},expander);
+            entry = {row,text,expander,symbol}; this.rowPool.push(entry);
           }
-
-          createElement('a-text', {
-            value: status + ' ' + node.label,
-            align: 'left',
-            anchor: 'left',
-            width: Math.max(0.36, 0.70 - indentation),
-            'wrap-count': 34,
-            color: node.suppressed ? '#FDA4AF' : '#F8FAFC',
-            position: textX + ' 0 0.006'
-          }, row);
+          entry.row.object3D.visible=true;
+          entry.row.setAttribute('color',color);
+          entry.row.setAttribute('position','-0.025 '+y+' 0.012');
+          entry.row.setAttribute('viewer-button','action: component-toggle; value: '+nodeIndex);
+          const indentation=Math.min(node.depth,7)*0.04,hasChildren=node.children.length>0;
+          entry.expander.object3D.visible=hasChildren;
+          entry.expander.setAttribute('position',(-0.34+indentation)+' 0 0.008');
+          entry.expander.setAttribute('color',node.expanded?'#0F766E':'#334155');
+          entry.expander.setAttribute('viewer-button','action: component-expand; value: '+nodeIndex);
+          entry.symbol.setAttribute('value',node.expanded?'-':'+');
+          const maxChars=34-Math.min(node.depth,7)*2;
+          entry.text.setAttribute('value',status+' '+(node.label.length>maxChars?node.label.slice(0,maxChars-1)+'…':node.label));
+          entry.text.setAttribute('position',(-0.355+indentation+(hasChildren?0.052:0.020))+' 0 0.006');
+          entry.text.setAttribute('width',Math.max(0.36,0.70-indentation));
+          entry.text.setAttribute('color',node.suppressed?'#FDA4AF':'#F8FAFC');
         }
 
         this.updateScrollBar(rows.length);
@@ -3450,7 +3412,8 @@
         }
       },
 
-      tick: function () {
+      tick: function (time) {
+        if (time - (this.lastHelperUpdate || 0) < 45) return; this.lastHelperUpdate = time;
         this.updateHelpers();
       },
 
@@ -3462,50 +3425,6 @@
       }
     });
 
-
-    AFRAME.registerComponent('mr-near-reticle', {
-      schema: {
-        camera: {type: 'selector'},
-        placementDistance: {type: 'number', default: 1.25},
-        maxDistance: {type: 'number', default: 1.8},
-        minDistance: {type: 'number', default: 0.65}
-      },
-      init: function () {
-        this.cameraWorld = new THREE.Vector3();
-        this.hitWorld = new THREE.Vector3();
-        this.adjustedWorld = new THREE.Vector3();
-        this.horizontal = new THREE.Vector3();
-      },
-      tick: function () {
-        if (window.QUEST_MODE !== 'mr' || !this.data.camera) return;
-        var viewer = this.el.components['quest-viewer'];
-        if (viewer && viewer.placed) return;
-
-        var hitTest = this.el.components['ar-hit-test'];
-        var reticleMesh = hitTest && hitTest.bboxMesh;
-        if (!reticleMesh || !reticleMesh.visible) return;
-
-        this.data.camera.object3D.getWorldPosition(this.cameraWorld);
-        reticleMesh.getWorldPosition(this.hitWorld);
-        this.horizontal.copy(this.hitWorld).sub(this.cameraWorld);
-        this.horizontal.y = 0;
-
-        var distance = this.horizontal.length();
-        if (!Number.isFinite(distance) || distance < 0.0001) return;
-
-        var desiredDistance = distance;
-        if (distance > this.data.maxDistance) desiredDistance = this.data.placementDistance;
-        else if (distance < this.data.minDistance) desiredDistance = this.data.minDistance;
-        if (Math.abs(desiredDistance - distance) < 0.001) return;
-
-        this.horizontal.multiplyScalar(desiredDistance / distance);
-        this.adjustedWorld.copy(this.cameraWorld).add(this.horizontal);
-        this.adjustedWorld.y = this.hitWorld.y;
-
-        if (reticleMesh.parent) reticleMesh.parent.worldToLocal(this.adjustedWorld);
-        reticleMesh.position.copy(this.adjustedWorld);
-      }
-    });
 
     AFRAME.registerComponent('quest-viewer', {
       schema: {
@@ -3561,7 +3480,8 @@
         this.ready = false;
         this.placed = this.modeType === 'vr';
         this.interactionMode = this.modeType === 'vr' ? 'nav' : 'move';
-        this.scalePercent = MOJA.clamp(Number(window.MOJA_START_SCALE) || 100, 10, 500);
+        this.scalePercent = MOJA.clamp(Number(window.MOJA_START_SCALE) || 100, 1, 500);
+        this.twoGripScaling = false; this.scaleSnapped = false; this.lastScaleUI = -Infinity;
         this.baseSize = new THREE.Vector3(1, 1, 1);
         this.axes = {left: new THREE.Vector2(), right: new THREE.Vector2()};
         this.verticalUp = false;
@@ -3643,14 +3563,8 @@
         if (this.modeType === 'mr') {
           this.el.removeAttribute('background');
           this.el.setAttribute('xr-mode-ui', 'XRMode: ar; enterARButton: #enterXR; enterVREnabled: false');
-          this.el.setAttribute('webxr', 'referenceSpaceType: local-floor; requiredFeatures: hit-test,local-floor; optionalFeatures: anchors,bounded-floor');
-          this.el.setAttribute('ar-hit-test', 'target: #placementReticle; enabled: true; type: map; mapSize: 0.34 0.34');
-          this.el.setAttribute(
-            'mr-near-reticle',
-            'camera: #camera; placementDistance: ' + this.data.placementDistance +
-            '; maxDistance: ' + this.data.maxPlacementDistance +
-            '; minDistance: 0.65'
-          );
+          this.el.setAttribute('webxr', 'referenceSpaceType: local-floor; requiredFeatures: local-floor; optionalFeatures: hit-test,bounded-floor');
+          this.el.setAttribute('surface-placement', '');
           if (this.floor) {
             this.floor.object3D.visible = false;
             this.floor.classList.remove('ray-target', 'teleportable', 'measure-target');
@@ -3685,6 +3599,7 @@
           this.left.addEventListener('ybuttondown', function () { self.handleY(); });
           this.left.addEventListener('gripdown', function () { self.setGrip('left', true); });
           this.left.addEventListener('gripup', function () { self.setGrip('left', false); });
+          this.left.addEventListener('controllerdisconnected', function () { self.cancelGrabs(); });
         }
         if (this.right) {
           this.right.addEventListener('thumbstickmoved', function (event) {
@@ -3699,6 +3614,7 @@
           this.right.addEventListener('bbuttonup', function () { self.verticalUp = false; });
           this.right.addEventListener('gripdown', function () { self.setGrip('right', true); });
           this.right.addEventListener('gripup', function () { self.setGrip('right', false); });
+          this.right.addEventListener('controllerdisconnected', function () { self.cancelGrabs(); });
         }
       },
       getMeasurement: function () {
@@ -3755,17 +3671,21 @@
         this.placeAtReticle();
       },
       placeAtReticle: function () {
-        this.reticle.object3D.getWorldPosition(this.worldPosition);
+        const placement = this.el.components['surface-placement'];
+        if (!placement || !placement.tracker.valid(performance.now())) return;
+        const pose = runtime.surfacePose(placement.tracker.point, placement.tracker.normal, this.baseSize, this.scalePercent/100);
+        this.worldPosition.copy(pose.position);
+        this.surfaceNormal = placement.tracker.normal.clone(); this.surfaceLocked = true;
         var parent = this.pivot.object3D.parent;
         if (parent) parent.worldToLocal(this.worldPosition);
 
         this.pivot.object3D.position.copy(this.worldPosition);
-        this.pivot.object3D.rotation.set(0, 0, 0);
+        this.pivot.object3D.quaternion.copy(pose.quaternion);
         this.pivot.object3D.scale.setScalar(this.scalePercent / 100);
         this.pivot.object3D.visible = true;
         this.placed = true;
 
-        this.el.setAttribute('ar-hit-test', 'enabled', false);
+        this.el.components['surface-placement']?.tracker.reset();
         this.reticle.object3D.visible = false;
         this.updateInfo();
         this.updateModeUI();
@@ -3792,7 +3712,8 @@
         if (annotation) annotation.setEnabled(false);
         this.interactionMode = 'move';
         this.setScalePanelVisible(false);
-        this.el.setAttribute('ar-hit-test', 'enabled', true);
+        this.cancelGrabs();
+        this.el.components['surface-placement']?.tracker.reset();
         this.updateModeUI();
       },
       onScaleRequest: function (event) {
@@ -3801,12 +3722,15 @@
       },
       setScalePercent: function (percent, silent) {
         if (this.modeType !== 'mr') return;
-        this.scalePercent = Math.round(MOJA.clamp(Number(percent) || 100, 10, 500));
+        this.scalePercent = MOJA.clamp(Number(percent) || 100, 1, 500);
         if (this.pivot) this.pivot.object3D.scale.setScalar(this.scalePercent / 100);
-        this.updateScalePanel();
-        if (this.ready && this.placed) this.updateInfo();
+        if (performance.now() - this.lastScaleUI > 60 || !this.twoGripScaling) {
+          this.updateScalePanel();
+          if (this.ready && this.placed) this.updateInfo();
+          this.lastScaleUI = performance.now();
+        }
         try {
-          window.localStorage.setItem('moja-ck-207-74-5000_vr-mr-scale', String(this.scalePercent));
+          if (!this.twoGripScaling) window.localStorage.setItem('moja-ck-207-74-5000_vr-mr-scale', String(this.scalePercent));
         } catch (error) {}
         if (!silent) {
           window.dispatchEvent(new CustomEvent('moja-scale-changed', {detail: {percent: this.scalePercent}}));
@@ -3815,11 +3739,11 @@
       updateScalePanel: function () {
         if (this.scaleValueText) {
           var scale = this.scalePercent / 100;
-          this.scaleValueText.setAttribute('value', this.scalePercent + '%  •  ' + MOJA.formatScaleRatio(scale));
+          this.scaleValueText.setAttribute('value', MOJA.formatNumber(this.scalePercent, 1) + '%  •  ' + MOJA.formatScaleRatio(scale));
         }
         if (this.scaleKnob) {
-          var clamped = MOJA.clamp(this.scalePercent, 10, 300);
-          var normalized = (clamped - 10) / 290;
+          var clamped = MOJA.clamp(this.scalePercent, 1, 500);
+          var normalized = Math.log(clamped) / Math.log(500);
           this.scaleKnob.object3D.position.x = (normalized - 0.5) * 0.42;
         }
       },
@@ -3848,12 +3772,31 @@
         var text = 'SCALE ' + Math.round(scale * 100) + '%  •  ' + MOJA.formatScaleRatio(scale) + '  •  ' +
           MOJA.formatMetres(x) + ' × ' + MOJA.formatMetres(z) + ' × ' + MOJA.formatMetres(y) + ' m';
         this.infoText.setAttribute('value', text);
-        this.pivot.object3D.getWorldPosition(this.worldPosition);
-        this.worldPosition.y += y + Math.max(0.10, Math.min(0.35, y * 0.045));
+        this.pivot.object3D.updateWorldMatrix(true,false);
+        const infoBounds=new THREE.Box3();
+        for(const bx of [-0.5,0.5]) for(const by of [0,1]) for(const bz of [-0.5,0.5]) {
+          infoBounds.expandByPoint(new THREE.Vector3(this.baseSize.x*bx,this.baseSize.y*by,this.baseSize.z*bz).applyMatrix4(this.pivot.object3D.matrixWorld));
+        }
+        infoBounds.getCenter(this.worldPosition); this.worldPosition.y=infoBounds.max.y+Math.max(0.10,Math.min(0.35,y*0.045));
         this.info.object3D.position.copy(this.worldPosition);
         var infoScale = MOJA.clamp(Math.max(x, y, z) * 0.052, 0.24, 0.62);
         this.info.object3D.scale.setScalar(infoScale);
         this.info.object3D.visible = true;
+      },
+      cancelGrabs: function () {
+        this.grips.left = this.grips.right = false;
+        this.grabMoving = this.freeGrabMoving = this.twoGripRotating = this.twoGripScaling = false;
+        this.freeGrabHand = null; this.verticalUp = this.verticalDown = false;
+        this.axes.left.set(0, 0); this.axes.right.set(0, 0);
+      },
+      setMode: function (mode) {
+        this.cancelGrabs(); this.interactionMode = mode;
+        this.getMeasurement()?.setEnabled(mode === 'measure');
+        this.getSelection()?.setEnabled(mode === 'select');
+        this.getAnnotation()?.setEnabled(mode === 'annotate');
+        if (mode !== 'move') this.setScalePanelVisible(false);
+        if (this.teleportMarker) this.teleportMarker.object3D.visible = false;
+        this.updateModeUI(); this.updateRayColor();
       },
       cycleMode: function () {
         if (!this.ready || (this.modeType === 'mr' && !this.placed)) return;
@@ -3873,6 +3816,7 @@
           else this.interactionMode = 'move';
         }
 
+        this.cancelGrabs();
         measurement.setEnabled(this.interactionMode === 'measure');
         if (selection) selection.setEnabled(this.interactionMode === 'select');
         if (annotation) annotation.setEnabled(this.interactionMode === 'annotate');
@@ -3889,11 +3833,6 @@
           if (!measurement) return;
           if (measurement.panelVisible) {
             measurement.setPanelVisible(false);
-            return;
-          }
-          if (measurement.hasSavedMeasurements && measurement.hasSavedMeasurements() && !(measurement.hasWorkInProgress && measurement.hasWorkInProgress())) {
-            measurement.clearStoredMeasurements();
-            measurement.clear();
             return;
           }
           measurement.togglePanel();
@@ -3916,7 +3855,7 @@
       updateModeUI: function () {
         if (!this.modeText) return;
         if (this.modeType === 'mr' && !this.placed) {
-          this.modeText.setAttribute('value', 'PLACEMENT  •  TRIGGER: PLACE MODEL');
+          this.modeText.setAttribute('value', 'AUTO SURFACE  •  POINT, PREVIEW, TRIGGER TO PLACE');
           this.modeText.setAttribute('color', '#D1FAE5');
           return;
         }
@@ -3924,24 +3863,24 @@
           var measurement = this.getMeasurement();
           var measureName = measurement && measurement.getModeLabel ? measurement.getModeLabel() : 'MEASURE';
           var snapState = measurement && measurement.getSnapModeLabel ? 'SNAP ' + measurement.getSnapModeLabel() : 'AUTO SNAP';
-          this.modeText.setAttribute('value', measureName + '  •  ' + snapState + '  •  POINTER ACTIVE  •  TRIGGER: CAPTURE  •  Y: PANEL / CLEAR');
+          this.modeText.setAttribute('value', measureName + '  /  ' + snapState + '  /  Y: PANEL');
           this.modeText.setAttribute('color', '#FBBF24');
         } else if (this.interactionMode === 'select') {
-          this.modeText.setAttribute('value', 'MODEL TREE  •  POINTER ACTIVE  •  TRIGGER: SELECT  •  Y: PANEL  •  RIGHT STICK: SCROLL');
+          this.modeText.setAttribute('value', 'COMPONENTS  /  TRIGGER: SELECT  /  Y: PANEL');
           this.modeText.setAttribute('color', '#C4B5FD');
         } else if (this.interactionMode === 'annotate') {
-          this.modeText.setAttribute('value', '3D MARKUP  •  POINTER ACTIVE  •  DRAW: HOLD TRIGGER  •  Y: PANEL');
+          this.modeText.setAttribute('value', 'MARKUP  /  HOLD TRIGGER: DRAW  /  Y: PANEL');
           this.modeText.setAttribute('color', '#F9A8D4');
         } else if (this.modeType === 'mr') {
           this.modeText.setAttribute(
             'value',
             this.freeGrab3D
-              ? 'MR FREE GRAB 3D  •  1 GRIP: MOVE + ROTATE  •  2 GRIPS: Y ROTATION  •  Y: SCALE'
-              : 'MR  •  LEFT STICK: MOVE  •  RIGHT GRIP: MOVE  •  2 GRIPS: Y ROTATION  •  Y: SCALE'
+              ? 'FREE 3D  /  1 GRIP: MOVE + ROTATE  /  2 GRIPS: SCALE'
+              : 'MR  /  2 GRIPS: SCALE  /  R STICK: ROTATE  /  Y: PANEL'
           );
           this.modeText.setAttribute('color', '#D1FAE5');
         } else {
-          this.modeText.setAttribute('value', 'NAVIGATION  •  L: MOVE  •  R: TURN  •  B: UP  •  A: DOWN  •  POINTER: TELEPORT  •  TRIGGER: JUMP');
+          this.modeText.setAttribute('value', 'NAVIGATION  /  STICKS: MOVE + TURN  /  TRIGGER: TELEPORT');
           this.modeText.setAttribute('color', '#E0F2FE');
         }
       },
@@ -3972,6 +3911,7 @@
 
         // Panel controls take priority only when they are the first ray hit.
         var targetEl = detail.targetEl || MOJA.getInteractiveEl(intersection);
+        if (targetEl && targetEl.object3D && !runtime.visible(targetEl.object3D)) return;
         if (targetEl && targetEl.id === 'freeGrabButton') {
           this.toggleFreeGrab3D();
           return;
@@ -4072,34 +4012,49 @@
         if (ray) window.setTimeout(function () { ray.refresh(); }, 0);
       },
       setGrip: function (hand, active) {
-        if (this.modeType !== 'mr' || !this.ready || !this.placed) return;
-
+        if (this.modeType !== 'mr' || !this.ready || !this.placed || this.interactionMode !== 'move') return;
+        // Grips over a panel must not move the model while operating controls.
+        const target = MOJA.getInteractiveEl(this.right?.components['trigger-ray']?.currentIntersection);
+        if (active && target?.classList.contains('ui-click') && this.right.components['trigger-ray']?.active) return;
         this.grips[hand] = active;
-
-        if (this.grips.left && this.grips.right) {
-          this.freeGrabMoving = false;
-          this.beginTwoGripRotation();
-          return;
+        if (this.grips.left && this.grips.right) { this.beginTwoGripScale(); return; }
+        const wasScaling = this.twoGripScaling;
+        this.twoGripScaling = false; this.twoGripRotating = false;
+        this.freeGrabMoving = false; this.grabMoving = false;
+        if (wasScaling) this.setScalePercent(this.scalePercent);
+        const remaining = this.grips.right ? 'right' : this.grips.left ? 'left' : null;
+        if (this.freeGrab3D && remaining) this.beginFreeGrab(remaining);
+        else if (this.grips.right) this.beginMoveGrab();
+      },
+      beginTwoGripScale: function () {
+        this.grabMoving = false; this.freeGrabMoving = false;
+        this.controllerPositionInPivotParent(this.left, this.leftPosition);
+        this.controllerPositionInPivotParent(this.right, this.rightPosition);
+        this.scaleStartDistance = this.leftPosition.distanceTo(this.rightPosition);
+        if (this.scaleStartDistance < 0.08) return;
+        this.scaleStartPercent = this.scalePercent;
+        this.twoGripScaling = true; this.scaleSnapped = Math.abs(this.scalePercent - 100) < 0.1;
+      },
+      updateTwoGripScale: function (dt) {
+        if (!this.twoGripScaling || !this.grips.left || !this.grips.right) return;
+        this.controllerPositionInPivotParent(this.left, this.leftPosition);
+        this.controllerPositionInPivotParent(this.right, this.rightPosition);
+        const distance = this.leftPosition.distanceTo(this.rightPosition);
+        if (distance < 0.04) return;
+        const desired = this.scaleStartPercent * distance / this.scaleStartDistance;
+        const detent = runtime.scaleDetent(desired, this.scaleSnapped);
+        if (detent.snapped && !this.scaleSnapped) {
+          const input = Array.from(this.el.renderer?.xr.getSession()?.inputSources || []).find(source=>source.handedness==='right');
+          input?.gamepad?.hapticActuators?.[0]?.pulse(0.3, 35).catch(() => {});
         }
-
-        this.twoGripRotating = false;
-
-        if (this.freeGrab3D) {
-          var remainingHand = this.grips.right ? 'right' : (this.grips.left ? 'left' : null);
-          if (remainingHand) this.beginFreeGrab(remainingHand);
-          else {
-            this.freeGrabMoving = false;
-            this.freeGrabHand = null;
-          }
-          this.grabMoving = false;
-          return;
-        }
-
-        this.freeGrabMoving = false;
-        this.freeGrabHand = null;
-
-        if (this.grips.right) this.beginMoveGrab();
-        else this.grabMoving = false;
+        this.scaleSnapped = detent.snapped;
+        // Base-centred scaling keeps the normalised model on its support surface.
+        this.setScalePercent(detent.snapped ? 100 : THREE.MathUtils.lerp(this.scalePercent, detent.value, 1 - Math.exp(-18 * dt)), true);
+      },
+      updateMRRotation: function (dt) {
+        if (this.interactionMode !== 'move' || this.twoGripScaling || this.freeGrabMoving || this.grabMoving) return;
+        const x = Math.abs(this.axes.right.x) > 0.18 ? this.axes.right.x : 0;
+        if (x) { this.pivot.object3D.rotateOnWorldAxis(this.surfaceLocked ? this.surfaceNormal : MOJA.UP, -x * THREE.MathUtils.degToRad(55) * dt); this.updateInfo(); }
       },
       controllerPositionInPivotParent: function (controller, output) {
         controller.object3D.getWorldPosition(output);
@@ -4138,6 +4093,7 @@
         var now = performance.now();
         if (now - (this.lastFreeGrabToggleAt || 0) < 250) return;
         this.lastFreeGrabToggleAt = now;
+        this.cancelGrabs();
         this.freeGrab3D = !this.freeGrab3D;
         this.freeGrabMoving = false;
         this.freeGrabHand = null;
@@ -4153,6 +4109,7 @@
         var controller = hand === 'left' ? this.left : this.right;
         if (!controller) return;
 
+        this.surfaceLocked = false;
         this.freeGrabHand = hand;
         this.freeGrabMoving = true;
         this.grabMoving = false;
@@ -4178,11 +4135,13 @@
 
         this.controllerPositionInPivotParent(controller, this.freeGrabCurrentController);
         this.moveVector.copy(this.freeGrabCurrentController).sub(this.freeGrabStartController);
-        this.pivot.object3D.position.copy(this.freeGrabStartModel).add(this.moveVector);
+        // Rotate around the held controller, preserving the original grab offset.
 
         this.controllerQuaternionInPivotParent(controller, this.freeGrabCurrentControllerQuat);
         this.freeGrabDeltaQuat.copy(this.freeGrabCurrentControllerQuat).multiply(this.freeGrabStartControllerQuatInv);
         this.pivot.object3D.quaternion.copy(this.freeGrabDeltaQuat).multiply(this.freeGrabStartModelQuat).normalize();
+        this.moveVector.copy(this.freeGrabStartModel).sub(this.freeGrabStartController).applyQuaternion(this.freeGrabDeltaQuat);
+        this.pivot.object3D.position.copy(this.freeGrabCurrentController).add(this.moveVector);
 
         this.updateInfo();
       },
@@ -4194,34 +4153,12 @@
         this.controllerPositionInPivotParent(this.right, this.grabStartController);
         this.grabStartModel.copy(this.pivot.object3D.position);
       },
-      beginTwoGripRotation: function () {
-        if (!this.left || !this.right) return;
-        this.controllerPositionInPivotParent(this.left, this.leftPosition);
-        this.controllerPositionInPivotParent(this.right, this.rightPosition);
-        this.startHandVector.copy(this.rightPosition).sub(this.leftPosition);
-        this.startHandVector.y = 0;
-        if (this.startHandVector.lengthSq() < 0.0025) return;
-        this.startHandAngle = Math.atan2(this.startHandVector.z, this.startHandVector.x);
-        this.startModelRotationY = this.pivot.object3D.rotation.y;
-        this.grabMoving = false;
-        this.twoGripRotating = true;
-      },
       updateMoveGrab: function () {
         if (!this.grabMoving || this.twoGripRotating || !this.grips.right) return;
         this.controllerPositionInPivotParent(this.right, this.controllerPosition);
         this.moveVector.copy(this.controllerPosition).sub(this.grabStartController);
+        if (this.surfaceLocked) this.moveVector.addScaledVector(this.surfaceNormal, -this.moveVector.dot(this.surfaceNormal));
         this.pivot.object3D.position.copy(this.grabStartModel).add(this.moveVector);
-        this.updateInfo();
-      },
-      updateTwoGripRotation: function () {
-        if (!this.twoGripRotating || !this.grips.left || !this.grips.right) return;
-        this.controllerPositionInPivotParent(this.left, this.leftPosition);
-        this.controllerPositionInPivotParent(this.right, this.rightPosition);
-        this.currentHandVector.copy(this.rightPosition).sub(this.leftPosition);
-        this.currentHandVector.y = 0;
-        if (this.currentHandVector.lengthSq() < 0.0025) return;
-        var angle = Math.atan2(this.currentHandVector.z, this.currentHandVector.x);
-        this.pivot.object3D.rotation.y = this.startModelRotationY - (angle - this.startHandAngle);
         this.updateInfo();
       },
       updateVRMovement: function (dt) {
@@ -4249,7 +4186,7 @@
         this.rig.object3D.position.z += this.cameraWorldBefore.z - this.cameraWorldAfter.z;
       },
       updateMRMovement: function (dt) {
-        if (!this.placed || this.grabMoving || this.freeGrabMoving || this.twoGripRotating) return;
+        if (!this.placed || this.interactionMode !== 'move' || this.grabMoving || this.freeGrabMoving || this.twoGripScaling) return;
         var x = Math.abs(this.axes.left.x) > 0.12 ? this.axes.left.x : 0;
         var y = Math.abs(this.axes.left.y) > 0.12 ? this.axes.left.y : 0;
         if (x === 0 && y === 0) return;
@@ -4261,6 +4198,11 @@
         this.rightVector.crossVectors(this.forward, MOJA.UP).normalize();
         this.moveVector.copy(this.rightVector).multiplyScalar(x).addScaledVector(this.forward, -y);
         if (this.moveVector.lengthSq() > 1) this.moveVector.normalize();
+        if (this.surfaceLocked) {
+          const horizontal = new THREE.Vector3(1,0,0).applyQuaternion(this.pivot.object3D.quaternion);
+          const depth = new THREE.Vector3(0,0,1).applyQuaternion(this.pivot.object3D.quaternion);
+          this.moveVector.copy(horizontal).multiplyScalar(x).addScaledVector(depth,y);
+        }
         this.pivot.object3D.position.addScaledVector(this.moveVector, this.data.modelMoveSpeed * dt);
         this.updateInfo();
       },
@@ -4298,10 +4240,11 @@
       updateVertical: function (dt) {
         var direction = (this.verticalUp ? 1 : 0) - (this.verticalDown ? 1 : 0);
         if (direction === 0) return;
-        if (this.modeType === 'vr') {
+        if (this.modeType === 'vr' && this.interactionMode === 'nav') {
           this.rig.object3D.position.y += direction * this.data.verticalSpeed * dt;
-        } else if (this.placed && this.interactionMode === 'move') {
-          this.pivot.object3D.position.y += direction * this.data.modelVerticalSpeed * dt;
+        } else if (this.placed && this.interactionMode === 'move' && !this.twoGripScaling && !this.grabMoving && !this.freeGrabMoving) {
+          if (this.surfaceLocked) this.pivot.object3D.position.addScaledVector(this.surfaceNormal, direction * this.data.modelVerticalSpeed * dt);
+          else this.pivot.object3D.position.y += direction * this.data.modelVerticalSpeed * dt;
           this.updateInfo();
         }
       },
@@ -4309,17 +4252,19 @@
         if (!this.ready) return;
         var dt = Math.min(delta / 1000, 0.05);
         if (this.modeType === 'vr') {
-          this.updateVRMovement(dt);
-          this.updateVRTurning(dt);
+          if (this.interactionMode === 'nav') this.updateVRMovement(dt);
+          if (this.interactionMode === 'nav') this.updateVRTurning(dt);
           this.updateTeleportMarker();
         } else if (this.placed) {
           this.updateFreeGrab();
           this.updateMoveGrab();
-          this.updateTwoGripRotation();
+          if (this.grips.left && this.grips.right && !this.twoGripScaling) this.beginTwoGripScale();
+          this.updateTwoGripScale(dt);
+          this.updateMRRotation(dt);
           this.updateMRMovement(dt);
         }
         this.updateVertical(dt);
-        if (this.interactionMode === 'measure') this.updateMeasurementPreview();
+        if (this.interactionMode === 'measure' && time - (this.lastPreviewAt || 0) > 35) { this.updateMeasurementPreview(); this.lastPreviewAt = time; }
       },
       remove: function () {
         this.el.removeEventListener('model-normalized', this.onNormalized);
@@ -4331,6 +4276,7 @@
     });
   })();
   </script>
+  <script src="moja-xr-ui.js?v=27.1"></script>
 </head>
 <body>
   <div class="topbar">
@@ -4351,8 +4297,8 @@
         <label for="scaleNumber">Model scale</label>
         <div>
           <div class="scale-input">
-            <input id="scaleNumber" type="number" min="10" max="500" step="5" value="100" inputmode="numeric" aria-label="Model scale in percent">
-            <input id="scaleRange" type="range" min="10" max="300" step="5" value="100" aria-label="Model scale slider">
+            <input id="scaleNumber" type="number" min="1" max="500" step="5" value="100" inputmode="numeric" aria-label="Model scale in percent">
+            <input id="scaleRange" type="range" min="1" max="500" step="0.1" value="100" aria-label="Model scale slider">
           </div>
           <div class="presets">
             <button class="preset" type="button" data-scale="50">50%</button>
@@ -4374,7 +4320,7 @@
     </div>
   </div>
 
-  <a-scene
+  <a-scene xr-workspace
     id="scene"
     quest-viewer="pivot: #modelPivot; asset: #modelAsset; rig: #rig; camera: #camera; left: #leftHand; right: #rightHand; floor: #floor; grid: #metricGrid; reticle: #placementReticle; info: #modelInfo; infoText: #modelInfoText; modeText: #modeText; teleportMarker: #teleportMarker; scalePanel: #scalePanel; scaleValueText: #scaleValueText; scaleKnob: #scaleKnob; componentPanel: #componentPanel; freeGrabButton: #freeGrabButton; freeGrabButtonText: #freeGrabButtonText"
     component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; scrollTrack: #componentScrollTrack; scrollThumb: #componentScrollThumb; structureUrl: CK-207-74-5000_VR.structure.json?v=27; rows: 8"
@@ -4485,14 +4431,22 @@
       <a-camera id="camera" position="0 1.65 0" look-controls wasd-controls="enabled: false">
         <a-entity position="0 -0.46 -1.05" scale="0.68 0.68 0.68">
           <a-plane width="1.55" height="0.105" color="#0F172A" opacity="0.66" material="shader: flat; transparent: true"></a-plane>
-          <a-text id="modeText" value="LOADING" align="center" anchor="center" baseline="center" width="1.44" color="#E0F2FE" position="0 0 0.006"></a-text>
+          <a-text id="modeText" value="LOADING" wrap-count="76" align="center" anchor="center" baseline="center" width="1.44" color="#E0F2FE" position="0 0 0.006"></a-text>
         </a-entity>
       </a-camera>
 
       <a-entity id="leftHand" meta-touch-controls="hand: left">
-        <a-entity id="measurePanel" position="0.07 0.13 -0.31" rotation="-35 0 0" scale="0.56 0.56 0.56" visible="false">
+        <a-entity id="workspaceDock" position="0 0.08 -0.18" rotation="-30 0 0" scale="0.7 0.7 0.7">
+          <a-plane width="0.82" height="0.17" color="#0B1424" material="shader: flat" soft-card="radius: 0.025"></a-plane>
+          <a-text value="MOJA / XR" width="0.6" color="#7DD3FC" position="-0.36 0.045 0.01"></a-text>
+          <a-plane class="ui-click ray-target" width="0.18" height="0.06" position="-0.3 -0.025 0.01" color="#1D3048" material="shader: flat" viewer-button="action: mode-move" soft-card><a-text value="MOVE" width="0.27" align="center" position="0 0 0.006"></a-text></a-plane>
+          <a-plane class="ui-click ray-target" width="0.18" height="0.06" position="-0.09999999999999998 -0.025 0.01" color="#1D3048" material="shader: flat" viewer-button="action: mode-select" soft-card><a-text value="PARTS" width="0.27" align="center" position="0 0 0.006"></a-text></a-plane>
+          <a-plane class="ui-click ray-target" width="0.18" height="0.06" position="0.10000000000000003 -0.025 0.01" color="#1D3048" material="shader: flat" viewer-button="action: mode-measure" soft-card><a-text value="MEASURE" width="0.27" align="center" position="0 0 0.006"></a-text></a-plane>
+          <a-plane class="ui-click ray-target" width="0.18" height="0.06" position="0.3000000000000001 -0.025 0.01" color="#1D3048" material="shader: flat" viewer-button="action: mode-annotate" soft-card><a-text value="MARKUP" width="0.27" align="center" position="0 0 0.006"></a-text></a-plane>
+        </a-entity>
+        <a-entity id="measurePanel" workspace-panel position="0.07 0.13 -0.31" rotation="-35 0 0" scale="0.56 0.56 0.56" visible="false">
           <a-plane width="0.94" height="1.18" color="#0F172A" opacity="0.96" material="shader: flat; transparent: true; depthWrite: false"></a-plane>
-          <a-text value="GLB MEASUREMENTS" align="center" width="0.84" color="#BAE6FD" position="0 0.51 0.008"></a-text>
+          <a-text value="MODEL MEASUREMENTS / mm" align="center" width="0.84" color="#BAE6FD" position="0 0.51 0.008"></a-text>
           <a-text id="measurePanelStatus" value="DISTANCE • AUTO SNAP" align="center" width="0.82" wrap-count="34" color="#E2E8F0" position="0 0.405 0.008"></a-text>
 
           <a-plane id="measureBtnDistance" class="measure-ui ui-click" width="0.40" height="0.105" color="#0284C7" position="-0.22 0.25 0.012" material="shader: flat" viewer-button="action: measure-distance"><a-text value="DISTANCE" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
@@ -4507,10 +4461,10 @@
           <a-plane class="measure-ui ui-click" width="0.40" height="0.105" color="#334155" position="0.22 -0.375 0.012" material="shader: flat" viewer-button="action: measure-close"><a-text value="CLOSE" align="center" width="0.36" color="#FFFFFF" position="0 0 0.008"></a-text></a-plane>
         </a-entity>
 
-        <a-entity id="scalePanel" position="0.07 0.12 -0.29" rotation="-35 0 0" scale="0.54 0.54 0.54" visible="false">
+        <a-entity id="scalePanel" workspace-panel position="0.07 0.12 -0.29" rotation="-35 0 0" scale="0.54 0.54 0.54" visible="false">
           <a-plane width="0.72" height="0.68" color="#0F172A" opacity="0.94" material="shader: flat; transparent: true"></a-plane>
-          <a-text value="MODEL SCALE" align="center" width="0.66" color="#E2E8F0" position="0 0.205 0.006"></a-text>
-          <a-text id="scaleValueText" value="100% • 1:1" align="center" width="0.62" color="#86EFAC" position="0 0.145 0.006"></a-text>
+          <a-text value="MODEL SCALE" align="center" width="0.66" wrap-count="24" color="#E2E8F0" position="0 0.205 0.006"></a-text>
+          <a-text id="scaleValueText" value="100% • 1:1" align="center" width="0.62" wrap-count="22" color="#86EFAC" position="0 0.145 0.006"></a-text>
 
           <a-plane class="scale-ui ui-click" width="0.18" height="0.068" color="#334155" position="-0.22 0.065 0.008" viewer-button="action: scale-delta; value: -10">
             <a-text value="−10%" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
@@ -4528,7 +4482,7 @@
           <a-plane class="scale-ui ui-click" width="0.105" height="0.055" color="#1E3A5F" position="-0.125 -0.020 0.008" viewer-button="action: scale; value: 75">
             <a-text value="75" align="center" width="0.22" color="#DBEAFE" position="0 0 0.006"></a-text>
           </a-plane>
-          <a-plane class="scale-ui ui-click" width="0.105" height="0.055" color="#166534" position="0 -0.020 0.008" viewer-button="action: scale; value: 100">
+          <a-plane class="scale-ui ui-click" width="0.105" height="0.055" color="#145B55" position="0 -0.020 0.008" viewer-button="action: scale; value: 100">
             <a-text value="100" align="center" width="0.22" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
           <a-plane class="scale-ui ui-click" width="0.105" height="0.055" color="#1E3A5F" position="0.125 -0.020 0.008" viewer-button="action: scale; value: 150">
@@ -4538,7 +4492,7 @@
             <a-text value="200" align="center" width="0.22" color="#DBEAFE" position="0 0 0.006"></a-text>
           </a-plane>
 
-          <a-plane class="scale-ui ui-click" width="0.42" height="0.045" color="#334155" position="0 -0.100 0.008" scale-slider="min: 10; max: 300; width: 0.42">
+          <a-plane class="scale-ui ui-click" width="0.42" height="0.045" color="#334155" position="0 -0.100 0.008" scale-slider="min: 1; max: 500; width: 0.42">
             <a-plane id="scaleKnob" width="0.020" height="0.070" color="#4ADE80" position="0 0 0.008"></a-plane>
           </a-plane>
 
@@ -4554,27 +4508,30 @@
           </a-plane>
         </a-entity>
 
-        <a-entity id="componentPanel" position="0.11 0.17 -0.40" rotation="-35 0 0" scale="0.52 0.52 0.52" visible="false">
-          <a-plane width="0.94" height="1.12" color="#0F172A" opacity="0.97" material="shader: flat; transparent: true"></a-plane>
-          <a-text id="componentHeader" value="MODEL TREE / PART NUMBER" align="center" width="0.84" color="#EDE9FE" position="-0.01 0.505 0.008"></a-text>
-          <a-text id="componentSummary" value="LOADING MODEL TREE…" align="center" width="0.82" color="#C4B5FD" position="-0.01 0.450 0.008"></a-text>
+        <a-entity id="componentPanel" workspace-panel position="0.11 0.17 -0.40" rotation="-35 0 0" scale="0.52 0.52 0.52" visible="false">
+          <a-plane width="0.94" height="1.36" color="#0B1424" opacity="0.97" material="shader: flat; transparent: true"></a-plane>
+          <a-text id="componentHeader" value="COMPONENTS" align="center" width="0.84" color="#EDE9FE" position="-0.01 0.505 0.008"></a-text>
+          <a-text id="componentHoverName" value="Point to preview · trigger to select" align="center" width="0.84" color="#7DD3FC" position="0 0.60 0.012"></a-text>
+          <a-text id="componentDetails" value="Select a component" align="left" width="0.83" wrap-count="60" color="#CBD5E1" position="-0.41 -0.54 0.012"></a-text>
+          <a-plane class="component-ui ui-click" width="0.24" height="0.06" color="#1D3048" position="0.29 -0.62 0.012" material="shader: flat" viewer-button="action: component-parent" soft-card><a-text value="PARENT" align="center" width="0.3" position="0 0 0.006"></a-text></a-plane>
+          <a-text id="componentSummary" value="LOADING MODEL TREE…" align="center" width="0.82" color="#7DD3FC" position="-0.01 0.450 0.008"></a-text>
           <a-entity id="componentList" position="-0.025 0.365 0.012"></a-entity>
 
           <a-plane id="componentScrollTrack" width="0.020" height="0.49" color="#1E293B" opacity="0.88" position="0.435 0.140 0.014" material="shader: flat; transparent: true">
             <a-plane id="componentScrollThumb" width="0.016" height="0.12" color="#A78BFA" position="0 0.185 0.006" material="shader: flat"></a-plane>
           </a-plane>
 
-          <a-plane class="component-ui ui-click" width="0.225" height="0.060" color="#7F1D1D" position="-0.250 -0.155 0.012" viewer-button="action: component-hide">
+          <a-plane class="component-ui ui-click" width="0.225" height="0.060" color="#68323E" position="-0.250 -0.155 0.012" viewer-button="action: component-hide">
             <a-text value="HIDE" align="center" width="0.31" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
-          <a-plane class="component-ui ui-click" width="0.225" height="0.060" color="#166534" position="0 -0.155 0.012" viewer-button="action: component-show">
+          <a-plane class="component-ui ui-click" width="0.225" height="0.060" color="#145B55" position="0 -0.155 0.012" viewer-button="action: component-show">
             <a-text value="SHOW" align="center" width="0.31" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
-          <a-plane class="component-ui ui-click" width="0.225" height="0.060" color="#5B21B6" position="0.250 -0.155 0.012" viewer-button="action: component-isolate">
+          <a-plane class="component-ui ui-click" width="0.225" height="0.060" color="#075985" position="0.250 -0.155 0.012" viewer-button="action: component-isolate">
             <a-text value="ISOLATE" align="center" width="0.31" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
 
-          <a-plane class="component-ui ui-click" width="0.36" height="0.060" color="#1D4ED8" position="-0.195 -0.235 0.012" viewer-button="action: component-show-all">
+          <a-plane class="component-ui ui-click" width="0.36" height="0.060" color="#075985" position="-0.195 -0.235 0.012" viewer-button="action: component-show-all">
             <a-text value="SHOW ALL" align="center" width="0.48" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
           <a-plane class="component-ui ui-click" width="0.36" height="0.060" color="#334155" position="0.195 -0.235 0.012" viewer-button="action: component-clear">
@@ -4582,7 +4539,7 @@
           </a-plane>
 
           <a-plane class="component-ui ui-click" width="0.11" height="0.060" color="#334155" position="-0.390 -0.315 0.012" viewer-button="action: component-scroll-up">
-            <a-text value="▲" align="center" width="0.23" color="#FFFFFF" position="0 0 0.006"></a-text>
+            <a-text value="UP" align="center" width="0.23" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
           <a-plane class="component-ui ui-click" width="0.22" height="0.060" color="#0F766E" position="-0.210 -0.315 0.012" viewer-button="action: component-expand-all">
             <a-text value="EXPAND" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
@@ -4591,10 +4548,10 @@
             <a-text value="COLLAPSE" align="center" width="0.30" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
           <a-plane class="component-ui ui-click" width="0.11" height="0.060" color="#334155" position="0.390 -0.315 0.012" viewer-button="action: component-scroll-down">
-            <a-text value="▼" align="center" width="0.23" color="#FFFFFF" position="0 0 0.006"></a-text>
+            <a-text value="DOWN" align="center" width="0.23" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
 
-          <a-plane class="component-ui ui-click" width="0.24" height="0.060" color="#4338CA" position="-0.290 -0.430 0.012" viewer-button="action: component-edges">
+          <a-plane class="component-ui ui-click" width="0.24" height="0.060" color="#1D3048" position="-0.290 -0.430 0.012" viewer-button="action: component-edges">
             <a-text value="EDGES" align="center" width="0.33" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
           <a-plane class="component-ui ui-click" width="0.26" height="0.060" color="#075985" position="0 -0.430 0.012" viewer-button="action: lighting-open">
@@ -4605,7 +4562,7 @@
           </a-plane>
         </a-entity>
 
-        <a-entity id="lightingPanel" position="0.10 0.16 -0.37" rotation="-35 0 0" scale="0.52 0.52 0.52" visible="false">
+        <a-entity id="lightingPanel" workspace-panel position="0.10 0.16 -0.37" rotation="-35 0 0" scale="0.52 0.52 0.52" visible="false">
           <a-plane width="0.84" height="0.52" color="#071827" opacity="0.97" material="shader: flat; transparent: true"></a-plane>
 
           <a-text
@@ -4680,7 +4637,7 @@
 
         </a-entity>
 
-        <a-entity id="annotationPanel" position="0.10 0.16 -0.37" rotation="-35 0 0" scale="0.52 0.52 0.52" visible="false">
+        <a-entity id="annotationPanel" workspace-panel position="0.10 0.16 -0.37" rotation="-35 0 0" scale="0.52 0.52 0.52" visible="false">
           <a-plane width="0.92" height="0.82" color="#101522" opacity="0.97" material="shader: flat; transparent: true"></a-plane>
 
           <a-text value="3D MARKUP" align="center" width="0.82" color="#F9A8D4" position="0 0.350 0.008"></a-text>
@@ -4731,7 +4688,7 @@
           <a-plane class="annotation-ui ui-click" width="0.24" height="0.060" color="#475569" position="-0.27 -0.325 0.012" viewer-button="action: annotation-undo">
             <a-text value="UNDO" align="center" width="0.32" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
-          <a-plane class="annotation-ui ui-click" width="0.24" height="0.060" color="#7F1D1D" position="0 -0.325 0.012" viewer-button="action: annotation-clear">
+          <a-plane class="annotation-ui ui-click" width="0.24" height="0.060" color="#68323E" position="0 -0.325 0.012" viewer-button="action: annotation-clear">
             <a-text value="CLEAR" align="center" width="0.32" color="#FFFFFF" position="0 0 0.006"></a-text>
           </a-plane>
           <a-plane class="annotation-ui ui-click" width="0.24" height="0.060" color="#334155" position="0.27 -0.325 0.012" viewer-button="action: annotation-close">
@@ -4795,23 +4752,23 @@
         landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v27';
         landingVersion.classList.add('mr');
         landingTitle.textContent = 'CK-207-74-5000_VR — Mixed Reality';
-        landingDescription.textContent = 'Place the model in the room, set an exact scale, move it, and rotate it around the vertical axis using two grips.';
+        landingDescription.textContent = 'Point at any surface: floor, slope or wall. Preview the model bottom aligned to it, then confirm with the right trigger. Scale with two grips; rotate with the right stick.';
         landingEnter.textContent = 'ENTER MR — QUEST 3';
         landingEnter.classList.add('mr');
         mrScaleBox.hidden = false;
-        landingNote.textContent = 'Two grips rotate the model around its geometric center without changing scale.';
+        landingNote.textContent = 'Spread two grips to scale. Release near 100% for 1:1. Use the right stick to rotate.';
         pills([
           'Left stick: move model',
           'Right grip: move / FREE GRAB 3D',
-          '2 grips: Y-axis rotation',
-          'B: up  •  A: down',
+          '2 grips: scale / right stick: rotate',
+          'B / A: surface offset',
           'X: move → measure → components → markup',
-          'Y: panel / clear'
+          'Y: open / close panel'
         ], landingControls);
         pills([
           'L: move model',
-          '2 grips: rotate model',
-          'B: up  •  A: down',
+          '2 grips: scale',
+          'B / A: surface offset',
           'X: mode',
           'Y: panel',
           'Trigger: hold — visible pointer • release — action'
@@ -4831,7 +4788,7 @@
           'B: up  •  A: down',
           'Trigger: hold — visible pointer • release — teleport / point',
           'X: navigation → measure → components → markup',
-          'Y: clear / panel'
+          'Y: open / close panel'
         ], landingControls);
         pills([
           'L: walk',
@@ -4846,14 +4803,14 @@
       function clampScale(value) {
         var parsed = Number(value);
         if (!Number.isFinite(parsed)) return Math.round(window.MOJA_START_SCALE || 100);
-        return Math.max(10, Math.min(500, Math.round(parsed)));
+        return Math.max(1, Math.min(500, Math.round(parsed * 10) / 10));
       }
 
       function updateScaleInputs(value, emit) {
         var current = clampScale(value);
         window.MOJA_START_SCALE = current;
         numberInput.value = String(current);
-        rangeInput.value = String(Math.max(10, Math.min(300, current)));
+        rangeInput.value = String(Math.max(1, Math.min(500, current)));
         try { window.localStorage.setItem('moja-ck-207-74-5000_vr-mr-scale', String(current)); } catch (error) {}
         if (emit) window.dispatchEvent(new CustomEvent('moja-scale-request', {detail: {percent: current}}));
       }
