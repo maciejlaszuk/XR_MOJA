@@ -6,7 +6,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="referrer" content="no-referrer">
-  <title>CK-207-74-5000_VR — Meta Quest Viewer v27.5</title>
+  <title>CK-207-74-5000_VR — Meta Quest Viewer v27.6</title>
   <script>
     window.MOJA_XR_MODEL = "CK-207-74-5000_VR";
   </script>
@@ -1758,9 +1758,6 @@
         front: {type: 'selector'},
         back: {type: 'selector'},
         left: {type: 'selector'},
-        right: {type: 'selector'},
-        top: {type: 'selector'},
-        bottom: {type: 'selector'},
         panel: {type: 'selector'},
         valueText: {type: 'selector'},
         detailText: {type: 'selector'},
@@ -1815,18 +1812,15 @@
         var factor = this.percent / 100;
 
         /*
-          Balanced 360° lighting for CAD.
+          Three-light studio for CAD: key, fill, and rim.
           Shadow maps are intentionally disabled.
           One percentage controls all light directions.
         */
-        this.setIntensity(this.data.ambient, 0.12 * factor);
+        this.setIntensity(this.data.ambient, 0.10 * factor);
 
-        this.setIntensity(this.data.front,  0.18 * factor);
-        this.setIntensity(this.data.back,   0.18 * factor);
-        this.setIntensity(this.data.left,   0.18 * factor);
-        this.setIntensity(this.data.right,  0.18 * factor);
-        this.setIntensity(this.data.top,    0.24 * factor);
-        this.setIntensity(this.data.bottom, 0.10 * factor);
+        this.setIntensity(this.data.front,  0.80 * factor);
+        this.setIntensity(this.data.back,   0.32 * factor);
+        this.setIntensity(this.data.left,   0.24 * factor);
 
         this.updatePanel();
         this.save();
@@ -1860,7 +1854,7 @@
         if (this.data.detailText) {
           this.data.detailText.setAttribute(
             'value',
-            '360° LIGHTING  •  FRONT / BACK / LEFT / RIGHT / TOP / BOTTOM'
+            'STUDIO LIGHTING  •  SOFT FILL / CLEAR SHAPE / REFLECTIONS'
           );
         }
       },
@@ -4281,12 +4275,12 @@
     });
   })();
   </script>
-  <script src="moja-xr-ui.js?v=27.5"></script>
+  <script src="moja-xr-ui.js?v=27.6"></script>
 </head>
 <body>
   <div class="topbar">
     <a class="pill" href="index.html?v=27">← Viewer</a>
-    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v27.5</div>
+    <div id="topTitle" class="pill title">CK-207-74-5000_VR • QUEST v27.6</div>
     <button id="enterXR" class="pill enter" type="button">ENTER VR</button>
   </div>
 
@@ -4294,7 +4288,7 @@
 
   <div id="landing" class="landing">
     <div class="card">
-      <div id="landingVersion" class="version">META QUEST 3 • v27.5</div>
+      <div id="landingVersion" class="version">META QUEST 3 • v27.6</div>
       <h1 id="landingTitle">CK-207-74-5000_VR — Virtual Reality</h1>
       <p id="landingDescription">The model is anchored at 1:1 scale. Move around, place persistent measurements, and control component visibility.</p>
 
@@ -4321,7 +4315,7 @@
         <a class="button" href="index.html?v=27">← Back</a>
         <button id="landingEnter" class="button primary" type="button">ENTER VR — QUEST 3</button>
       </div>
-      <div id="landingNote" class="note">Subtle edges, balanced 360° lighting, and no heavy shadow maps.</div>
+      <div id="landingNote" class="note">Subtle edges, studio lighting, and no heavy shadow maps.</div>
     </div>
   </div>
 
@@ -4329,7 +4323,7 @@
     id="scene"
     quest-viewer="pivot: #modelPivot; asset: #modelAsset; rig: #rig; camera: #camera; left: #leftHand; right: #rightHand; floor: #floor; grid: #metricGrid; reticle: #placementReticle; info: #modelInfo; infoText: #modelInfoText; modeText: #modeText; teleportMarker: #teleportMarker; scalePanel: #scalePanel; scaleValueText: #scaleValueText; scaleKnob: #scaleKnob; componentPanel: #componentPanel; freeGrabButton: #freeGrabButton; freeGrabButtonText: #freeGrabButtonText"
     component-selection="asset: #modelAsset; pivot: #modelPivot; camera: #camera; right: #rightHand; panel: #componentPanel; list: #componentList; header: #componentHeader; summary: #componentSummary; scrollTrack: #componentScrollTrack; scrollThumb: #componentScrollThumb; structureUrl: CK-207-74-5000_VR.structure.json?v=27; rows: 8"
-    lighting-control="ambient: #ambientLight; front: #lightFront; back: #lightBack; left: #lightLeft; right: #lightRight; top: #lightTop; bottom: #lightBottom; panel: #lightingPanel; valueText: #lightingValueText; detailText: #lightingDetailText; storageKey: moja-ck-207-74-5000_vr-mr-scale-lighting360"
+    lighting-control="ambient: #ambientLight; front: #lightFront; back: #lightBack; left: #lightLeft; panel: #lightingPanel; valueText: #lightingValueText; detailText: #lightingDetailText; storageKey: moja-ck-207-74-5000_vr-mr-scale-lighting360"
     annotation-control="pivot: #modelPivot; root: #annotationRoot; camera: #camera; right: #rightHand; panel: #annotationPanel; keyboard: #annotationKeyboard; preview: #annotationTextPreview; status: #annotationStatus"
     measurement-tool="target: #modelPivot; asset: #modelAsset; camera: #camera; right: #rightHand; pointA: #measurePointA; pointB: #measurePointB; pointC: #measurePointC; line: #measureLine; line2: #measureLine2; label: #measureLabel; labelText: #measureLabelText; snapLabel: #measureSnapLabel; snapLabelText: #measureSnapLabelText; panel: #measurePanel; status: #measurePanelStatus; color: #2563EB"
     loading-screen="backgroundColor: #0B1220; dotsColor: #60A5FA">
@@ -4337,40 +4331,25 @@
     <a-assets timeout="120000">
       <a-asset-item id="modelSource" src="CK-207-74-5000_VR.glb?v=27"></a-asset-item>
     </a-assets>
-    <!-- MODEL LIGHTING 360° — bez map cieni -->
+    <!-- STUDIO LIGHTING — three directions, no shadow maps -->
     <a-entity id="ambientLight"
-      light="type: ambient; color: #EAF2FA; intensity: 0.12">
+      light="type: ambient; color: #F1F5F9; intensity: 0.10">
     </a-entity>
 
     <!-- Every directional light points toward the scene/model center. -->
     <a-entity id="lightFront"
-      light="type: directional; color: #FFFFFF; intensity: 0.18"
-      position="0 4 8">
+      light="type: directional; color: #FFFAF4; intensity: 0.80"
+      position="-3 6 5">
     </a-entity>
 
     <a-entity id="lightBack"
-      light="type: directional; color: #FFFFFF; intensity: 0.18"
-      position="0 4 -8">
+      light="type: directional; color: #FFFFFF; intensity: 0.32"
+      position="3 5 -6">
     </a-entity>
 
     <a-entity id="lightLeft"
-      light="type: directional; color: #FFFFFF; intensity: 0.18"
-      position="-8 4 0">
-    </a-entity>
-
-    <a-entity id="lightRight"
-      light="type: directional; color: #FFFFFF; intensity: 0.18"
-      position="8 4 0">
-    </a-entity>
-
-    <a-entity id="lightTop"
-      light="type: directional; color: #FFFFFF; intensity: 0.24"
-      position="0 10 0">
-    </a-entity>
-
-    <a-entity id="lightBottom"
-      light="type: directional; color: #DDEBFA; intensity: 0.10"
-      position="0 -6 0">
+      light="type: directional; color: #E4EEFF; intensity: 0.24"
+      position="5 2 3">
     </a-entity>
 
 <a-plane
@@ -4440,7 +4419,7 @@
         </a-entity>
       </a-camera>
 
-      <a-entity id="leftHand" meta-touch-controls="hand: left">
+      <a-entity id="leftHand" meta-touch-controls="hand: left" controller-presentation>
         <a-entity id="workspaceDock" position="0 0.08 -0.18" rotation="-30 0 0" scale="0.7 0.7 0.7" visible="false">
           <a-plane class="ui-click" width="1.10" height="0.18" color="#0B1424" material="shader: flat" soft-card="radius: 0.025"></a-plane>
           <a-text value="MOJA / XR" width="0.6" color="#7DD3FC" position="-0.50 0.05 0.01"></a-text>
@@ -4590,7 +4569,7 @@
 
           <a-text
             id="lightingDetailText"
-            value="360° LIGHTING  •  FRONT / BACK / LEFT / RIGHT / TOP / BOTTOM"
+            value="STUDIO LIGHTING  •  SOFT FILL / CLEAR SHAPE / REFLECTIONS"
             align="center"
             width="0.76"
             color="#94A3B8"
@@ -4715,6 +4694,7 @@
 
       <a-entity
         id="rightHand"
+        controller-presentation
         laser-controls="hand: right"
         raycaster="objects: .ray-target; far: 80; showLine: false; lineColor: #38BDF8; lineOpacity: 0.34"
         trigger-ray="objects: .ray-target; marker: #pointerDot; color: #38BDF8; far: 80; alwaysVisible: true; idleOpacity: 0.34; activeOpacity: 0.96">
@@ -4751,11 +4731,11 @@
       }
 
       if (mode === 'mr') {
-        document.title = 'CK-207-74-5000_VR — Meta Quest MR v27.5';
-        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v27.5';
+        document.title = 'CK-207-74-5000_VR — Meta Quest MR v27.6';
+        topTitle.textContent = 'CK-207-74-5000_VR • MIXED REALITY • v27.6';
         enterXR.textContent = 'ENTER MR';
         enterXR.classList.add('mr');
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v27.5';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE MR • v27.6';
         landingVersion.classList.add('mr');
         landingTitle.textContent = 'CK-207-74-5000_VR — Mixed Reality';
         landingDescription.textContent = 'Point at any surface: floor, slope or wall. Preview the model bottom aligned to it, then confirm with the right trigger. Scale with two grips; rotate with the right stick.';
@@ -4780,10 +4760,10 @@
           'Trigger: hold — visible pointer • release — action'
         ], legend);
       } else {
-        document.title = 'CK-207-74-5000_VR — Meta Quest VR v27.5';
-        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v27.5';
+        document.title = 'CK-207-74-5000_VR — Meta Quest VR v27.6';
+        topTitle.textContent = 'CK-207-74-5000_VR • VR WALKAROUND • v27.6';
         enterXR.textContent = 'ENTER VR';
-        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v27.5';
+        landingVersion.textContent = 'META QUEST 3 • IMMERSIVE VR • v27.6';
         landingTitle.textContent = 'CK-207-74-5000_VR — Virtual Reality';
         landingDescription.textContent = 'The model remains anchored at 1:1 scale. Walk, turn, teleport, measure, and isolate components.';
         landingEnter.textContent = 'ENTER VR — QUEST 3';
