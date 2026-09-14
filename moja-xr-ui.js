@@ -3,24 +3,149 @@
   const THREE = AFRAME.THREE;
   const runtime = window.MOJA_RUNTIME.create(THREE);
 
-  // Keep the native normalized depth comparison. CAD materials are untouched.
-  // Every written depth is >= the original centre sample: smoothing can only
-  // reduce occlusion, never hide a previously visible model pixel.
+  // Filter environment depth at its own resolution, before rendering the CAD
+  // scene. Four MSAA depth samples approximate a soft visibility mask without
+  // changing any model/UI material, alpha, sorting, or interaction behavior.
   function createDepthEdgeFilter() {
-    let mesh = null, original = null, background = null, foreground = null;
+    let mesh = null, original = null, passes = [], renderer = null;
+    let targets = null, prepScene = null, prepMaterial = null, prepGeometry = null;
+    let size = new THREE.Vector2(), nextTarget = 0, lastTime = null, historyValid = false, targetsChecked = false;
+    const previous = [null, null], savedViewport = new THREE.Vector4(), savedScissor = new THREE.Vector4();
     const uniforms = {
       depthColor: {value: null}, depthWidth: {value: 1}, depthHeight: {value: 1},
-      edgeRadius: {value: 2.0}, depthRange: {value: new THREE.Vector2(0.1, 100)}
+      depthRange: {value: new THREE.Vector2(0.1, 100)},
+      filtered0: {value: null}, filtered1: {value: null}, filterSize: {value: size}
     };
-    const vertexShader = 'void main() { gl_Position = vec4(position, 1.0); }';
-    const common = `
+    const vertexShader = 'varying vec2 filterUV; void main() { filterUV = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
+    const depthMath = `
+uniform vec2 depthRange;
+float toMeters(float z, vec2 range) {
+  // range.y == 0 represents an infinite far plane. Avoid inf / inf and NaNs.
+  return range.y == 0.0 ? range.x / max(0.000001, 1.0 - z) :
+    range.x * range.y / max(0.000001, range.y - z * (range.y - range.x));
+}
+float fromMeters(float metres) {
+  if (depthRange.y == 0.0) return clamp(1.0 - depthRange.x / metres, 0.0, 1.0);
+  return clamp(depthRange.y * (metres - depthRange.x) / (metres * (depthRange.y - depthRange.x)), 0.0, 1.0);
+}
+`;
+    const filteredSampling = `
+uniform vec2 filterSize;
+vec4 filteredSample(sampler2D source, vec2 uv) {
+#ifdef FILTER_LINEAR
+  return texture2D(source, clamp(uv, 0.5 / filterSize, 1.0 - 0.5 / filterSize));
+#else
+  // Float-linear filtering is optional. Never rely on it silently.
+  vec2 p = uv * filterSize - 0.5, f = fract(p), base = floor(p);
+  vec2 lo = clamp((base + 0.5) / filterSize, 0.5 / filterSize, 1.0 - 0.5 / filterSize);
+  vec2 hi = clamp((base + 1.5) / filterSize, 0.5 / filterSize, 1.0 - 0.5 / filterSize);
+  return mix(mix(texture2D(source, lo), texture2D(source, vec2(hi.x, lo.y)), f.x),
+             mix(texture2D(source, vec2(lo.x, hi.y)), texture2D(source, hi), f.x), f.y);
+#endif
+}
+`;
+    const prepUniforms = {
+      depthColor: uniforms.depthColor, depthRange: uniforms.depthRange, filterSize: uniforms.filterSize,
+      eye: {value: 0}, history: {value: null}, historyWeight: {value: 0},
+      historyRange: {value: new THREE.Vector2()}, currentToPrevious: {value: new THREE.Matrix4()}
+    };
+    function initialize(nextRenderer, width, height) {
+      if (renderer && renderer !== nextRenderer) release();
+      renderer = nextRenderer;
+      const linear = renderer.extensions.has('OES_texture_float_linear');
+      if (!prepScene) {
+        prepMaterial = new THREE.ShaderMaterial({
+          uniforms: prepUniforms, vertexShader, depthTest: false, depthWrite: false, blending: THREE.NoBlending,
+          defines: linear ? {FILTER_LINEAR: 1} : {},
+          fragmentShader: depthMath + filteredSampling + `
 uniform highp sampler2DArray depthColor;
+uniform sampler2D history;
+uniform float eye;
+uniform float historyWeight;
+uniform vec2 historyRange;
+uniform mat4 currentToPrevious;
+varying vec2 filterUV;
+void main() {
+  vec2 uv = filterUV, stepUV = 1.0 / filterSize;
+  float depths[9]; float weights[9];
+  float low = 1.0, high = 0.0, total = 0.0;
+  // A small Gaussian kernel in DEPTH pixels, not display pixels. This removes
+  // the coarse staircase even when one sensor sample spans many display pixels.
+  for (int y = 0; y < 3; y++) for (int x = 0; x < 3; x++) {
+    int i = y * 3 + x;
+    vec2 p = clamp(uv + vec2(float(x - 1), float(y - 1)) * stepUV, stepUV * 0.5, 1.0 - stepUV * 0.5);
+    float d = texture(depthColor, vec3(p, eye)).r;
+    d = (d >= 0.0 && d <= 1.0) ? d : 1.0;
+    float w = (x == 1 ? 2.0 : 1.0) * (y == 1 ? 2.0 : 1.0);
+    depths[i] = d; weights[i] = w; low = min(low, d); high = max(high, d); total += d * w;
+  }
+  float lowMetres = toMeters(low, depthRange), highMetres = toMeters(high, depthRange);
+  float split = fromMeters((lowMetres + highMetres) * 0.5);
+  float nearSum = 0.0, farSum = 0.0, nearWeight = 0.0, farWeight = 0.0;
+  for (int i = 0; i < 9; i++) {
+    if (depths[i] <= split) { nearSum += depths[i] * weights[i]; nearWeight += weights[i]; }
+    else { farSum += depths[i] * weights[i]; farWeight += weights[i]; }
+  }
+  float front = nearWeight > 0.0 ? nearSum / nearWeight : low;
+  float back = farWeight > 0.0 ? farSum / farWeight : high;
+  float coverage = nearWeight / 16.0;
+  if (highMetres - lowMetres < max(0.035, lowMetres * 0.02)) {
+    front = total / 16.0; back = front; coverage = 1.0;
+  }
+  // Stabilize the silhouette in the previous EYE pose. Blend coverage only;
+  // never accumulate stale depths or average unaligned camera frames.
+  if (historyWeight > 0.0 && back - front > 0.000001) {
+    vec4 clip = currentToPrevious * vec4(uv * 2.0 - 1.0, depths[4] * 2.0 - 1.0, 1.0);
+    if (clip.w > 0.0) {
+      vec3 previousNDC = clip.xyz / clip.w;
+      vec2 previousUV = previousNDC.xy * 0.5 + 0.5;
+      if (all(greaterThan(previousUV, vec2(0.0))) && all(lessThan(previousUV, vec2(1.0)))) {
+        vec4 old = filteredSample(history, previousUV);
+        bool sameEdge = old.g - old.r > 0.000001 &&
+          abs(toMeters(old.r, historyRange) - toMeters(front, depthRange)) < max(0.08, lowMetres * 0.04) &&
+          abs(toMeters(old.g, historyRange) - toMeters(back, depthRange)) < max(0.08, highMetres * 0.04);
+        if (sameEdge && previousNDC.z >= -1.0 && previousNDC.z <= 1.0) {
+          // Limit trails from moving furniture/hands and reveal newly visible
+          // areas promptly, even when their depth happens to remain similar.
+          coverage = mix(coverage, clamp(old.b, coverage - 0.15, coverage + 0.15), historyWeight);
+        }
+      }
+    }
+  }
+  gl_FragColor = vec4(front, back, coverage, depths[4]);
+}`
+        });
+        prepGeometry = new THREE.PlaneGeometry(2, 2);
+        prepScene = new THREE.Scene(); prepScene.add(new THREE.Mesh(prepGeometry, prepMaterial));
+        const options = {type: THREE.FloatType, format: THREE.RGBAFormat, depthBuffer: false, stencilBuffer: false,
+          minFilter: linear ? THREE.LinearFilter : THREE.NearestFilter, magFilter: linear ? THREE.LinearFilter : THREE.NearestFilter};
+        targets = [0, 1].map(() => [new THREE.WebGLRenderTarget(width, height, options), new THREE.WebGLRenderTarget(width, height, options)]);
+      }
+      if (size.x !== width || size.y !== height) {
+        size.set(width, height); targets.flat().forEach(target => target.setSize(width, height));
+        historyValid = false; targetsChecked = false; previous.fill(null);
+      }
+      return linear;
+    }
+    function attach(nextMesh, linear) {
+      if (mesh === nextMesh) return;
+      detach(); mesh = nextMesh;
+      original = {material: mesh.material, renderOrder: mesh.renderOrder, frustumCulled: mesh.frustumCulled};
+      for (let index = 0; index < 4; index++) {
+        const passUniforms = Object.assign({}, uniforms, {
+          quantile: {value: (3.5 - index) / 4}, sampleCoverage: {value: (4 - index) / 4}
+        });
+        const material = new THREE.ShaderMaterial({
+          uniforms: passUniforms, vertexShader, colorWrite: false, depthWrite: true, depthTest: true,
+          alphaToCoverage: index > 0, defines: linear ? {FILTER_LINEAR: 1} : {},
+          fragmentShader: depthMath + filteredSampling + `
+uniform sampler2D filtered0;
+uniform sampler2D filtered1;
 uniform float depthWidth;
 uniform float depthHeight;
-uniform float edgeRadius;
-uniform vec2 depthRange;
-vec3 depthCoordinate() {
-  // Same coordinate convention as A-Frame's native depth prepass.
+uniform float quantile;
+uniform float sampleCoverage;
+void main() {
   vec2 uv = gl_FragCoord.xy / vec2(depthWidth, depthHeight);
   float eye = 0.0;
 #ifdef VIEW_ID
@@ -28,93 +153,115 @@ vec3 depthCoordinate() {
 #else
   if (uv.x >= 1.0) { uv.x -= 1.0; eye = 1.0; }
 #endif
-  return vec3(uv, eye);
-}
-float sampleDepth(vec3 coord, vec2 offset) {
-  vec2 border = 0.5 / vec2(depthWidth, depthHeight);
-  vec2 uv = clamp(coord.xy + offset, border, vec2(1.0) - border);
-  return texture(depthColor, vec3(uv, coord.z)).r;
-}
-void readDepths(out float centre, out vec4 neighbours) {
-  vec3 coord = depthCoordinate();
-  vec2 stepUV = edgeRadius / vec2(depthWidth, depthHeight);
-  centre = sampleDepth(coord, vec2(0.0));
-  neighbours = vec4(
-    sampleDepth(coord, vec2(-stepUV.x, 0.0)),
-    sampleDepth(coord, vec2( stepUV.x, 0.0)),
-    sampleDepth(coord, vec2(0.0, -stepUV.y)),
-    sampleDepth(coord, vec2(0.0,  stepUV.y)));
-}
-float linearDepth(float depth) {
-  return depthRange.x * depthRange.y /
-    max(0.000001, depthRange.y - depth * (depthRange.y - depthRange.x));
-}
-`;
-    function attach(nextMesh) {
-      if (mesh === nextMesh) return;
-      detach(); mesh = nextMesh;
-      original = {material: mesh.material, renderOrder: mesh.renderOrder, frustumCulled: mesh.frustumCulled};
-      background = new THREE.ShaderMaterial({
-        uniforms, vertexShader, colorWrite: false, depthWrite: true, depthTest: true,
-        fragmentShader: common + `
-void main() {
-  float centre; vec4 neighbours; readDepths(centre, neighbours);
-  gl_FragDepth = max(centre, max(max(neighbours.x, neighbours.y), max(neighbours.z, neighbours.w)));
-  gl_FragColor = vec4(0.0);
+  vec4 distribution = eye < 0.5 ? filteredSample(filtered0, uv) : filteredSample(filtered1, uv);
+  float fraction = clamp(distribution.b, 0.0, 1.0);
+  float d, localQuantile;
+  if (quantile < fraction) {
+    d = distribution.r; localQuantile = quantile / max(fraction, 0.000001);
+  } else {
+    d = distribution.g; localQuantile = (quantile - fraction) / max(1.0 - fraction, 0.000001);
+  }
+  float metres = toMeters(d, depthRange);
+  // A short, one-sided contact fade (12–30 mm) keeps an object sitting ON a
+  // wall/floor fully visible, and softly hides it as it enters that surface.
+  float contactBand = clamp(metres * 0.006, 0.012, 0.03);
+  gl_FragDepth = fromMeters(metres + contactBand * localQuantile);
+  gl_FragColor = vec4(0.0, 0.0, 0.0, sampleCoverage);
 }`
-      });
-      const material = new THREE.ShaderMaterial({
-        uniforms, vertexShader, colorWrite: false, depthWrite: true, depthTest: true,
-        alphaToCoverage: true,
-        fragmentShader: common + `
-void main() {
-  float centre; vec4 neighbours; readDepths(centre, neighbours);
-  float distance = linearDepth(centre);
-  // Smooth depth discontinuities only, not gently sloped/noisy surfaces.
-  float tolerance = max(0.025, distance * 0.01);
-  float coverage = 1.0;
-  coverage += 1.0 - smoothstep(tolerance, tolerance * 2.0, linearDepth(neighbours.x) - distance);
-  coverage += 1.0 - smoothstep(tolerance, tolerance * 2.0, linearDepth(neighbours.y) - distance);
-  coverage += 1.0 - smoothstep(tolerance, tolerance * 2.0, linearDepth(neighbours.z) - distance);
-  coverage += 1.0 - smoothstep(tolerance, tolerance * 2.0, linearDepth(neighbours.w) - distance);
-  gl_FragDepth = centre;
-  gl_FragColor = vec4(0.0, 0.0, 0.0, coverage / 5.0);
-}`
-      });
-      foreground = new THREE.Mesh(mesh.geometry, material);
-      foreground.frustumCulled = false; foreground.renderOrder = -999999;
-      foreground.raycast = function () {};
-      mesh.material = background; mesh.renderOrder = -1000000; mesh.frustumCulled = false;
-      mesh.add(foreground);
+        });
+        if (index === 0) mesh.material = material;
+        else {
+          const child = new THREE.Mesh(mesh.geometry, material);
+          child.frustumCulled = false; child.renderOrder = -1000000 + index;
+          child.raycast = function () {}; mesh.add(child); passes.push(child);
+        }
+      }
+      mesh.renderOrder = -1000000; mesh.frustumCulled = false;
     }
     function detach() {
       if (!mesh) return;
+      mesh.material.dispose();
+      passes.forEach(pass => { pass.removeFromParent(); pass.material.dispose(); }); passes = [];
       mesh.material = original.material; mesh.renderOrder = original.renderOrder; mesh.frustumCulled = original.frustumCulled;
-      foreground.removeFromParent(); foreground.material.dispose(); background.dispose();
-      // The full-screen geometry and the XR texture belong to Three.js.
-      mesh = null; original = null; foreground = null; background = null;
-      uniforms.depthColor.value = null;
+      mesh = null; original = null;
     }
+    function resetHistory() { historyValid = false; lastTime = null; previous.fill(null); }
+    function disable() { detach(); resetHistory(); uniforms.depthColor.value = null; }
+    function release() {
+      disable(); targets?.flat().forEach(target => target.dispose());
+      prepGeometry?.dispose(); prepMaterial?.dispose();
+      targets = null; prepScene = null; prepGeometry = null; prepMaterial = null; renderer = null; size.set(0, 0);
+      uniforms.filtered0.value = null; uniforms.filtered1.value = null;
+    }
+    function viewState(view, range) {
+      if (!view?.projectionMatrix || !view.transform?.matrix) return null;
+      const projection = new THREE.Matrix4().fromArray(view.projectionMatrix);
+      const near = range.x, far = range.y;
+      projection.elements[10] = far === 0 ? -1 : -(far + near) / (far - near);
+      projection.elements[14] = far === 0 ? -2 * near : -2 * far * near / (far - near);
+      const world = new THREE.Matrix4().fromArray(view.transform.matrix);
+      return {world, projection, viewProjection: projection.clone().multiply(world.clone().invert()), range: range.clone()};
+    }
+    const prepCamera = new THREE.Camera();
     return {
       uniforms,
-      apply(depthMesh, viewport, near, far, samples) {
-        const source = mesh && mesh === depthMesh ? original.material : depthMesh?.material;
+      apply(depthMesh, viewport, near, far, samples, frameData = {}) {
+        const source = mesh === depthMesh && original ? original.material : depthMesh?.material;
         const texture = source?.uniforms?.depthColor?.value;
-        if (!depthMesh || !texture || !(viewport?.z > 0 && viewport?.w > 0) || !(near > 0 && far > near) || !(samples >= 2)) {
-          detach(); return false;
+        const nextRenderer = frameData.renderer, width = frameData.width, height = frameData.height;
+        if (!texture || !(viewport?.z > 0 && viewport?.w > 0) || !Number.isFinite(near) || near <= 0 || !(far > near) ||
+            !(samples >= 4) || !nextRenderer?.extensions.has('EXT_color_buffer_float') || nextRenderer.getContext().isContextLost() ||
+            !Number.isInteger(width) || !Number.isInteger(height) || width < 2 || height < 2 || width > 2048 || height > 2048) {
+          disable(); return false;
         }
-        attach(depthMesh);
+        const linear = initialize(nextRenderer, width, height);
         uniforms.depthColor.value = texture;
+        uniforms.depthRange.value.set(near, Number.isFinite(far) ? far : 0);
         uniforms.depthWidth.value = viewport.z; uniforms.depthHeight.value = viewport.w;
-        uniforms.depthRange.value.set(near, far);
-        original.material.uniforms.depthWidth.value = viewport.z;
-        original.material.uniforms.depthHeight.value = viewport.w;
+        const target = renderer.getRenderTarget(), face = renderer.getActiveCubeFace(), mip = renderer.getActiveMipmapLevel();
+        renderer.getViewport(savedViewport); renderer.getScissor(savedScissor);
+        const scissorTest = renderer.getScissorTest(), xrEnabled = renderer.xr.enabled, autoClear = renderer.autoClear;
+        const time = frameData.time, dt = Number.isFinite(time) && lastTime !== null ? time - lastTime : 0;
+        const views = frameData.views || [];
+        try {
+          renderer.xr.enabled = false; renderer.autoClear = false; renderer.setScissorTest(false);
+          for (let eye = 0; eye < 2; eye++) {
+            const current = viewState(views[eye], uniforms.depthRange.value), old = previous[eye];
+            let weight = 0;
+            if (historyValid && current && old && dt > 0 && dt < 120) {
+              const position = new THREE.Vector3().setFromMatrixPosition(current.world);
+              const oldPosition = new THREE.Vector3().setFromMatrixPosition(old.world);
+              const angle = new THREE.Quaternion().setFromRotationMatrix(current.world).angleTo(new THREE.Quaternion().setFromRotationMatrix(old.world));
+              if (position.distanceTo(oldPosition) < 0.15 && angle < 0.2) {
+                prepUniforms.currentToPrevious.value.copy(old.viewProjection).multiply(current.world).multiply(current.projection.clone().invert());
+                prepUniforms.historyRange.value.copy(old.range); weight = Math.min(0.7, Math.exp(-dt / 40));
+              }
+            }
+            prepUniforms.eye.value = eye; prepUniforms.historyWeight.value = weight;
+            prepUniforms.history.value = targets[eye][1 - nextTarget].texture;
+            renderer.setRenderTarget(targets[eye][nextTarget]);
+            if (!targetsChecked) {
+              const gl = renderer.getContext();
+              if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error('Float depth filter target is incomplete.');
+            }
+            renderer.render(prepScene, prepCamera); previous[eye] = current;
+          }
+          targetsChecked = true;
+          uniforms.filtered0.value = targets[0][nextTarget].texture; uniforms.filtered1.value = targets[1][nextTarget].texture;
+          nextTarget = 1 - nextTarget; lastTime = Number.isFinite(time) ? time : null; historyValid = true;
+        } finally {
+          renderer.setRenderTarget(target, face, mip); renderer.setViewport(savedViewport); renderer.setScissor(savedScissor);
+          renderer.setScissorTest(scissorTest); renderer.autoClear = autoClear; renderer.xr.enabled = xrEnabled;
+        }
+        attach(depthMesh, linear);
+        original.material.uniforms.depthWidth.value = viewport.z; original.material.uniforms.depthHeight.value = viewport.w;
         return true;
       },
-      disable: detach,
-      dispose: detach
+      disable,
+      dispose: release
     };
   }
+
 
   AFRAME.registerComponent('room-occlusion', {
     init: function () {
@@ -126,7 +273,7 @@ void main() {
         if (configuration) configuration.depthSensing = {usagePreference: ['gpu-optimized'], dataFormatPreference: ['unsigned-short'], matchDepthView: true};
       };
       this.onChanged = event => { if (event.detail?.name === 'webxr') this.onConfigure(); };
-      this.onEnd = () => { this.edgeFilter.disable(); this.clear(); this.setStatus('REAL-WORLD OCCLUSION: WAITING FOR MR'); };
+      this.onEnd = () => { this.edgeFilter.dispose(); this.clear(); this.setStatus('REAL-WORLD OCCLUSION: WAITING FOR MR'); };
       this.el.addEventListener('componentchanged', this.onChanged);
       this.el.addEventListener('loaded', this.onConfigure);
       this.el.addEventListener('exit-vr', this.onEnd);
@@ -154,15 +301,16 @@ void main() {
       }
       geometry.computeBoundingSphere(); return geometry;
     },
-    tick: function () {
+    tick: function (time) {
       const xr = this.el.renderer?.xr, frame = this.el.frame, session = xr?.getSession();
       if (!session || !frame || window.QUEST_MODE !== 'mr') { this.edgeFilter.disable(); this.group.visible = false; return; }
-      let freshDepth = false, depthInfo = null;
+      let freshDepth = false, depthInfo = null, depthViews = [];
       // Do not display the engine's previous depth texture after tracking is lost.
       try {
         if (session.depthUsage === 'gpu-optimized' && session.depthActive !== false) {
           const pose = frame.getViewerPose(xr.getReferenceSpace());
           const views = pose?.views;
+          depthViews = views ? Array.from(views) : [];
           const binding = xr.getBinding?.();
           freshDepth = Boolean(views?.length && binding && Array.from(views).every(view => {
             const depth = binding.getDepthInformation(view);
@@ -189,8 +337,16 @@ void main() {
         // layers expose antialias directly. Never use alpha-to-coverage without MSAA.
         const target = this.el.renderer.getRenderTarget();
         const samples = target?.samples || (xr.getBaseLayer?.()?.antialias ? 4 : 0);
-        const smooth = this.edgeFilter.apply(depthMesh, xr.getCamera().cameras[0]?.viewport, near, far, samples);
-        this.group.visible = false; this.setStatus(smooth ? 'REAL-WORLD OCCLUSION: LIVE / EDGE AA' : 'REAL-WORLD OCCLUSION: LIVE'); return;
+        let smooth = false;
+        try {
+          smooth = this.edgeFilter.apply(depthMesh, xr.getCamera().cameras[0]?.viewport, near, far, samples, {
+            renderer: this.el.renderer, width: depthInfo.width, height: depthInfo.height, views: depthViews, time
+          });
+        } catch (error) {
+          this.edgeFilter.disable();
+          if (!this.filterWarning) { console.warn('Environment depth filter unavailable; using native occlusion.', error); this.filterWarning = true; }
+        }
+        this.group.visible = false; this.setStatus(smooth ? 'REAL-WORLD OCCLUSION: LIVE / SOFT' : 'REAL-WORLD OCCLUSION: LIVE'); return;
       }
       this.edgeFilter.disable();
       this.group.visible = true;
